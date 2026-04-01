@@ -14,6 +14,8 @@ Everything is a block on a grid. Units are blocks. Buildings are blocks. The eco
 
 Two players (Blue = Player 0, Red = Player 1) compete on a shared grid. Each player commands their colored blocks. The game runs in real-time with discrete tick-based simulation underneath — both players act simultaneously, and the board resolves on each tick.
 
+*comment* : Two or more players. I want to have 1v1, 2v2, 3v3 and FFA modes.
+
 ---
 
 ## 3. Grid and Simulation
@@ -37,6 +39,8 @@ Two players (Blue = Player 0, Red = Player 1) compete on a shared grid. Each pla
 Each cell has:
 - **Ground type**: Normal, Boot, Overload, Proto, Terrain, Breakable Wall, Fragile Wall
 - **Block reference**: Optional — the block occupying this cell (by ID, not direct reference)
+
+*question*: we are making an implementation statement here (by id not reference). Is this relevant for the design? Is it the best choice for the engine and language we are going to?
 
 ---
 
@@ -104,7 +108,7 @@ The ranged crowd-control unit. Fast and fragile.
 | Combat role | Ranged stun + Wall killer |
 
 **Abilities:**
-- **Stun Ray** (S key): Fires a ray in a cardinal direction. Range: 5 cells. Stuns the first enemy hit for 160 ticks (~13.3s). Walls are **killed** instead of stunned. Ray stops at terrain, walls, formations, and the first hit target.
+- **Stun Ray** (S key): Fires 3 rays in a cardinal direction. Range: 5 cells. Stuns the first enemy hit for 160 ticks (~13.3s). Walls are **killed** instead of stunned. Ray stops at terrain, walls, formations, and the first hit target.
 - **Cooldown**: 140 ticks after firing — **cannot move** while on cooldown.
 - **Root** (F key): Can root to participate in Stun Towers.
 - **Self-Destruct** (D key): When fully rooted, fires stun blasts in all 8 directions (range 4 cells). Destroys the Stunner.
@@ -122,7 +126,7 @@ Spawned from Builder Nests on overload ground instead of normal Builders.
 
 **Abilities:**
 - **Zone of Control**: Passive aura. Enemies within 4-cell Chebyshev radius move at half speed (their move interval is doubled).
-- **Magnet Pull** (D key, fully rooted): Pulls all uprooted enemy blocks within 4-cell radius one step diagonally toward the Warden. Cooldown: 140 ticks.
+- **Magnet Pull** (D key, fully rooted): Pulls all uprooted enemy blocks within 4-cell radius as close as possible, also diagonally, toward the Warden. Cooldown: 140 ticks.
 
 ### 4.6 Variant: Jumper (Overload Soldier)
 
@@ -172,7 +176,7 @@ Soldiers kill adjacent enemies based on how many Soldiers are touching the targe
 | Fully rooted Soldier | 2 | All 8 directions |
 | Rooted Warden | 2 | All 8 directions |
 | Formation member | 3 | Orthogonal |
-| Rooting Stunner | 3 | Orthogonal |
+| Rooted Stunner | 3 | Orthogonal |
 
 - Surviving Soldiers lose 1 HP per enemy killed. A Soldier at 0 HP dies.
 - **Walls are immune** to Soldier adjacency kills.
@@ -183,7 +187,7 @@ Two destructible neutral obstacle types:
 
 **Breakable Wall** (`~`):
 - Blocks all movement and ray line-of-sight, like terrain.
-- Two-hit destruction: first hit (stun ray or Jumper) converts to Fragile Wall. Second hit destroys it.
+- Two-hit destruction: first hit (stun ray, blast ray or Jumper) converts to Fragile Wall. Second hit destroys it.
 
 **Fragile Wall** (`=`):
 - Blocks all movement and ray line-of-sight.
@@ -239,11 +243,15 @@ A Builder Nest upgrades automatically to a Soldier Nest when 2 free Walls appear
 
 Economy is entirely physical and visible. Newly spawned blocks must be moved away from the nest to keep production flowing. If an opponent disrupts this flow (e.g., pushes blocks back toward the nest), the economy chokes.
 
+*comment*: this is no longer true. Nests can't be blocked, spawn happens at the next available cell. We should check how that's working exactly.
+
 ---
 
 ## 7. Formations (Non-Nest)
 
 Formations are created by rooting specific patterns of blocks. Members cannot move while participating. When a formation loses a member, it enters **TearingDown** state (24 ticks) before dissolving.
+
+*comment*: is this true, tearingdown, if the formation member dies?
 
 ### 7.1 Rooting Timing
 
@@ -259,12 +267,16 @@ Formations are created by rooting specific patterns of blocks. Members cannot mo
 - Range: 4 cells. Kills Walls, stuns others for 160 ticks.
 - Does **not** spawn blocks.
 
+*comment*: this is old design, we need to review behavior.
+
 ### 7.3 Soldier Tower
 
 - **Pattern**: 1 fully rooted Soldier (center) + 1 or more fully rooted Builders (adjacent directions).
 - **Behavior**: When an enemy is detected within range in any Builder direction, fires kill blasts in all Builder directions simultaneously. Fire interval: 12 ticks.
 - Blast range: 5 cells. Kills non-Wall, non-formation enemy blocks.
 - Does **not** spawn blocks.
+
+*comment*: this is old design, we need to review behavior.
 
 ### 7.4 Supply Formation
 
