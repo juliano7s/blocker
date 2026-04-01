@@ -12,9 +12,7 @@ A minimalist, fast-paced RTS where two armies expand across a grid through forma
 
 Everything is a block on a grid. Units are blocks. Buildings are blocks. The economy is blocks. The entire game state is readable at a glance through color and position. There is no UI for resources, no tech tree menu — everything is physical, spatial, and visible on the board.
 
-Two players (Blue = Player 0, Red = Player 1) compete on a shared grid. Each player commands their colored blocks. The game runs in real-time with discrete tick-based simulation underneath — both players act simultaneously, and the board resolves on each tick.
-
-*comment* : Two or more players. I want to have 1v1, 2v2, 3v3 and FFA modes.
+Up to 6 players compete on a shared grid, each with a unique color. Players are organized into teams (see Section 12). All players act simultaneously in real-time, and the board resolves on each tick.
 
 ---
 
@@ -38,9 +36,7 @@ Two players (Blue = Player 0, Red = Player 1) compete on a shared grid. Each pla
 
 Each cell has:
 - **Ground type**: Normal, Boot, Overload, Proto, Terrain, Breakable Wall, Fragile Wall
-- **Block reference**: Optional — the block occupying this cell (by ID, not direct reference)
-
-*question*: we are making an implementation statement here (by id not reference). Is this relevant for the design? Is it the best choice for the engine and language we are going to?
+- **Block**: Optional — at most one block can occupy a cell at any time
 
 ---
 
@@ -241,17 +237,17 @@ A Builder Nest upgrades automatically to a Soldier Nest when 2 free Walls appear
 
 ### 6.5 Nest Congestion
 
-Economy is entirely physical and visible. Newly spawned blocks must be moved away from the nest to keep production flowing. If an opponent disrupts this flow (e.g., pushes blocks back toward the nest), the economy chokes.
-
-*comment*: this is no longer true. Nests can't be blocked, spawn happens at the next available cell. We should check how that's working exactly.
+Economy is entirely physical and visible. When the center cell is occupied, spawning searches outward (BFS up to 3 cells) for the nearest free cell. If no free cell exists within range, spawn progress holds and retries each tick. Congestion delays production but doesn't permanently block it — however, a heavily congested nest spawns units further from the center, which is strategically disadvantageous.
 
 ---
 
 ## 7. Formations (Non-Nest)
 
-Formations are created by rooting specific patterns of blocks. Members cannot move while participating. When a formation loses a member, it enters **TearingDown** state (24 ticks) before dissolving.
+Formations are created by rooting specific patterns of blocks. Members cannot move while participating.
 
-*comment*: is this true, tearingdown, if the formation member dies?
+**Formation dissolution** has two paths:
+- **Member killed** (combat, stun ray, jump): If membership drops below minimum, the formation **dissolves instantly** — remaining members are freed immediately.
+- **Member uproots voluntarily** (player toggles root): The formation enters **TearingDown** state (24 ticks) before dissolving, giving time for the player to reconsider.
 
 ### 7.1 Rooting Timing
 
@@ -262,21 +258,19 @@ Formations are created by rooting specific patterns of blocks. Members cannot mo
 
 ### 7.2 Stun Tower
 
-- **Pattern**: 1 fully rooted Stunner (center) + 1 or more fully rooted Builders (any adjacent direction, including diagonals).
-- **Behavior**: Auto-fires stun rays cycling through all Builder directions. Fires one direction every 16 ticks. Only fires if an enemy is within range in that direction.
+- **Creation**: Player selects a fully rooted Stunner and presses T. The Stunner becomes the center, and one adjacent fully rooted Builder (same owner) joins as the direction arm. If multiple adjacent Builders exist, the first found in sweep order is chosen. Only one Builder is used — towers are single-direction at creation.
+- **Adding/removing arms**: Additional adjacent rooted Builders can join the tower, adding fire directions. If a Builder member is uprooted or killed, its direction is removed and `builderDirections` is recomputed from remaining members. The tower dissolves if the center Stunner is lost or no Builders remain.
+- **Firing behavior**: Scans builder directions for enemies. When an enemy is found, begins a **firing cycle** that sweeps through all builder directions sequentially. Fires 3 parallel rays (center + 2 perpendicular side rays) in the current direction every 16 ticks, then advances to the next direction. Only starts a new cycle when the previous one finishes and an enemy is detected.
 - Range: 4 cells. Kills Walls, stuns others for 160 ticks.
 - Does **not** spawn blocks.
 
-*comment*: this is old design, we need to review behavior.
-
 ### 7.3 Soldier Tower
 
-- **Pattern**: 1 fully rooted Soldier (center) + 1 or more fully rooted Builders (adjacent directions).
-- **Behavior**: When an enemy is detected within range in any Builder direction, fires kill blasts in all Builder directions simultaneously. Fire interval: 12 ticks.
-- Blast range: 5 cells. Kills non-Wall, non-formation enemy blocks.
+- **Creation**: Same as Stun Tower but with a fully rooted Soldier as center (T key). Single Builder arm at creation.
+- **Adding/removing arms**: Same dynamic builder management as Stun Tower.
+- **Firing behavior**: Scans all builder directions for enemies (line-of-sight blocked by walls, terrain, breakable/fragile walls). When any enemy is detected, fires kill blast rays in **all** builder directions simultaneously. Fire interval: 12 ticks.
+- Blast range: 5 cells. Kills non-Wall, non-formation enemy blocks. Stops at walls.
 - Does **not** spawn blocks.
-
-*comment*: this is old design, we need to review behavior.
 
 ### 7.4 Supply Formation
 
@@ -366,6 +360,8 @@ Builders can be sent to a target location with automatic root + convert queued. 
 
 Each block has a command queue. Shift+action appends to the queue; non-shift actions are immediate and clear the queue. The queue processes one entry per tick when preconditions are met (idle for move, fully rooted for convert, etc.).
 
+**Auto-chaining**: Some commands implicitly queue a follow-up without requiring Shift. For example, pressing W while a Builder is still rooting auto-queues the Wall conversion — it fires as soon as the root completes. Similarly, Blueprint Mode auto-queues move → root → convert as a single action.
+
 ---
 
 ## 11. Win Conditions
@@ -377,40 +373,71 @@ A player is defeated when **all three** conditions are true simultaneously:
 2. **No active nests** — cannot produce new units
 3. **Fewer than 3 Builders** — cannot form a new nest
 
-If both players meet these conditions simultaneously, the player with more total blocks wins.
+In team modes, a player's defeat does not eliminate the team — the team fights on with remaining players. A **team** is eliminated when all its players are defeated. Last team standing wins.
+
+If all remaining teams meet elimination conditions simultaneously, the team with more total blocks wins.
 
 ### 11.2 Surrender
 
-A player can concede at any time via the Surrender button (multiplayer only).
+A player can concede at any time. In team modes, a player's surrender eliminates only that player — teammates continue.
 
 ---
 
 ## 12. Multiplayer
 
-### 12.1 Architecture: Lockstep
+### 12.1 Game Modes and Teams
 
-Both clients run identical deterministic simulation. Only player commands are exchanged — not game state. This works because the simulation is fully deterministic (no RNG, no floats, grid-based). Both clients produce identical state from identical inputs. Only ~100 bytes/tick of commands are transmitted.
+The game supports up to **6 players** across these modes:
 
-### 12.2 Tick Rate and Responsiveness
+| Mode | Teams | Players |
+|------|-------|---------|
+| 1v1 | 2 teams of 1 | 2 |
+| 2v2 | 2 teams of 2 | 4 |
+| 3v3 | 2 teams of 3 | 6 |
+| 2v2v2 | 3 teams of 2 | 6 |
+| FFA | 6 teams of 1 | Up to 6 |
+
+The core abstraction is **teams**, not player count. Every player belongs to a team. All game rules use team membership to determine friend vs. enemy:
+
+- **"Enemy"** = any block owned by a player on a different team
+- **"Friendly"** = any block owned by a player on the same team (including your own)
+- Combat thresholds combine across teammates — e.g., 1 Soldier from Player A + 1 Soldier from Player B (same team) = 2 adjacent Soldiers for kill threshold purposes
+- Friendly blocks from teammates count as "friendly neighbors" for overcrowding checks
+- Push waves affect all blocks regardless of team (friendly fire on push is intentional)
+
+### 12.2 Team Win Conditions
+
+A **team** is eliminated when all players on that team meet the elimination criteria (no army, no nests, fewer than 3 Builders). Last team standing wins.
+
+In FFA, each player is their own team — standard elimination rules apply per player.
+
+### 12.3 Architecture: Lockstep
+
+All clients run identical deterministic simulation. Only player commands are exchanged — not game state. The simulation is fully deterministic (no RNG, no floats, grid-based), so all clients produce identical state from identical inputs.
+
+For 2+ player games, networking uses a relay server (WebSocket or reliable UDP) rather than peer-to-peer mesh — simpler topology, single-digit ms overhead for same-region players.
+
+### 12.4 Tick Rate and Responsiveness
 
 - Default: 12 tps (local and networked), configurable 4-20.
 - Input delay: 1 tick, adaptive to 2 ticks if RTT > 80ms.
 - Visual interpolation between `prevPos` and `pos` keeps movement smooth regardless of tick rate.
 
-### 12.3 Desync Detection
+### 12.5 Desync Detection
 
 After each tick, clients exchange FNV-1a hashes of the full game state. Hash mismatch = game pauses with diagnostic info.
 
-### 12.4 Online Lobby
+### 12.6 Online Lobby
 
-- Players connect to a signaling server to browse, host, and join lobbies in real-time.
-- Host creates a named lobby → another player joins → host starts → both transition to gameplay.
-- Map selection happens in the lobby.
+- Players connect to a server to browse, host, and join lobbies in real-time.
+- Host creates a named lobby, selects map and game mode, assigns teams.
+- Players join and pick team slots. Host starts when all slots are filled (or marked as AI).
+- Map selection and team configuration happen in the lobby.
 
-### 12.5 Determinism Rules
+### 12.7 Determinism Rules
 
 Any game mechanic **must** follow these rules:
-1. No randomness in simulation (`Math.random()` / equivalent is forbidden)
+1. No randomness in simulation — deterministic RNG seeded per match is acceptable, but no system-level random
 2. No floating-point arithmetic — all positions and distances are integer grid coordinates
 3. All player actions flow through the command system and are validated
 4. Tick budget: at 12 tps, each tick is ~83ms — keep processing fast
@@ -422,15 +449,14 @@ Any game mechanic **must** follow these rules:
 
 ### 13.1 Play vs AI
 
-Three AI opponent types:
+Two scripted AI opponent types ship with the initial release:
 
-- **Easy Bot**: Simple rule-based scripted AI. Runs client-side, no server needed.
-- **Aggressive Bot**: More aggressive rule-based variant. Also client-side.
-- **Trained Model**: PPO-trained neural network running server-side. Generates macro-actions every 6 ticks. The client connects via WebSocket; the server acts as Player 1 (Red).
+- **Easy Bot**: Simple rule-based scripted AI. Prioritizes economy, defensive play.
+- **Aggressive Bot**: More aggressive rule-based variant. Pushes early and contests boot zones.
 
-### 13.2 Tutorial
+Both run locally — no server required.
 
-A 14-step guided tutorial teaches core mechanics: selection, movement, rooting, wall conversion, nest building, combat, and abilities. Each step has a specific goal, overlay instructions, and snapshot state.
+> **Deferred**: Trained neural network AI and tutorial system will be designed separately after core gameplay is solid.
 
 ---
 
@@ -459,15 +485,13 @@ Each tick resolves in this exact order:
 
 ## 15. Map System
 
-### 15.1 Format
+Maps in the Godot version will support larger grids than the original 41x25. The map format will be redesigned during Phase 2 (Architecture Design) — it may use Godot's TileMap, a custom binary format, or an editor-native format. The plain-text format below is preserved as reference for what information a map must encode.
 
-Maps are plain-text files. One character per cell, one line per row. Width and height are inferred from the grid.
+### 15.1 Reference Format (from TypeScript version)
 
-**Single-layer format**: Ground and units in one grid (legacy, fully supported).
+The original game uses plain-text files — one character per cell, one line per row. Width and height are inferred from the grid. Two variants exist: single-layer (ground + units mixed) and two-layer (terrain grid + `---` separator + units grid).
 
-**Two-layer format**: Terrain grid + `---` separator + units grid. Both layers must have matching dimensions. The only format that can represent a unit on a boot/overload/proto cell.
-
-### 15.2 Character Legend
+### 15.2 Cell Types (what maps must encode)
 
 **Ground types:**
 
@@ -510,27 +534,174 @@ Maps are plain-text files. One character per cell, one line per row. Width and h
 - Player 0 = Blue palette. Player 1 = Red palette.
 - Smooth movement interpolation between ticks for fluid animation.
 
-### 16.2 Visual Effects
+**Asset strategy — procedural fallback**: All block visuals have a **procedural rendering** implementation (code-drawn shapes, animations, and effects). PNG sprites can optionally replace the procedural visuals when available, but the game must be fully playable and visually complete without any sprite assets. This is the same pattern used for audio — sound files enhance the experience but the game works without them. The procedural visuals described below are the baseline; sprites are an upgrade layer on top.
 
-- **Stun rays**: Animated beam traveling cell-by-cell with fade trail.
-- **Push waves**: Expanding wavefront with displacement feedback.
-- **Boot ground**: Ambient particle/lightning effects.
-- **Death effects**: Block destruction animation (type-specific, timed).
-- **Rooting progress**: Visual indicator showing root completion percentage.
-- **Stun state**: Distinct visual treatment for stunned blocks.
-- **Jump trail**: Jumper leaves a kill trail along the jump path.
-- **Combo indicator**: Visual cue when Jumper is in combo-ready state.
-- **Warden ZoC**: Visible aura showing the slow zone radius.
-- **Selection**: Highlight ring on selected blocks. Box select rectangle.
-- **Command queue path**: Dotted line through queued move waypoints (own blocks only in multiplayer).
+Up to 6 players supported. Each player has a unique color palette (Blue, Red, Yellow, Green + 2 more TBD). See Section 12 for multiplayer modes and team system.
 
-### 16.3 HUD
+### 16.2 Block Visuals by Type
+
+Each block is a colored square with a type-specific inner element:
+
+**Builder**: Sprite-based icon, no procedural animation. Player-colored square.
+
+**Soldier — Spinning Swords**:
+- 4 diagonal gold sword arms rotating around center (TL, TR, BL, BR).
+- Periodic spin: 500ms ease-in-out rotation every 4 seconds, staggered per block.
+- Visible arms indicate HP: 4 HP = all 4, 3 HP = 3 arms, etc. Arms disappear BR → BL → TL → TR.
+- **Arm pop animation**: When HP drops, the lost arm flies outward with spinning motion (3.5π spin over 520ms), gold glow trail, cubic ease-out fade.
+
+**Stunner — Diamond Spin**:
+- Outer diamond (player color) + inner diamond (white highlight, 50% opacity).
+- Same 4-second spin cycle as Soldier. Radial glow intensifies when stun ray fires.
+
+**Warden — Shield Pulse**:
+- Periodic 500ms flash every 4 seconds (cubic ease in-out).
+- Breathing bob: ±2% vertical sway. Scale pulses with flash intensity.
+- Radial glow peaks at flash moment.
+
+**Jumper — Lava Ball**:
+- Radial gradient circle: bright highlight → core color → dark rim.
+- **HP scaling**: 3 HP = 100% size, 2 HP = 60%, 1 HP = 20%. Dramatic visual degradation.
+- Slow 2-second pulse glow. White flash overlay on damage.
+
+**Wall**: Static player-colored square, no animation.
+
+### 16.3 Rooting Visuals
+
+**While Rooting (progress 0→100%)**:
+- **Diagonal stripes**: Animated hash lines scrolling rightward across the block. Alpha increases from 8% to 38%.
+- **Growing corner anchors**: Gray lines extend inward from all four corners, reaching 35% of block size at full root. Line width 2→3.5px.
+- **Spinning perimeter segment**: White highlight line rotates around the block's edges (3 full rotations over the root duration), 20% of perimeter visible, 35% alpha.
+
+**Fully Rooted**:
+- **Inset shadow**: Dark gradients on top/left edges, light catch on bottom-right — "sunken into the grid" appearance.
+- **Static corner anchors**: Full size, 80% opacity.
+- **Frozen diagonal stripes**: Pattern stops scrolling, remains at 38% alpha.
+
+**While Uprooting**:
+- Stripes scroll in reverse (leftward).
+- Shrinking inner rectangle overlay.
+
+### 16.4 Combat Threat Indicators
+
+**Soldier Threat Corners**: When a block is adjacent to Soldiers but below the kill threshold, red pulsing corner marks appear:
+- Corners light up clockwise: TL (1 Soldier), TR (2), BR (3).
+- Double stroke: thin 2.5px red line + outer glow (5px, 30% alpha).
+- Pulsing brightness oscillation (0.55→1.0).
+- Thresholds: Formation members = 3, Rooted Stunner = 3, Rooted Soldier = 2, Mobile units = 1.
+- Hidden while stunned.
+
+### 16.5 Grid Lightning Effects
+
+The signature visual system. Procedural lightning patterns travel along grid lines, triggered by game events. Multi-pass rendering with bloom creates a dramatic electric feel.
+
+**Lightning Types** (each with unique shape and timing):
+
+| Trigger | Shape | Segments | Duration | Trail Width |
+|---------|-------|----------|----------|-------------|
+| Movement | Backward trail from moving block | ~30 | 1200ms | 3.0 cells |
+| Root start | Radiates outward from all 4 edges | ~28 | 900ms | 1.2 cells |
+| Uproot start | Same as root but fades outer-first | ~28 | 900ms | 1.2 cells |
+| Death (explosion) | Long burst from all edges | ~56 | 1800ms | 2.8 cells |
+| Wall convert | Short fast burst from all edges | ~14 | 450ms | 2.5 cells |
+| Formation complete | Clockwise spiral from center | ~40 | 1800ms | 4.0 cells |
+| Uproot complete | Small cross contracting inward | 12 (4×3) | 600ms | 1.5 cells |
+| Death effect | 8-arm jittery zigzag burst | 8 arms | 400ms | 1.0 cells |
+| Selection | 3 concentric squares | 3 squares | 350ms | 1.5 cells |
+| Builder spawn | 4 single-line arms, staggered | 4 arms | 800ms | — |
+| Soldier spawn | 6 jittery arms from back edge | 6 arms | 1000ms | — |
+| Stunner spawn | Fast branching from all edges | ~36 | 600ms | — |
+
+**Rendering passes** (per lightning effect):
+1. Outer bloom: 9px wide, 6% alpha (additive)
+2. Inner bloom halo: 5px, 15% alpha
+3. Colored core: 1.8px, 80% alpha
+4. White-hot tip: 1px on bright segments (>55% brightness)
+5. Shimmer: all brightness × (0.8 + 0.2 × sin(age × 0.006))
+
+**Sparks**: Up to 30 per effect, 8% spawn chance per visible segment, travel outward, 400ms lifetime.
+
+**Wave animation**: easeOutCubic progress, wave travels at 1.4× overshoot to create trailing fade.
+
+### 16.6 Stun Ray Visuals
+
+- Traveling pulse wave along ray path (1D Gaussian ring, 800ms cycle).
+- Blue tint for stun rays, orange for blast rays.
+- Base 15% alpha + ring strength up to 70% with edge fade.
+- Ray advances cell-by-cell at configured interval, then fades over STUN_RAY_FADE ticks.
+
+### 16.7 Frozen/Stunned Block
+
+- **Ice blue overlay**: `rgba(140, 200, 255)` pulsing between 15-25% alpha.
+- **Frost crack lines**: 4 directional cracks from edges inward (3 of 4 crack sets visible per frame, cycling).
+- **Crystalline border**: Pulsing `rgba(140, 210, 255)` at 30-50% alpha.
+- **Radial frost glow**: Soft gradient from center outward.
+
+### 16.8 Push Wave Visuals
+
+- **Double chevron motif** pointing in push direction (e.g., `>>` for right push).
+- Core glow: 40% alpha at full cell size. Outer glow: 15% alpha at 140% cell size.
+- Chevron arms: 2px white lines, 22% cell-size length.
+- Player-colored teal/cyan tint.
+
+### 16.9 Jump Trail (Jumper)
+
+- **Core streak**: Bright narrow line (8% cell width) from origin to landing, fading over 500ms.
+- **Wide glow**: Dimmer broad trail (30% cell width) behind core.
+- **Ember particles**: Deterministic pseudo-random along path, drift laterally.
+- **Impact flash**: Radial bloom at landing for first 30% of animation.
+- Tail recedes from origin (head moves 30% toward landing).
+
+### 16.10 Warden Zone of Control
+
+- Smooth expanding pulse wave (2500ms cycle, 1.4× overshoot).
+- Gaussian-shaped ring travels outward, lighting up cells in player color.
+- Base 5% alpha + ring peak at 14% with edge fade.
+- Octagonal shape (Chebyshev radius minus corners).
+
+### 16.11 Death Effect Animation
+
+**Phase 1 — Inflation (3 ticks)**:
+- Block inflates 1.0→1.15× scale.
+- White flash overlay peaking at 50% intensity.
+- 4×4 crack grid appearing at 0→60% alpha.
+
+**Phase 2 — Brick Explosion (7 ticks)**:
+- Expanding radial glow burst (30%→130% cell size).
+- 28 fragments launched from center: 2-5.5px rectangles, player-colored.
+- Each fragment has outward velocity, rotation (3-7× spin), gravity arc.
+- Alpha fades as (1 - progress).
+
+### 16.12 Selection and Targeting
+
+- **Selected block**: White dashed border (2px, [3,3] dash). "W" indicator on eligible Builders.
+- **Drag select**: Dashed rectangle (1px, [4,4] dash) with subtle fill.
+- **Move target**: Small filled circle (cell/6 radius).
+- **Hover**: Faint dashed border (40% alpha).
+- **Command queue path**: Dotted line through waypoints (own blocks only in multiplayer).
+
+### 16.13 Formation Visuals
+
+- **Outer border**: Double-stroke glow (4px at 35% + 1.5px full alpha), color per formation type.
+- **Center diamond**: Rotating diamond, 18% cell size, formation-type color.
+- **Corner brackets**: 4 L-shaped marks, 4px long, matching border color.
+- **Tearing down**: Shrinking inner rectangle, neutral gray.
+- **Member connectors**: Dashed lines between formation members (40% alpha).
+
+### 16.14 Post-Processing
+
+- **Bloom**: Downscaled 50% copy, 6px blur, composited at 35% opacity additive. Creates soft glow on lightning, impacts, and bright elements.
+- **Kill flash**: White screen flash when enemy unit dies, multiplicative decay.
+
+### 16.15 HUD
 
 - **Population display**: Current pop / max pop per player.
+- **Block count bar**: Top margin bar comparing relative non-wall block counts per player.
 - **Nest timers**: Spawn progress bars near active nests.
 - **Selection info**: Type and count of selected blocks.
 - **Minimap**: Bottom-right corner. Shows terrain, blocks, and nest zones. Click to jump camera.
-- **Keybind hints**: Contextual key prompts based on selection.
+- **Keybind hints**: Contextual key prompts based on current selection.
+- **Chat messages**: Player name + text with timestamps, rendered in margin area.
 
 ---
 
@@ -618,6 +789,7 @@ These features are not part of the current game but are being considered:
 - **Spectator mode**: Watch live games without participating.
 - **Reconnection**: Rejoin after disconnect in multiplayer.
 - **Replays**: Games recorded as tick-by-tick command logs. Playback re-simulates from commands. Version-tagged for compatibility.
+- **Toggle Spawning**: Each unit has a toggle to keep spawning it or not
 
 ---
 
