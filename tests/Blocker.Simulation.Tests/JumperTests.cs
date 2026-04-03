@@ -7,6 +7,11 @@ namespace Blocker.Simulation.Tests;
 
 public class JumperTests
 {
+    public JumperTests()
+    {
+        Constants.Reset();
+    }
+
     private GameState CreateState(int width = 15, int height = 15)
     {
         var state = new GameState(new Grid(width, height));
@@ -53,7 +58,7 @@ public class JumperTests
         JumperSystem.Jump(state, jumper, Direction.Right);
 
         Assert.True(jumper.HasCombo);
-        Assert.Equal(Constants.JumperJumpCooldown, jumper.Cooldown);
+        Assert.Equal(0, jumper.Cooldown); // No cooldown on kill — combo allows immediate re-jump
     }
 
     [Fact]
@@ -116,9 +121,9 @@ public class JumperTests
 
         JumperSystem.Jump(state, jumper, Direction.Right);
         Assert.True(jumper.HasCombo);
-        Assert.True(jumper.IsOnCooldown);
+        Assert.False(jumper.IsOnCooldown); // No cooldown with combo
 
-        // Second jump should work despite cooldown (combo)
+        // Second jump should work immediately (combo)
         var result = JumperSystem.Jump(state, jumper, Direction.Right);
         Assert.True(result);
         Assert.True(jumper.Pos.X > 6);

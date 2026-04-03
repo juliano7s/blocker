@@ -33,6 +33,7 @@ public class Block
     // Movement
     public GridPos? MoveTarget { get; set; }
     public bool IsAttackMoving { get; set; }
+    public int StuckTicks { get; set; }       // Ticks unable to move toward target
 
     // Push state
     public bool IsPushing { get; set; }

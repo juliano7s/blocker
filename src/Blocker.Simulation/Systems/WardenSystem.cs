@@ -70,13 +70,15 @@ public static class WardenSystem
 
         bool pulledAny = false;
 
-        foreach (var target in state.Blocks.ToList())
-        {
-            if (target.PlayerId == warden.PlayerId) continue;
-            if (target.IsImmobile) continue;
-            if (target.Type == BlockType.Wall) continue;
-            if (target.Pos.ChebyshevDistance(warden.Pos) > Constants.WardenPullRadius) continue;
+        // Collect and sort by distance ascending — closest move first, making room for farther blocks
+        var targets = state.Blocks
+            .Where(t => t.PlayerId != warden.PlayerId && !t.IsImmobile && t.Type != BlockType.Wall
+                        && t.Pos.ChebyshevDistance(warden.Pos) <= Constants.WardenPullRadius)
+            .OrderBy(t => t.Pos.ChebyshevDistance(warden.Pos))
+            .ToList();
 
+        foreach (var target in targets)
+        {
             // Pull one cell toward the Warden
             var dx = warden.Pos.X - target.Pos.X;
             var dy = warden.Pos.Y - target.Pos.Y;

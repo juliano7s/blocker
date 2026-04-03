@@ -7,6 +7,11 @@ namespace Blocker.Simulation.Tests;
 
 public class MapLoaderTests
 {
+    public MapLoaderTests()
+    {
+        Constants.Reset();
+    }
+
     [Fact]
     public void LoadTwoLayerMap_ParsesGroundTypes()
     {

@@ -67,76 +67,46 @@ public static class StunSystem
 
     /// <summary>
     /// Self-destruct: fully rooted Stunner fires stun blasts in all 8 directions, then dies.
+    /// Soldier self-destruct fires kill blasts in all 8 directions (range 3), then dies.
     /// </summary>
-    public static bool SelfDestruct(GameState state, Block stunner)
+    public static bool SelfDestruct(GameState state, Block block)
     {
-        if (stunner.Type != BlockType.Stunner) return false;
-        if (!stunner.IsFullyRooted) return false;
+        if (block.Type is not (BlockType.Stunner or BlockType.Soldier)) return false;
+        if (!block.IsFullyRooted) return false;
 
-        // Fire rays in all 4 cardinal directions
-        foreach (var dir in new[] { Direction.Up, Direction.Right, Direction.Down, Direction.Left })
-        {
-            var dirOffset = dir.ToOffset();
-            var startPos = stunner.Pos + dirOffset;
-            if (!state.Grid.InBounds(startPos)) continue;
+        // Determine ray type and range based on block type
+        var rayType = block.Type == BlockType.Soldier ? RayType.Blast : RayType.Stun;
+        var range = block.Type == BlockType.Soldier ? Constants.SoldierExplodeRange : Constants.StunTowerRange;
 
-            var ray = new Ray
-            {
-                Type = RayType.Stun,
-                PlayerId = stunner.PlayerId,
-                Origin = stunner.Pos,
-                Direction = dir,
-                HeadPos = startPos,
-                Distance = 1,
-                Range = Constants.StunTowerRange, // Self-destruct uses 4 range
-                AdvanceInterval = Constants.StunUnitRayAdvanceInterval,
-                FadeTicks = Constants.StunRayFade
-            };
-            state.Rays.Add(ray);
-
-            // Also fire diagonal rays (using the two perpendicular offsets as diagonals)
-            var perpOffsets = GetPerpendicularOffsets(dir);
-            foreach (var perpOffset in new[] { perpOffsets.left, perpOffsets.right })
-            {
-                var diagStart = stunner.Pos + dirOffset + perpOffset;
-                // Diagonal rays are not standard — self-destruct fires in all 8 cardinal+diag
-                // Actually, re-reading: "fires stun blasts in all 8 directions"
-                // So we fire 8 rays, one per AllOffsets direction
-            }
-        }
-
-        // Actually simpler: fire one ray per each of the 8 directions
-        // Clear the rays we just added and redo properly
-        state.Rays.RemoveAll(r => r.Origin == stunner.Pos && r.Distance == 1);
-
+        // Fire one ray in each of the 8 directions
         foreach (var offset in GridPos.AllOffsets)
         {
-            var startPos = stunner.Pos + offset;
+            var startPos = block.Pos + offset;
             if (!state.Grid.InBounds(startPos)) continue;
 
-            // Determine cardinal direction for the ray (approximate for diagonals)
             var dir = OffsetToDirection(offset);
 
             var ray = new Ray
             {
-                Type = RayType.Stun,
-                PlayerId = stunner.PlayerId,
-                Origin = stunner.Pos,
+                Type = rayType,
+                PlayerId = block.PlayerId,
+                Origin = block.Pos,
                 Direction = dir,
                 HeadPos = startPos,
                 Distance = 1,
-                Range = Constants.StunTowerRange,
-                AdvanceInterval = Constants.StunUnitRayAdvanceInterval,
+                Range = range,
+                AdvanceInterval = block.Type == BlockType.Soldier
+                    ? Constants.BlastUnitRayAdvanceInterval
+                    : Constants.StunUnitRayAdvanceInterval,
                 FadeTicks = Constants.StunRayFade
             };
             state.Rays.Add(ray);
         }
 
         state.VisualEvents.Add(new VisualEvent(
-            VisualEventType.SelfDestructed, stunner.Pos, stunner.PlayerId, BlockId: stunner.Id));
+            VisualEventType.SelfDestructed, block.Pos, block.PlayerId, BlockId: block.Id));
 
-        // Kill the stunner
-        state.RemoveBlock(stunner);
+        state.RemoveBlock(block);
         return true;
     }
 

@@ -1,22 +1,159 @@
-[gd_scene load_steps=6 format=3 uid="uid://main001"]
+[gd_scene format=3 uid="uid://main001"]
 
-[ext_resource type="Script" path="res://Scripts/Game/GameManager.cs" id="1_game"]
-[ext_resource type="Script" path="res://Scripts/Rendering/GridRenderer.cs" id="2_grid"]
-[ext_resource type="Script" path="res://Scripts/Input/CameraController.cs" id="3_cam"]
-[ext_resource type="Script" path="res://Scripts/Input/SelectionManager.cs" id="4_sel"]
-[ext_resource type="Script" path="res://Scripts/Game/TickRunner.cs" id="5_tick"]
+[ext_resource type="Script" uid="uid://b12nbwwjp1ai3" path="res://Scripts/Game/GameManager.cs" id="1_game"]
+[ext_resource type="Script" uid="uid://b7acklf11mv41" path="res://Scripts/Rendering/GridRenderer.cs" id="2_grid"]
+[ext_resource type="Script" uid="uid://b0tdonjk25i0t" path="res://Scripts/Config/PlayerPalette.cs" id="2_jw32o"]
+[ext_resource type="Script" uid="uid://dvc4f2vsxi3lp" path="res://Scripts/Config/GameConfig.cs" id="3_50glp"]
+[ext_resource type="Script" uid="uid://bl1eninpi0jar" path="res://Scripts/Input/CameraController.cs" id="3_cam"]
+[ext_resource type="Script" uid="uid://cohivq00vl8s4" path="res://Scripts/Input/SelectionManager.cs" id="4_sel"]
+[ext_resource type="Script" uid="uid://c7n8ntfqyjgw5" path="res://Scripts/Game/TickRunner.cs" id="5_tick"]
 
-[node name="Main" type="Node2D"]
+[sub_resource type="Resource" id="Resource_jw32o"]
+script = ExtResource("2_jw32o")
+BuilderFill = Color(0.25, 0.55, 1, 1)
+BuilderGradientLight = Color(0.46, 0.676, 1, 1)
+BuilderGradientDark = Color(0.205, 0.451, 0.82, 1)
+SoldierFill = Color(0.175, 0.385, 0.7, 1)
+SoldierArmsColor = Color(1, 0.78, 0.2, 1)
+SoldierArmsGlow = Color(1, 0.78, 0.2, 0.25)
+SoldierCenterDot = Color(1, 0.78, 0.2, 1)
+StunnerFill = Color(0.25, 0.55, 1, 1)
+StunnerBevelLight = Color(0.5875, 0.7525, 1, 1)
+StunnerBevelShadow = Color(0.15, 0.33, 0.6, 1)
+StunnerDiamondOuter = Color(0.47500002, 0.685, 1, 1)
+StunnerDiamondInner = Color(1, 1, 1, 0.5)
+StunnerGlow = Color(0.25, 0.55, 1, 1)
+WardenFill = Color(0.25, 0.55, 1, 0.5)
+WardenRing = Color(0.55, 0.73, 1, 1)
+WardenInnerHighlight = Color(0.625, 0.775, 1, 1)
+WardenGlow = Color(0.25, 0.55, 1, 1)
+WardenZocColor = Color(0.25, 0.55, 1, 1)
+JumperCore = Color(0.25, 0.55, 1, 1)
+JumperBright = Color(0.625, 0.775, 1, 1)
+JumperDark = Color(0.175, 0.385, 0.7, 1)
+JumperPulseGlow = Color(0.25, 0.55, 1, 1)
+WallFill = Color(0.125, 0.275, 0.5, 1)
+WallHighlight = Color(0.2, 0.44000003, 0.8, 1)
+WallShadow = Color(0.075, 0.165, 0.3, 1)
+WallInner = Color(0.1625, 0.3575, 0.65, 1)
+BuilderNestOutline = Color(0.4, 0.64, 1, 1)
+BuilderNestOutlineGlow = Color(0.4, 0.64, 1, 0.35)
+BuilderNestDiamond = Color(0.5, 0.95, 1, 1)
+BuilderNestSpawnBar = Color(0.4, 0.7, 1, 0.35)
+SoldierNestOutline = Color(0.4, 0.64, 1, 1)
+SoldierNestOutlineGlow = Color(0.4, 0.64, 1, 0.35)
+SoldierNestDiamond = Color(1, 0.88, 0.3, 1)
+SoldierNestSpawnBar = Color(1, 0.6, 0.2, 0.35)
+StunnerNestOutline = Color(0.4, 0.64, 1, 1)
+StunnerNestOutlineGlow = Color(0.4, 0.64, 1, 0.35)
+StunnerNestDiamond = Color(0.9, 0.55, 1, 1)
+StunnerNestSpawnBar = Color(0.8, 0.3, 1, 0.35)
+SupplyOutline = Color(0.4, 0.55, 0.775, 1)
+SupplyOutlineGlow = Color(0.4, 0.55, 0.775, 0.35)
+SupplyDiamond = Color(1, 1, 1, 1)
+StunTowerOutline = Color(0.4375, 0.6625, 1, 1)
+StunTowerOutlineGlow = Color(0.4375, 0.6625, 1, 0.35)
+StunTowerDiamond = Color(0.70000005, 0.82000005, 1, 1)
+SoldierTowerOutline = Color(0.4375, 0.6625, 1, 1)
+SoldierTowerOutlineGlow = Color(0.4375, 0.6625, 1, 0.35)
+SoldierTowerDiamond = Color(0.70000005, 0.82000005, 1, 1)
+PushWaveColor = Color(0.17500001, 0.76500005, 0.90000004, 1)
+DeathColor = Color(0.25, 0.55, 1, 1)
+DeathFragmentColor = Color(0.25, 0.55, 1, 1)
+RootingBracketColor = Color(0.7, 0.7, 0.7, 1)
+CornerTickColor = Color(0.4, 0.64, 1, 1)
+metadata/_custom_type_script = "uid://b0tdonjk25i0t"
+
+[sub_resource type="Resource" id="Resource_50glp"]
+script = ExtResource("2_jw32o")
+Base = Color(0.20543507, 0.673457, 7.70092e-07, 1)
+BuilderFill = Color(0.20543507, 0.673457, 7.70092e-07, 1)
+BuilderGradientLight = Color(0.42791325, 0.76488906, 0.28000057, 1)
+BuilderGradientDark = Color(0.16845675, 0.55223477, 6.314755e-07, 1)
+SoldierFill = Color(0.14380455, 0.4714199, 5.390644e-07, 1)
+SoldierArmsColor = Color(1, 0.78, 0.2, 1)
+SoldierArmsGlow = Color(1, 0.78, 0.2, 0.25)
+SoldierCenterDot = Color(1, 0.78, 0.2, 1)
+StunnerFill = Color(0.20543507, 0.673457, 7.70092e-07, 1)
+StunnerBevelLight = Color(0.5629893, 0.8204014, 0.4500004, 1)
+StunnerBevelShadow = Color(0.12326104, 0.40407422, 4.6205523e-07, 1)
+StunnerDiamondOuter = Color(0.44380456, 0.77141994, 0.30000055, 1)
+StunnerDiamondInner = Color(1, 1, 1, 0.5)
+StunnerGlow = Color(0.20543507, 0.673457, 7.70092e-07, 1)
+WardenFill = Color(0.20543507, 0.673457, 7.70092e-07, 0.5)
+WardenRing = Color(0.5232611, 0.8040742, 0.40000048, 1)
+WardenInnerHighlight = Color(0.6027175, 0.8367285, 0.50000036, 1)
+WardenGlow = Color(0.20543507, 0.673457, 7.70092e-07, 1)
+WardenZocColor = Color(0.20543507, 0.673457, 7.70092e-07, 1)
+JumperCore = Color(0.20543507, 0.673457, 7.70092e-07, 1)
+JumperBright = Color(0.6027175, 0.8367285, 0.50000036, 1)
+JumperDark = Color(0.14380455, 0.4714199, 5.390644e-07, 1)
+JumperPulseGlow = Color(0.20543507, 0.673457, 7.70092e-07, 1)
+WallFill = Color(0.10271753, 0.3367285, 3.85046e-07, 1)
+WallHighlight = Color(0.16434805, 0.5387656, 6.1607363e-07, 1)
+WallShadow = Color(0.06163052, 0.20203711, 2.3102761e-07, 1)
+WallInner = Color(0.13353279, 0.43774706, 5.005598e-07, 1)
+BuilderNestOutline = Color(0.36434805, 0.7387656, 0.20000063, 1)
+BuilderNestOutlineGlow = Color(0.36434805, 0.7387656, 0.20000063, 0.35)
+BuilderNestDiamond = Color(0.5, 0.95, 1, 1)
+BuilderNestSpawnBar = Color(0.4, 0.7, 1, 0.35)
+SoldierNestOutline = Color(0.36434805, 0.7387656, 0.20000063, 1)
+SoldierNestOutlineGlow = Color(0.36434805, 0.7387656, 0.20000063, 0.35)
+SoldierNestDiamond = Color(1, 0.88, 0.3, 1)
+SoldierNestSpawnBar = Color(1, 0.6, 0.2, 0.35)
+StunnerNestOutline = Color(0.36434805, 0.7387656, 0.20000063, 1)
+StunnerNestOutlineGlow = Color(0.36434805, 0.7387656, 0.20000063, 0.35)
+StunnerNestDiamond = Color(0.9, 0.55, 1, 1)
+StunnerNestSpawnBar = Color(0.8, 0.3, 1, 0.35)
+SupplyOutline = Color(0.37771755, 0.61172855, 0.2750004, 1)
+SupplyOutlineGlow = Color(0.37771755, 0.61172855, 0.2750004, 0.35)
+SupplyDiamond = Color(1, 1, 1, 1)
+StunTowerOutline = Color(0.4040763, 0.75509274, 0.25000057, 1)
+StunTowerOutlineGlow = Color(0.4040763, 0.75509274, 0.25000057, 0.35)
+StunTowerDiamond = Color(0.6821741, 0.8693828, 0.6000003, 1)
+SoldierTowerOutline = Color(0.4040763, 0.75509274, 0.25000057, 1)
+SoldierTowerOutlineGlow = Color(0.4040763, 0.75509274, 0.25000057, 0.35)
+SoldierTowerDiamond = Color(0.6821741, 0.8693828, 0.6000003, 1)
+PushWaveColor = Color(0.16163053, 0.8020371, 0.60000026, 1)
+DeathColor = Color(0.20543507, 0.673457, 7.70092e-07, 1)
+DeathFragmentColor = Color(0.20543507, 0.673457, 7.70092e-07, 1)
+RootingBracketColor = Color(0.5, 0.5, 0.5, 1)
+CornerTickColor = Color(0.36434805, 0.7387656, 0.20000063, 1)
+metadata/_custom_type_script = "uid://b0tdonjk25i0t"
+
+[sub_resource type="Resource" id="Resource_4kpch"]
+script = ExtResource("3_50glp")
+GridLineColor = Color(0.23137255, 0.24313726, 0.39215687, 0.52156866)
+PlayerPalettes = [SubResource("Resource_jw32o"), SubResource("Resource_50glp")]
+metadata/_custom_type_script = "uid://dvc4f2vsxi3lp"
+
+[sub_resource type="Environment" id="SubResource_env"]
+background_mode = 3
+glow_enabled = true
+glow_levels/1 = 1.0
+glow_levels/2 = 1.0
+glow_levels/3 = 0.0
+glow_levels/4 = 0.0
+glow_intensity = 0.8
+glow_bloom = 0.35
+glow_blend_mode = 0
+glow_hdr_threshold = 0.65
+
+[node name="Main" type="Node2D" unique_id=1453460776]
 script = ExtResource("1_game")
+Config = SubResource("Resource_4kpch")
 
-[node name="GridRenderer" type="Node2D" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1198587807]
+environment = SubResource("SubResource_env")
+
+[node name="GridRenderer" type="Node2D" parent="." unique_id=700592717]
 script = ExtResource("2_grid")
 
-[node name="SelectionManager" type="Node2D" parent="."]
+[node name="SelectionManager" type="Node2D" parent="." unique_id=1234077948]
 script = ExtResource("4_sel")
 
-[node name="Camera" type="Camera2D" parent="."]
+[node name="Camera" type="Camera2D" parent="." unique_id=243441696]
 script = ExtResource("3_cam")
 
-[node name="TickRunner" type="Node" parent="."]
+[node name="TickRunner" type="Node" parent="." unique_id=1479709618]
 script = ExtResource("5_tick")

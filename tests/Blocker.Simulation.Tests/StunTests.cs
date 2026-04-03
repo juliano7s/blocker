@@ -7,6 +7,11 @@ namespace Blocker.Simulation.Tests;
 
 public class StunTests
 {
+    public StunTests()
+    {
+        Constants.Reset();
+    }
+
     private GameState CreateState(int width = 15, int height = 15)
     {
         var state = new GameState(new Grid(width, height));

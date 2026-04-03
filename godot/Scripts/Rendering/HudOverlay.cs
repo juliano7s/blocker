@@ -1,3 +1,4 @@
+using Blocker.Game.Config;
 using Blocker.Simulation.Blocks;
 using Blocker.Simulation.Core;
 using Godot;
@@ -11,19 +12,9 @@ namespace Blocker.Game.Rendering;
 public partial class HudOverlay : CanvasLayer
 {
 	private GameState? _gameState;
+	private GameConfig _config = GameConfig.CreateDefault();
 	private int _controllingPlayer;
 	private IReadOnlyList<Block>? _selectedBlocks;
-
-	// Colors matching GridRenderer player colors
-	private static readonly Color[] PlayerColors =
-	[
-		new(0.2f, 0.4f, 0.9f),   // P0: Blue
-		new(0.9f, 0.25f, 0.2f),  // P1: Red
-		new(0.9f, 0.8f, 0.2f),   // P2: Yellow
-		new(0.2f, 0.8f, 0.3f),   // P3: Green
-		new(0.8f, 0.4f, 0.1f),   // P4: Orange
-		new(0.6f, 0.2f, 0.8f),   // P5: Purple
-	];
 
 	private static readonly Color BgColor = new(0.05f, 0.05f, 0.08f, 0.85f);
 	private static readonly Color TextColor = new(0.85f, 0.85f, 0.85f);
@@ -45,6 +36,7 @@ public partial class HudOverlay : CanvasLayer
 	}
 
 	public void SetGameState(GameState state) => _gameState = state;
+	public void SetConfig(GameConfig config) => _config = config;
 	public void SetControllingPlayer(int playerId) => _controllingPlayer = playerId;
 	public void SetSelectedBlocks(IReadOnlyList<Block> blocks) => _selectedBlocks = blocks;
 
@@ -79,18 +71,22 @@ public partial class HudOverlay : CanvasLayer
 
 			// Player info (left side)
 			int pid = _hud.GetControllingPlayer();
-			var playerColor = pid >= 0 && pid < PlayerColors.Length ? PlayerColors[pid] : Colors.White;
+			var playerColor = _hud._config.GetPalette(pid).Base;
 			string playerName = $"Player {pid}";
 
 			// Player color indicator
-			DrawRect(new Rect2(padding, 8, 16, 16), playerColor);
-			DrawString(font, new Vector2(padding + 22, 22), playerName, HorizontalAlignment.Left, -1, fontSize, TextColor);
+			float x = padding;
+			DrawRect(new Rect2(x, 8, 16, 16), playerColor);
+			x += 22;
+			DrawString(font, new Vector2(x, 22), playerName, HorizontalAlignment.Left, -1, fontSize, TextColor);
+			x += font.GetStringSize(playerName, HorizontalAlignment.Left, -1, fontSize).X + 20;
 
-			// Tick counter (center)
+			// Tick counter
 			string tickText = $"Tick {state.TickNumber}";
-			DrawString(font, new Vector2(viewport.X / 2, 22), tickText, HorizontalAlignment.Center, -1, fontSize, DimTextColor);
+			DrawString(font, new Vector2(x, 22), tickText, HorizontalAlignment.Left, -1, fontSize, DimTextColor);
+			x += font.GetStringSize(tickText, HorizontalAlignment.Left, -1, fontSize).X + 20;
 
-			// Population display (right side)
+			// Population display
 			if (pid < state.Players.Count)
 			{
 				var player = state.Players.Find(p => p.Id == pid);
@@ -98,7 +94,7 @@ public partial class HudOverlay : CanvasLayer
 				{
 					int currentPop = state.GetPopulation(pid);
 					string popText = $"Pop: {currentPop} / {player.MaxPopulation}";
-					DrawString(font, new Vector2(viewport.X - padding, 22), popText, HorizontalAlignment.Right, -1, fontSize, TextColor);
+					DrawString(font, new Vector2(x, 22), popText, HorizontalAlignment.Left, -1, fontSize, TextColor);
 				}
 			}
 
@@ -182,9 +178,7 @@ public partial class HudOverlay : CanvasLayer
 			{
 				if (!counts.TryGetValue(player.Id, out int count)) continue;
 				float width = rect.Size.X * count / total;
-				var color = player.Id >= 0 && player.Id < PlayerColors.Length
-					? PlayerColors[player.Id]
-					: Colors.White;
+				var color = _hud._config.GetPalette(player.Id).Base;
 				DrawRect(new Rect2(x, rect.Position.Y, width, rect.Size.Y), color);
 				x += width;
 			}

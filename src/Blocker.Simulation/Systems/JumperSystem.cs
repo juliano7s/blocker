@@ -80,13 +80,12 @@ public static class JumperSystem
         // Combo: if killed at least 1 and path wasn't blocked
         if (kills > 0)
         {
-            // Grant combo — can jump again immediately
+            // Grant combo — can jump again immediately, NO cooldown yet
             jumper.HasCombo = true;
-            jumper.Cooldown = Constants.JumperJumpCooldown;
         }
         else
         {
-            // Miss: lose 1 HP, apply cooldown, no combo
+            // Miss: lose 1 HP, apply immobile cooldown, no combo
             jumper.HasCombo = false;
             jumper.Hp--;
             jumper.Cooldown = Constants.JumperJumpCooldown;
@@ -100,21 +99,16 @@ public static class JumperSystem
             }
         }
 
-        // Consuming combo means: mobile but can't jump until cooldown expires
-        if (jumper.HasCombo)
-        {
-            // Combo is available — jumper can jump again this tick or next
-        }
-
         return true;
     }
 
     /// <summary>
-    /// Consume combo on move command. Jumper becomes mobile but loses combo.
+    /// Consume combo on move command. Jumper becomes mobile but can't jump until cooldown expires.
     /// </summary>
     public static void ConsumeCombo(Block jumper)
     {
         if (jumper.Type != BlockType.Jumper) return;
         jumper.HasCombo = false;
+        jumper.Cooldown = Constants.JumperJumpCooldown;
     }
 }

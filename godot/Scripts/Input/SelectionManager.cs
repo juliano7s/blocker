@@ -42,6 +42,9 @@ public partial class SelectionManager : Node2D
 	// Attack-move mode (A key)
 	private bool _attackMoveMode;
 
+	// Jump targeting mode (F key with Jumpers selected)
+	private bool _jumpMode;
+
 	// Right-drag paint mode
 	private bool _isRightDragging;
 	private Vector2 _rightDragStart;
@@ -50,8 +53,7 @@ public partial class SelectionManager : Node2D
 
 	private static readonly Color HoverColor = new(1f, 1f, 1f, 0.08f);
 	private static readonly Color HoverBorderColor = new(1f, 1f, 1f, 0.25f);
-	private static readonly Color SelectionBorderColor = new(1f, 1f, 1f, 0.8f);
-	private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
+private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 	private static readonly Color DragRectColor = new(1f, 1f, 1f, 0.15f);
 	private static readonly Color DragRectBorderColor = new(1f, 1f, 1f, 0.4f);
 	private static readonly Color BlueprintTargetColor = new(0.9f, 0.6f, 0.1f, 0.5f);
@@ -118,9 +120,15 @@ public partial class SelectionManager : Node2D
 			{
 				if (mouseButton.Pressed)
 				{
+					if (_jumpMode)
+					{
+						HandleJumpClick(mouseWorld, mouseButton.ShiftPressed);
+						_jumpMode = false;
+						return;
+					}
 					if (_blueprintMode)
 					{
-						HandleBlueprintClick(mouseWorld);
+						HandleBlueprintClick(mouseWorld, mouseButton.ShiftPressed);
 						return;
 					}
 					if (_attackMoveMode)
@@ -149,6 +157,8 @@ public partial class SelectionManager : Node2D
 
 						if (isDoubleClick)
 							HandleDoubleClickSelect(mouseWorld);
+						else if (mouseButton.CtrlPressed)
+							HandleCtrlClickSelect(mouseWorld);
 						else
 							HandleClickSelect(mouseWorld, additive);
 
@@ -208,7 +218,19 @@ public partial class SelectionManager : Node2D
 			{
 				case Key.F:
 					if (_selectedBlocks.Any(b => b.Type == BlockType.Jumper))
-						IssueDirectionalCommand(CommandType.Jump, shiftHeld);
+					{
+						// Root non-jumpers immediately, then enter jump targeting for jumpers
+						var nonJumpers = _selectedBlocks.Where(b => b.Type != BlockType.Jumper).ToList();
+						if (nonJumpers.Count > 0)
+						{
+							var ids = nonJumpers.Select(b => b.Id).ToList();
+							_pendingCommands.Add(new Command(ControllingPlayer, CommandType.Root, ids, Queue: shiftHeld));
+						}
+						_jumpMode = true;
+						_blueprint.Deactivate();
+						_attackMoveMode = false;
+						GD.Print("Jump: click target direction");
+					}
 					else
 						IssueCommandToSelected(CommandType.Root, shiftHeld);
 					break;
@@ -253,10 +275,11 @@ public partial class SelectionManager : Node2D
 					}
 					break;
 				case Key.Escape:
-					if (_blueprintMode || _attackMoveMode)
+					if (_blueprintMode || _attackMoveMode || _jumpMode)
 					{
 						_blueprint.Deactivate();
 						_attackMoveMode = false;
+						_jumpMode = false;
 						GD.Print("Mode cancelled");
 					}
 					else
@@ -382,7 +405,7 @@ public partial class SelectionManager : Node2D
 		}
 	}
 
-	/// <summary>Double-click: select all blocks of same type AND rooting state, map-wide.</summary>
+	/// <summary>Double-click: select all blocks of same type AND rooting state, visible on screen.</summary>
 	private void HandleDoubleClickSelect(Vector2 worldPos)
 	{
 		var gridPos = GridRenderer.WorldToGrid(worldPos);
@@ -396,16 +419,23 @@ public partial class SelectionManager : Node2D
 		bool targetMobile = block.IsMobile;
 		_selectedBlocks.Clear();
 
-		// Map-wide: same type AND same rooting state (mobile vs non-mobile)
+		// Camera-limited: same type AND same rooting state, only visible blocks
 		foreach (var b in _gameState.Blocks)
 		{
 			if (b.PlayerId != ControllingPlayer) continue;
 			if (b.Type != targetType) continue;
 			if (b.IsMobile != targetMobile) continue;
+			if (!IsBlockVisible(b)) continue;
 			_selectedBlocks.Add(b);
 		}
 
-		GD.Print($"Double-click selected {_selectedBlocks.Count} {(targetMobile ? "mobile" : "rooted")} {targetType}s");
+		GD.Print($"Double-click selected {_selectedBlocks.Count} visible {(targetMobile ? "mobile" : "rooted")} {targetType}s");
+	}
+
+	/// <summary>Ctrl+click: select all same type on screen (replaces current selection, same as double-click).</summary>
+	private void HandleCtrlClickSelect(Vector2 worldPos)
+	{
+		HandleDoubleClickSelect(worldPos);
 	}
 
 	/// <summary>Control groups: Ctrl+N assign, N select, double-tap N center camera.</summary>
@@ -471,7 +501,7 @@ public partial class SelectionManager : Node2D
 	/// Blueprint placement: dispatch units to build the active blueprint at click position.
 	/// Closest-first greedy assignment. Shift+click keeps blueprint active.
 	/// </summary>
-	private void HandleBlueprintClick(Vector2 worldPos)
+	private void HandleBlueprintClick(Vector2 worldPos, bool shiftHeld = false)
 	{
 		var gridPos = GridRenderer.WorldToGrid(worldPos);
 		if (!_gameState!.Grid.InBounds(gridPos)) return;
@@ -570,8 +600,8 @@ public partial class SelectionManager : Node2D
 
 		GD.Print($"Blueprint: dispatched {assigned.Count} units for {_blueprint.ActiveType}");
 
-		// Shift+click keeps blueprint active; otherwise deactivate if no units left
-		if (_selectedBlocks.Count == 0)
+		// Shift+click keeps blueprint active; otherwise always deactivate
+		if (!shiftHeld)
 			_blueprint.Deactivate();
 	}
 
@@ -632,6 +662,12 @@ public partial class SelectionManager : Node2D
 		GD.Print($"Paint-moved {assignedBlocks.Count} blocks to {assignedCells.Count} cells");
 	}
 
+	private void HandleJumpClick(Vector2 worldPos, bool queue)
+	{
+		if (_selectedBlocks.Count == 0) return;
+		IssueDirectionalCommand(CommandType.Jump, queue, worldPos);
+	}
+
 	private void HandleAttackMoveClick(Vector2 worldPos, bool queue)
 	{
 		if (_selectedBlocks.Count == 0) return;
@@ -690,11 +726,11 @@ public partial class SelectionManager : Node2D
 	}
 
 	/// <summary>Per-unit direction snapping: each block gets its own direction from its position to mouse.</summary>
-	private void IssueDirectionalCommand(CommandType type, bool queue = false)
+	private void IssueDirectionalCommand(CommandType type, bool queue = false, Vector2? targetWorld = null)
 	{
 		if (_selectedBlocks.Count == 0) return;
 
-		var mouseWorld = GetGlobalMousePosition();
+		var mouseWorld = targetWorld ?? GetGlobalMousePosition();
 		var relevant = GetRelevantBlocks(type);
 		if (relevant.Count == 0) return;
 
@@ -742,11 +778,13 @@ public partial class SelectionManager : Node2D
 					DrawRect(rect, roleColor with { A = 0.8f }, false, 2f);
 				}
 			}
-			else if (_attackMoveMode)
+			else if (_attackMoveMode || _jumpMode)
 			{
+				var color = _jumpMode ? new Color(0.3f, 0.8f, 1f, 0.5f) : AttackMoveColor;
+				var borderColor = _jumpMode ? new Color(0.3f, 0.8f, 1f, 0.8f) : new Color(1f, 0.3f, 0.3f, 0.8f);
 				var rect = CellRect(pos);
-				DrawRect(rect, AttackMoveColor);
-				DrawRect(rect, new Color(1f, 0.3f, 0.3f, 0.8f), false, 2f);
+				DrawRect(rect, color);
+				DrawRect(rect, borderColor, false, 2f);
 			}
 			else
 			{
@@ -785,28 +823,13 @@ public partial class SelectionManager : Node2D
 			}
 		}
 
-		// Selection highlights
+		// Move target dots (correctly at grid destination, not visual pos)
 		foreach (var block in _selectedBlocks)
 		{
-			var rect = CellRect(block.Pos);
-			DrawDashedRect(rect, SelectionBorderColor, 2f, 4f, 3f);
-
 			if (block.MoveTarget.HasValue)
 			{
 				var targetCenter = GridRenderer.GridToWorld(block.MoveTarget.Value);
 				DrawCircle(targetCenter, GridRenderer.CellSize * 0.12f, MoveTargetColor);
-			}
-		}
-
-		// Rooting progress indicator
-		foreach (var block in _selectedBlocks)
-		{
-			if (block.State == BlockState.Rooting || block.State == BlockState.Uprooting)
-			{
-				float progress = (float)block.RootProgress / Constants.RootTicks;
-				var rect = CellRect(block.Pos);
-				var barRect = new Rect2(rect.Position.X, rect.Position.Y - 4, rect.Size.X * progress, 3);
-				DrawRect(barRect, Colors.Yellow);
 			}
 		}
 
@@ -851,6 +874,32 @@ public partial class SelectionManager : Node2D
 		"center" => new Color(1f, 1f, 1f),
 		_ => Colors.White
 	};
+
+	/// <summary>Get the grid-coordinate bounds currently visible in the camera viewport.</summary>
+	private (int minX, int minY, int maxX, int maxY) GetVisibleGridBounds()
+	{
+		var camera = GetViewport().GetCamera2D();
+		if (camera == null)
+			return (0, 0, _gameState!.Grid.Width - 1, _gameState!.Grid.Height - 1);
+
+		var viewportSize = GetViewportRect().Size;
+		var halfView = viewportSize / (2f * camera.Zoom);
+		var camPos = camera.GlobalPosition;
+
+		int minX = (int)Mathf.Floor((camPos.X - halfView.X) / GridRenderer.CellSize);
+		int maxX = (int)Mathf.Floor((camPos.X + halfView.X) / GridRenderer.CellSize);
+		int minY = (int)Mathf.Floor((camPos.Y - halfView.Y) / GridRenderer.CellSize);
+		int maxY = (int)Mathf.Floor((camPos.Y + halfView.Y) / GridRenderer.CellSize);
+
+		return (minX, minY, maxX, maxY);
+	}
+
+	private bool IsBlockVisible(Block block)
+	{
+		var (minX, minY, maxX, maxY) = GetVisibleGridBounds();
+		return block.Pos.X >= minX && block.Pos.X <= maxX
+			&& block.Pos.Y >= minY && block.Pos.Y <= maxY;
+	}
 
 	private static Rect2 CellRect(GridPos pos) =>
 		new(pos.X * GridRenderer.CellSize, pos.Y * GridRenderer.CellSize,

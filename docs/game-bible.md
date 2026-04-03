@@ -321,7 +321,8 @@ A fully rooted Builder (not part of a formation) can toggle push mode (G key, di
 - **Left-click**: Select a single block (own blocks only, excludes Walls).
 - **Left-click + drag (box select)**: Select multiple own blocks in the rectangle. Mobile-priority filter: if movable blocks exist in the box, only those are selected.
 - **Shift+click / Shift+drag**: Add to current selection.
-- **Double-click**: Select all blocks of the same type AND rooting state, map-wide.
+- **Double-click**: Select all blocks of the same type AND rooting state, visible on screen.
+- **Ctrl+click**: Select all blocks of the same type AND rooting state on screen, visible on screen.
 - **Backtick (`` ` ``)**: Quick-select all uprooted Soldiers and Stunners (mobile combat force).
 - **Control groups (0-9)**: Press number to select group. Ctrl+number to assign current selection. Double-tap to center camera on group.
 - **Escape**: Clear selection (or cancel active mode).

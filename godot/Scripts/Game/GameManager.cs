@@ -1,5 +1,7 @@
+using Blocker.Game.Config;
 using Blocker.Game.Input;
 using Blocker.Game.Rendering;
+using Blocker.Simulation.Core;
 using Blocker.Simulation.Maps;
 using Godot;
 
@@ -11,6 +13,7 @@ namespace Blocker.Game;
 public partial class GameManager : Node2D
 {
 	[Export] public string MapPath = "res://../maps/test-small.txt";
+	[Export] public GameConfig Config { get; set; } = null!;
 
 	private GridRenderer _gridRenderer = null!;
 	private CameraController _camera = null!;
@@ -20,6 +23,10 @@ public partial class GameManager : Node2D
 
 	public override void _Ready()
 	{
+		// Initialize config and simulation constants
+		Config ??= GameConfig.CreateDefault();
+		Constants.Initialize(Config.ToSimulationConfig());
+
 		// Load map
 		var absolutePath = ProjectSettings.GlobalizePath(MapPath);
 		if (!Godot.FileAccess.FileExists(MapPath) && !System.IO.File.Exists(absolutePath))
@@ -40,6 +47,7 @@ public partial class GameManager : Node2D
 		// Set up grid renderer
 		_gridRenderer = GetNode<GridRenderer>("GridRenderer");
 		_gridRenderer.SetGameState(gameState);
+		_gridRenderer.SetConfig(Config);
 
 		// Set up camera
 		_camera = GetNode<CameraController>("Camera");
@@ -53,15 +61,17 @@ public partial class GameManager : Node2D
 		_tickRunner = GetNode<TickRunner>("TickRunner");
 		_tickRunner.SetGameState(gameState);
 		_tickRunner.SetSelectionManager(_selectionManager);
+		_gridRenderer.SetTickInterval((float)_tickRunner.TickInterval);
 
 		// Set up HUD
 		_hud = new HudOverlay();
 		AddChild(_hud);
 		_hud.SetGameState(gameState);
+		_hud.SetConfig(Config);
 		_hud.SetControllingPlayer(0);
 
 		// Set background color
-		RenderingServer.SetDefaultClearColor(new Color(0.08f, 0.08f, 0.10f));
+		RenderingServer.SetDefaultClearColor(Config.BackgroundColor);
 	}
 
 	public override void _Process(double delta)
@@ -70,7 +80,7 @@ public partial class GameManager : Node2D
 		_hud.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_hud.SetSelectedBlocks(_selectionManager.SelectedBlocks);
 
-		// Smooth movement interpolation
-		_gridRenderer.SetInterpolation(_tickRunner.InterpolationFactor);
+		// Pass selected IDs to renderer so selection border tracks visual position
+		_gridRenderer.SetSelectedIds(_selectionManager.SelectedBlocks);
 	}
 }

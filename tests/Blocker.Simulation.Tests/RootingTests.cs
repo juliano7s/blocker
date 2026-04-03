@@ -8,6 +8,11 @@ namespace Blocker.Simulation.Tests;
 
 public class RootingTests
 {
+    public RootingTests()
+    {
+        Constants.Reset();
+    }
+
     private GameState CreateState(int width = 10, int height = 10)
     {
         return new GameState(new Grid(width, height));

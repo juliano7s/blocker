@@ -341,7 +341,25 @@ public class GameState
             var nextStep = PathfindingSystem.GetNextStep(this, block.Pos, target);
 
             if (nextStep.HasValue)
-                TryMoveBlock(block, nextStep.Value);
+            {
+                if (TryMoveBlock(block, nextStep.Value))
+                    block.StuckTicks = 0;
+                else
+                    block.StuckTicks++;
+            }
+            else
+            {
+                block.StuckTicks++;
+            }
+
+            // Give up if stuck too long
+            if (block.StuckTicks >= Constants.MoveGiveUpTicks)
+            {
+                block.MoveTarget = null;
+                block.IsAttackMoving = false;
+                block.StuckTicks = 0;
+                continue;
+            }
 
             // Clear target if we've arrived
             if (block.Pos == target)

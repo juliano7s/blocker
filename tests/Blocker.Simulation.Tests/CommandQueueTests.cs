@@ -7,6 +7,11 @@ namespace Blocker.Simulation.Tests;
 
 public class CommandQueueTests
 {
+    public CommandQueueTests()
+    {
+        Constants.Reset();
+    }
+
     private GameState CreateState()
     {
         var state = new GameState(new Grid(10, 10));
