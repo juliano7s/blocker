@@ -318,36 +318,57 @@ A fully rooted Builder (not part of a formation) can toggle push mode (G key, di
 
 ### 10.1 Selection
 
-- **Left-click**: Select a single block (own blocks only).
-- **Left-click + drag (box select)**: Select multiple own blocks in the rectangle.
+- **Left-click**: Select a single block (own blocks only, excludes Walls).
+- **Left-click + drag (box select)**: Select multiple own blocks in the rectangle. Mobile-priority filter: if movable blocks exist in the box, only those are selected.
 - **Shift+click / Shift+drag**: Add to current selection.
-- **Double-click**: Select all blocks of the same type on screen.
-- **Number keys (1-9, 0)**: Control groups. Press to select. Ctrl+number to assign. Double-tap to center camera on group.
-- **Tab**: Switch between players in local 2-player mode.
+- **Double-click**: Select all blocks of the same type AND rooting state, map-wide.
+- **Backtick (`` ` ``)**: Quick-select all uprooted Soldiers and Stunners (mobile combat force).
+- **Control groups (0-9)**: Press number to select group. Ctrl+number to assign current selection. Double-tap to center camera on group.
+- **Escape**: Clear selection (or cancel active mode).
+- **Tab**: Switch between players in local mode.
 
 ### 10.2 Movement
 
 - **Right-click**: Move selected blocks to target cell. Clears command queue.
 - **Shift+right-click**: Queue a move waypoint (dotted path shown for own blocks).
-- **A key (Attack-move)**: Move toward target, but engage enemies encountered along the way.
+- **Right-click + drag (paint mode)**: Drag paints target cells; on release, units are distributed via closest-first greedy Manhattan distance assignment. Shift+right-drag queues as waypoints.
+- **A key (Attack-move)**: Press A, then left-click target. Blocks move toward target but pause when adjacent to enemies.
 
 ### 10.3 Abilities
 
 | Key | Action | Condition |
 |-----|--------|-----------|
-| F | Root/Uproot toggle | Builder, Soldier, Stunner |
-| F | Begin Jump aim | Jumper (then left-click to execute) |
+| F | Root/Uproot toggle | Builder, Soldier, Stunner, Warden |
+| F | Jump (direction toward mouse) | Jumper |
 | W | Convert to Wall | Builder (queues if still rooting) |
-| S | Fire Stun Ray | Stunner (direction toward mouse) |
-| G | Toggle Push | Rooted Builder, not in formation (direction toward mouse) |
+| S | Fire Stun Ray | Stunner (per-unit direction snap toward mouse) |
+| G | Toggle Push | Rooted Builder, not in formation (per-unit direction snap) |
 | D | Self-Destruct | Rooted Soldier or Stunner |
 | D | Magnet Pull | Rooted Warden |
+| T | Create Tower | Rooted Soldier or Stunner (needs adjacent rooted Builder) |
 
-All ability keys support **Shift+key** to queue the action after the current command.
+All ability keys support **Shift+key** to queue the action after the current command. Commands are filtered to relevant block types only (e.g., S only affects Stunners in a mixed selection). Direction-based commands snap per-unit from each block's position to the mouse.
 
 ### 10.4 Blueprint Mode
 
-Builders can be sent to a target location with automatic root + convert queued. This streamlines wall placement — select Builders, activate blueprint, click destination cells. The system auto-queues: move → root → convert.
+Six formation blueprints available via number keys:
+
+| Key | Blueprint | Units Needed |
+|-----|-----------|-------------|
+| 1 | Builder Nest | 3 Builders |
+| 2 | Soldier Nest | 3 Builders + 2 Walls |
+| 3 | Stunner Nest | 3 Soldiers + 2 Walls |
+| 4 | Supply Formation | 3 Walls (L-shape) |
+| 5 | Stun Tower | 1 Stunner + 1 Builder |
+| 6 | Soldier Tower | 1 Soldier + 1 Builder |
+
+- **R**: Rotate blueprint 90° clockwise.
+- **Left-click**: Place blueprint. Units dispatched via closest-first greedy assignment, auto-queuing move → root (and → convert for wall roles). Dispatched units removed from selection.
+- **Shift+click**: Place and keep blueprint active for multiple placements.
+- **X**: Clear all placed blueprint ghosts.
+- **Right-click / Escape**: Cancel blueprint mode.
+
+Ghost previews persist for 15 seconds, fading over time. Gap-filling: cells already occupied by friendly blocks are skipped.
 
 ### 10.5 Camera
 
