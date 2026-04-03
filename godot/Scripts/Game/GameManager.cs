@@ -69,5 +69,8 @@ public partial class GameManager : Node2D
 		// Keep HUD in sync with controlling player and selection
 		_hud.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_hud.SetSelectedBlocks(_selectionManager.SelectedBlocks);
+
+		// Smooth movement interpolation
+		_gridRenderer.SetInterpolation(_tickRunner.InterpolationFactor);
 	}
 }

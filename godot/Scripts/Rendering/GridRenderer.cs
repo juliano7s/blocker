@@ -14,6 +14,9 @@ public partial class GridRenderer : Node2D
 	public const float GridLineWidth = 1f;
 
 	private GameState? _gameState;
+	private float _interpolation = 1f;
+
+	public void SetInterpolation(float t) => _interpolation = t;
 
 	// Death effect tracking
 	private record struct DeathEffect(Vector2 Pos, Color Color, float StartTime, float Duration);
@@ -116,14 +119,18 @@ public partial class GridRenderer : Node2D
 			DrawLine(from, to, GridLineColor, GridLineWidth);
 		}
 
-		// Draw blocks as colored squares
+		// Draw blocks as colored squares (with smooth interpolation)
 		foreach (var block in _gameState.Blocks)
 		{
 			var color = GetPlayerColor(block.PlayerId);
 			var inset = 2f;
+
+			// Interpolate between PrevPos and Pos for smooth movement
+			float lerpX = block.PrevPos.X + (block.Pos.X - block.PrevPos.X) * _interpolation;
+			float lerpY = block.PrevPos.Y + (block.Pos.Y - block.PrevPos.Y) * _interpolation;
 			var rect = new Rect2(
-				block.Pos.X * CellSize + inset,
-				block.Pos.Y * CellSize + inset,
+				lerpX * CellSize + inset,
+				lerpY * CellSize + inset,
 				CellSize - inset * 2,
 				CellSize - inset * 2
 			);
