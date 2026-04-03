@@ -1,0 +1,22 @@
+[gd_scene load_steps=6 format=3 uid="uid://main001"]
+
+[ext_resource type="Script" path="res://Scripts/Game/GameManager.cs" id="1_game"]
+[ext_resource type="Script" path="res://Scripts/Rendering/GridRenderer.cs" id="2_grid"]
+[ext_resource type="Script" path="res://Scripts/Input/CameraController.cs" id="3_cam"]
+[ext_resource type="Script" path="res://Scripts/Input/SelectionManager.cs" id="4_sel"]
+[ext_resource type="Script" path="res://Scripts/Game/TickRunner.cs" id="5_tick"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_game")
+
+[node name="GridRenderer" type="Node2D" parent="."]
+script = ExtResource("2_grid")
+
+[node name="SelectionManager" type="Node2D" parent="."]
+script = ExtResource("4_sel")
+
+[node name="Camera" type="Camera2D" parent="."]
+script = ExtResource("3_cam")
+
+[node name="TickRunner" type="Node" parent="."]
+script = ExtResource("5_tick")

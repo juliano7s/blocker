@@ -383,7 +383,7 @@ A player can concede at any time. In team modes, a player's surrender eliminates
 
 ---
 
-## 12. Multiplayer
+## 12. Multiplayer - ** Let's skip for now and implement after the visuals are done **
 
 ### 12.1 Game Modes and Teams
 
@@ -445,7 +445,7 @@ Any game mechanic **must** follow these rules:
 
 ---
 
-## 13. Single Player
+## 13. Single Player - ** Let's skip for now and implement after the visuals are done **
 
 ### 13.1 Play vs AI
 
@@ -483,7 +483,7 @@ Each tick resolves in this exact order:
 
 ---
 
-## 15. Map System
+## 15. Map System - ** Let's skip for now and implement after the visuals are done **
 
 Maps in the Godot version will support larger grids than the original 41x25. The map format will be redesigned during Phase 2 (Architecture Design) — it may use Godot's TileMap, a custom binary format, or an editor-native format. The plain-text format below is preserved as reference for what information a map must encode.
 
@@ -531,7 +531,7 @@ The original game uses plain-text files — one character per cell, one line per
 
 - 2D top-down grid. Each cell is a square.
 - Blocks are rendered as colored squares with type-specific inner details.
-- Player 0 = Blue palette. Player 1 = Red palette.
+- Up to 6 players supported. Each player has a unique color palette (Blue, Red, Yellow, Green + 2 more TBD).
 - Smooth movement interpolation between ticks for fluid animation.
 
 **Asset strategy — procedural fallback**: All block visuals have a **procedural rendering** implementation (code-drawn shapes, animations, and effects). PNG sprites can optionally replace the procedural visuals when available, but the game must be fully playable and visually complete without any sprite assets. This is the same pattern used for audio — sound files enhance the experience but the game works without them. The procedural visuals described below are the baseline; sprites are an upgrade layer on top.
@@ -706,6 +706,8 @@ The signature visual system. Procedural lightning patterns travel along grid lin
 ---
 
 ## 17. Audio
+
+**Asset strategy — procedural fallback**: All audio effects have a **procedural** implementation - Refer to `D:/claude/mini-rts/src/audio/` for how these are implemented in the Typescript prototype. OGG audio files can optionally replace the procedural effects, but the game must be fully playable without any audio assets.
 
 ### 17.1 Sound Events
 
