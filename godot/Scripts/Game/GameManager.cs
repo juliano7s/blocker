@@ -20,6 +20,7 @@ public partial class GameManager : Node2D
 	private SelectionManager _selectionManager = null!;
 	private TickRunner _tickRunner = null!;
 	private HudOverlay _hud = null!;
+	private PostProcessingManager _postProcessing = null!;
 
 	public override void _Ready()
 	{
@@ -69,6 +70,11 @@ public partial class GameManager : Node2D
 		_hud.SetGameState(gameState);
 		_hud.SetConfig(Config);
 		_hud.SetControllingPlayer(0);
+
+		// Set up post-processing
+		_postProcessing = GetNode<PostProcessingManager>("PostProcessing");
+		_postProcessing.SetGameState(gameState);
+		_postProcessing.SetGridRenderer(_gridRenderer);
 
 		// Set background color
 		RenderingServer.SetDefaultClearColor(Config.BackgroundColor);

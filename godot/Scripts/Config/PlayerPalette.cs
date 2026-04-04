@@ -195,11 +195,12 @@ public partial class PlayerPalette : Resource
         SoldierArmsGlow = new Color(1f, 0.78f, 0.2f, 0.25f);
         SoldierCenterDot = new Color(1f, 0.78f, 0.2f);
 
-        StunnerFill = b;
-        StunnerBevelLight = b.Lightened(0.45f);
-        StunnerBevelShadow = b.Darkened(0.4f);
+        var stunnerPurple = new Color(0.32f, 0.22f, 0.45f);
+        StunnerFill = stunnerPurple;
+        StunnerBevelLight = stunnerPurple.Lightened(0.45f);
+        StunnerBevelShadow = stunnerPurple.Darkened(0.4f);
         StunnerDiamondOuter = b.Lightened(0.3f);
-        StunnerDiamondInner = new Color(1f, 1f, 1f, 0.5f);
+        StunnerDiamondInner = b.Lightened(0.65f);
         StunnerGlow = b;
 
         WardenFill = b with { A = 0.5f };

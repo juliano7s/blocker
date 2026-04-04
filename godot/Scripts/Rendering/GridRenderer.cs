@@ -13,6 +13,7 @@ public partial class GridRenderer : Node2D
 {
 	public const float CellSize = 28f;
 	public const float GridLineWidth = 1f;
+	public const float BlockInset = 3f;
 
 	private GameConfig _config = GameConfig.CreateDefault();
 	private GameState? _gameState;
@@ -23,6 +24,13 @@ public partial class GridRenderer : Node2D
 
 	// Per-block visual positions in world coords — driven at constant speed toward actual pos
 	private readonly Dictionary<int, Vector2> _visualPositions = new();
+
+	// Per-block idle spin angle — only advances when block is idle
+	private readonly Dictionary<int, float> _idleAngles = new();
+
+	// Jumper ghost trails — position + start time for fading afterimages
+	private record struct GhostTrail(Vector2 Pos, Color Color, float StartTime, bool IsJump);
+	private readonly List<GhostTrail> _ghostTrails = [];
 
 	// Selected block IDs — set each frame by GameManager
 	private HashSet<int> _selectedIds = [];
@@ -56,7 +64,37 @@ public partial class GridRenderer : Node2D
 			float now = (float)Time.GetTicksMsec() / 1000f;
 			foreach (var evt in _gameState.VisualEvents)
 			{
-				if (evt.Type == VisualEventType.BlockDied)
+				// Jumper ghost trails from moves and jumps
+			if (evt.Type == VisualEventType.BlockMoved && evt.BlockId.HasValue)
+			{
+				var movedBlock = _gameState.Blocks.FirstOrDefault(b => b.Id == evt.BlockId.Value);
+				if (movedBlock is { Type: BlockType.Jumper })
+				{
+					var ghostPos = _visualPositions.TryGetValue(movedBlock.Id, out var gvp)
+						? gvp : GridToWorld(movedBlock.PrevPos);
+					var ghostColor = GetPlayerColor(movedBlock.PlayerId);
+					_ghostTrails.Add(new GhostTrail(ghostPos, ghostColor, now, false));
+				}
+			}
+			if (evt.Type == VisualEventType.JumpExecuted && evt.BlockId.HasValue)
+			{
+				var jumper = _gameState.Blocks.FirstOrDefault(b => b.Id == evt.BlockId.Value);
+				if (jumper != null)
+				{
+					var jumpColor = GetPlayerColor(jumper.PlayerId);
+					// Add blur ghosts along the jump path
+					var dir = evt.Direction!.Value;
+					var range = evt.Range ?? 1;
+					var offset = dir.ToOffset();
+					var pos = jumper.PrevPos;
+					for (int i = 0; i < range; i++)
+					{
+						pos = pos + offset;
+						_ghostTrails.Add(new GhostTrail(GridToWorld(pos), jumpColor, now, true));
+					}
+				}
+			}
+			if (evt.Type == VisualEventType.BlockDied)
 				{
 					var worldPos = GridToWorld(evt.Position);
 					var color = evt.PlayerId.HasValue ? GetPlayerColor(evt.PlayerId.Value) : Colors.White;
@@ -98,10 +136,42 @@ public partial class GridRenderer : Node2D
 				_visualPositions[block.Id] = vp.MoveToward(target, speed * dt);
 			}
 
+			// Advance idle angles — only when block is idle
+			foreach (var block in _gameState.Blocks)
+			{
+				bool idle = block.IsMobile && block.MoveTarget == null && !block.IsStunned;
+				if (!_idleAngles.ContainsKey(block.Id))
+					_idleAngles[block.Id] = 0f;
+
+				if (idle)
+				{
+					float idleSpeed = block.Type switch
+					{
+						BlockType.Builder => 1.8f,  // moderate
+						BlockType.Soldier => 4.5f,  // fast
+						BlockType.Stunner => 2.2f,  // constant
+						_ => 0f
+					};
+					_idleAngles[block.Id] += idleSpeed * dt;
+				}
+				else
+				{
+					// Snap to nearest completed 90° so rotation doesn't freeze mid-turn
+					float quarterTurn = Mathf.Pi * 0.5f;
+					float current = _idleAngles[block.Id];
+					_idleAngles[block.Id] = Mathf.Round(current / quarterTurn) * quarterTurn;
+				}
+			}
+
+			// Clean up ghost trails
+			_ghostTrails.RemoveAll(g => now - g.StartTime > (g.IsJump ? 0.3f : 0.5f));
+
 			// Remove positions for blocks that have died
 			var liveIds = _gameState.Blocks.Select(b => b.Id).ToHashSet();
 			foreach (var id in _visualPositions.Keys.Except(liveIds).ToList())
 				_visualPositions.Remove(id);
+			foreach (var id in _idleAngles.Keys.Except(liveIds).ToList())
+				_idleAngles.Remove(id);
 		}
 
 		QueueRedraw();
@@ -122,6 +192,10 @@ public partial class GridRenderer : Node2D
 				var cell = grid[x, y];
 				var rect = new Rect2(x * CellSize, y * CellSize, CellSize, CellSize);
 				DrawRect(rect, _config.GetGroundColor(cell.Ground));
+
+				// Draw terrain walls as inset blocks (after background, before grid lines)
+				if (cell.Ground is GroundType.Terrain or GroundType.BreakableWall or GroundType.FragileWall)
+					DrawTerrainWallBlock(rect, cell.Ground);
 			}
 		}
 
@@ -143,17 +217,15 @@ public partial class GridRenderer : Node2D
 		foreach (var block in _gameState.Blocks)
 		{
 			var color = _config.GetPalette(block.PlayerId).Base;
-			var inset = 2f;
-
 			var worldPos = _visualPositions.TryGetValue(block.Id, out var vp)
 				? vp
 				: GridToWorld(block.Pos);
 
 			var rect = new Rect2(
-				worldPos.X - CellSize / 2f + inset,
-				worldPos.Y - CellSize / 2f + inset,
-				CellSize - inset * 2,
-				CellSize - inset * 2
+				worldPos.X - CellSize / 2f + BlockInset,
+				worldPos.Y - CellSize / 2f + BlockInset,
+				CellSize - BlockInset * 2,
+				CellSize - BlockInset * 2
 			);
 
 			// Subtle glow behind block for luminous feel
@@ -204,6 +276,9 @@ public partial class GridRenderer : Node2D
 
 		// Draw nest spawn progress
 		DrawNestProgress();
+
+		// Draw jumper ghost trails
+		DrawGhostTrails();
 
 		// Draw death effects (explosions, fragments)
 		DrawDeathEffects();

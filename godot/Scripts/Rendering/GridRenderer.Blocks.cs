@@ -14,23 +14,240 @@ public partial class GridRenderer : Node2D
 
 	private void DrawRootingVisual(Block block, Rect2 rect)
 	{
-		var bracketBase = _config.GetPalette(block.PlayerId).RootingBracketColor;
-		if (block.State == BlockState.Rooting || block.State == BlockState.Rooted)
+		if (block.Type == BlockType.Wall)
+			return;
+
+		bool rooting = block.State == BlockState.Rooting;
+		bool rooted = block.State == BlockState.Rooted;
+		bool uprooting = block.State == BlockState.Uprooting;
+
+		if (!rooting && !rooted && !uprooting)
+			return;
+
+		float progress = (float)block.RootProgress / Constants.RootTicks;
+		var palette = _config.GetPalette(block.PlayerId);
+
+		// 1) Corner brackets — grow while rooting, shrink while uprooting
+		var bracketBase = palette.RootingBracketColor;
+		float anchorLen = rect.Size.X * 0.35f * progress;
+		if (rooted)
 		{
-			float progress = (float)block.RootProgress / Constants.RootTicks;
-			var anchorLen = rect.Size.X * 0.35f * progress;
-			var anchorColor = block.IsFullyRooted
-				? bracketBase with { A = 0.8f }
-				: bracketBase with { A = 0.1f + 0.3f * progress };
-			var w = 1.5f + progress;
-			DrawCornerBrackets(rect, anchorLen, anchorColor, w);
+			DrawCornerBrackets(rect, anchorLen, bracketBase with { A = 0.8f }, 2.5f);
 		}
-		else if (block.State == BlockState.Uprooting)
+		else
 		{
-			float progress = (float)block.RootProgress / Constants.RootTicks;
-			var anchorLen = rect.Size.X * 0.35f * progress;
-			var anchorColor = bracketBase with { A = 0.3f * progress };
-			DrawCornerBrackets(rect, anchorLen, anchorColor, 1.5f);
+			float bracketAlpha = rooting ? 0.1f + 0.3f * progress : 0.2f + 0.6f * progress;
+			float bracketWidth = rooting ? 1.5f + progress : 1.5f + progress;
+			DrawCornerBrackets(rect, anchorLen, bracketBase with { A = bracketAlpha }, bracketWidth);
+		}
+
+		// 2) Spinning outline tracer — clockwise when rooting, counter-clockwise when uprooting
+		if (!rooted)
+		{
+			float time = (float)Time.GetTicksMsec() / 1000f;
+			float spinSpeed = rooting ? 1.5f : -1.5f;
+			float tracerLen = 0.25f; // fraction of perimeter covered by the tracer
+			DrawOutlineTracer(rect, time * spinSpeed, tracerLen, new Color(0.78f, 0.78f, 0.78f, 0.4f + 0.3f * progress), 1.5f);
+		}
+
+		// 3) Digital root tendrils — grow from corners along grid lines
+		DrawRootTendrils(rect, progress, palette.Base);
+
+		// 4) Diagonal stripes — scroll TL→BR when rooting, BR→TL when uprooting, static when rooted
+		{
+			float stripeAlpha = rooted ? 0.18f : 0.18f * progress;
+			if (stripeAlpha > 0.005f)
+			{
+				float time = rooted ? 0f : (float)Time.GetTicksMsec() / 1000f;
+				float stripeDirection = rooting ? -1f : 1f;
+				DrawDiagonalStripes(rect, stripeAlpha, time, stripeDirection);
+			}
+		}
+	}
+
+	/// <summary>
+	/// Draws a short bright segment that travels along the rect's perimeter.
+	/// offset = current position along perimeter (0..1 wraps), length = fraction of perimeter to cover.
+	/// </summary>
+	private void DrawOutlineTracer(Rect2 rect, float timeOffset, float length, Color color, float width)
+	{
+		var tl = rect.Position;
+		var tr = new Vector2(rect.End.X, rect.Position.Y);
+		var br = rect.End;
+		var bl = new Vector2(rect.Position.X, rect.End.Y);
+
+		// Perimeter as 4 segments: top(0..w), right(w..w+h), bottom(w+h..2w+h), left(2w+h..perimeter)
+		float w = rect.Size.X;
+		float h = rect.Size.Y;
+		float perimeter = 2 * (w + h);
+
+		// Normalize timeOffset to 0..1 range
+		float startT = timeOffset - Mathf.Floor(timeOffset);
+		float endT = startT + length;
+
+		// Walk the perimeter and draw the lit portion
+		float[] segLengths = { w, h, w, h };
+		Vector2[] segStarts = { tl, tr, br, bl };
+		Vector2[] segEnds = { tr, br, bl, tl };
+
+		float cumulative = 0;
+		for (int i = 0; i < 4; i++)
+		{
+			float segLen = segLengths[i] / perimeter; // normalized segment length
+			float segStart = cumulative;
+			float segEnd = cumulative + segLen;
+			cumulative = segEnd;
+
+			// Check overlap with tracer range [startT, endT] (endT may exceed 1.0 for wrapping)
+			DrawTracerOnSegment(segStarts[i], segEnds[i], segStart, segEnd, startT, endT, color, width);
+			// Handle wrap-around (tracer crossing the 1.0 boundary)
+			if (endT > 1f)
+				DrawTracerOnSegment(segStarts[i], segEnds[i], segStart, segEnd, startT - 1f, endT - 1f, color, width);
+		}
+	}
+
+	private void DrawTracerOnSegment(Vector2 from, Vector2 to, float segStart, float segEnd,
+		float tracerStart, float tracerEnd, Color color, float width)
+	{
+		float overlapStart = Mathf.Max(segStart, tracerStart);
+		float overlapEnd = Mathf.Min(segEnd, tracerEnd);
+		if (overlapStart >= overlapEnd) return;
+
+		float segLen = segEnd - segStart;
+		if (segLen < 0.0001f) return;
+
+		float t0 = (overlapStart - segStart) / segLen;
+		float t1 = (overlapEnd - segStart) / segLen;
+		DrawLine(from.Lerp(to, t0), from.Lerp(to, t1), color, width);
+	}
+
+	/// <summary>
+	/// Digital root tendrils: segmented lines that grow from each block corner,
+	/// first diagonally to the nearest grid intersection, then along the grid line.
+	/// Thicker near the corner, tapering to thin. Team-colored, blending into the grid.
+	/// </summary>
+	private void DrawRootTendrils(Rect2 rect, float progress, Color teamColor)
+	{
+		if (progress < 0.02f) return;
+
+		float inset = BlockInset;
+		float maxGridLen = CellSize * 0.9f; // max reach along grid line after the diagonal
+		float totalReach = inset * Mathf.Sqrt2 + maxGridLen; // diagonal + grid portion
+		float tendrilLen = totalReach * progress;
+
+		if (tendrilLen < 1f) return;
+
+		// Grid intersections (cell corners) for each block corner
+		var tl = rect.Position; // block corner (inset from grid)
+		var tr = new Vector2(rect.End.X, rect.Position.Y);
+		var bl = new Vector2(rect.Position.X, rect.End.Y);
+		var br = rect.End;
+
+		// Grid intersections: block corner offset by inset diagonally outward
+		var tlGrid = tl + new Vector2(-inset, -inset);
+		var trGrid = tr + new Vector2(inset, -inset);
+		var blGrid = bl + new Vector2(-inset, inset);
+		var brGrid = br + new Vector2(inset, inset);
+
+		// Each corner sends two tendrils: diagonal to grid corner, then along each grid line
+		DrawTendril(tl, tlGrid, Vector2.Left, tendrilLen, totalReach, teamColor);
+		DrawTendril(tl, tlGrid, Vector2.Up, tendrilLen, totalReach, teamColor);
+		DrawTendril(tr, trGrid, Vector2.Right, tendrilLen, totalReach, teamColor);
+		DrawTendril(tr, trGrid, Vector2.Up, tendrilLen, totalReach, teamColor);
+		DrawTendril(bl, blGrid, Vector2.Left, tendrilLen, totalReach, teamColor);
+		DrawTendril(bl, blGrid, Vector2.Down, tendrilLen, totalReach, teamColor);
+		DrawTendril(br, brGrid, Vector2.Right, tendrilLen, totalReach, teamColor);
+		DrawTendril(br, brGrid, Vector2.Down, tendrilLen, totalReach, teamColor);
+	}
+
+	/// <summary>
+	/// Draws one tendril: diagonal from blockCorner to gridCorner, then along gridDir.
+	/// The tendril is drawn as tapered segments with gaps for a digital feel.
+	/// </summary>
+	private void DrawTendril(Vector2 blockCorner, Vector2 gridCorner, Vector2 gridDir,
+		float currentLen, float maxLen, Color color)
+	{
+		float diagLen = (gridCorner - blockCorner).Length();
+		int segments = 6;
+		float maxWidth = 2.5f;
+		float minWidth = 0.5f;
+
+		for (int i = 0; i < segments; i++)
+		{
+			float t0 = (float)i / segments;
+			float t1 = (float)(i + 1) / segments;
+
+			// Distance along the full tendril path
+			float d0 = t0 * currentLen;
+			float d1 = t1 * currentLen;
+
+			// Small gap between segments
+			float gap = (d1 - d0) * 0.15f;
+			d1 -= gap;
+
+			if (d1 <= d0) continue;
+
+			// Map distance to world position: first diagonal, then along grid
+			var p0 = TendrilPointAt(blockCorner, gridCorner, gridDir, diagLen, d0);
+			var p1 = TendrilPointAt(blockCorner, gridCorner, gridDir, diagLen, d1);
+
+			// Taper width and alpha from root to tip
+			float width = Mathf.Lerp(maxWidth, minWidth, t0);
+			float alpha = Mathf.Lerp(0.6f, 0.08f, t0);
+
+			DrawLine(p0, p1, color with { A = alpha * 0.3f }, width + 2f);
+			DrawLine(p0, p1, color with { A = alpha }, width);
+		}
+	}
+
+	private static Vector2 TendrilPointAt(Vector2 blockCorner, Vector2 gridCorner,
+		Vector2 gridDir, float diagLen, float dist)
+	{
+		if (dist <= diagLen)
+		{
+			// Still on the diagonal portion
+			float t = diagLen > 0.001f ? dist / diagLen : 1f;
+			return blockCorner.Lerp(gridCorner, t);
+		}
+		// Past the diagonal — continue along the grid line
+		return gridCorner + gridDir * (dist - diagLen);
+	}
+
+	/// <summary>
+	/// Draws dark diagonal stripes at 45° across the rect, scrolling in the given direction.
+	/// </summary>
+	private void DrawDiagonalStripes(Rect2 rect, float alpha, float time, float direction)
+	{
+		float stripeSpacing = 8f;
+		float stripeWidth = 3f;
+		float scrollSpeed = 8f * direction;
+		float offset = time * scrollSpeed;
+
+		var stripeColor = new Color(0.15f, 0.15f, 0.15f, alpha);
+
+		// Diagonal stripes: lines from top-left to bottom-right (slope = -1 in local coords)
+		// We sweep diagonal coordinate d = x + y, drawing lines where d hits the stripe grid
+		float minD = offset;
+		float maxD = rect.Size.X + rect.Size.Y + offset;
+
+		float firstStripe = Mathf.Floor(minD / stripeSpacing) * stripeSpacing;
+
+		for (float d = firstStripe; d <= maxD + stripeSpacing; d += stripeSpacing)
+		{
+			float localD = d - offset;
+			// Line equation: x + y = localD
+			// Entry: x=max(0, localD-h), y=localD-x  Exit: x=min(w, localD), y=localD-x
+			float x0 = Mathf.Max(0, localD - rect.Size.Y);
+			float y0 = localD - x0;
+			float x1 = Mathf.Min(rect.Size.X, localD);
+			float y1 = localD - x1;
+
+			if (x0 >= rect.Size.X || x1 <= 0 || y0 < 0 || y1 >= rect.Size.Y)
+				continue;
+
+			var p0 = rect.Position + new Vector2(x0, y0);
+			var p1 = rect.Position + new Vector2(x1, y1);
+			DrawLine(p0, p1, stripeColor, stripeWidth);
 		}
 	}
 
@@ -41,14 +258,17 @@ public partial class GridRenderer : Node2D
 		var bl = new Vector2(rect.Position.X, rect.End.Y);
 		var br = rect.End;
 
-		DrawLine(tl, tl + new Vector2(len, 0), color, width);
-		DrawLine(tl, tl + new Vector2(0, len), color, width);
-		DrawLine(tr, tr + new Vector2(-len, 0), color, width);
-		DrawLine(tr, tr + new Vector2(0, len), color, width);
-		DrawLine(bl, bl + new Vector2(len, 0), color, width);
-		DrawLine(bl, bl + new Vector2(0, -len), color, width);
-		DrawLine(br, br + new Vector2(-len, 0), color, width);
-		DrawLine(br, br + new Vector2(0, -len), color, width);
+		// Extend each arm slightly past the corner to fill the gap where perpendicular lines meet
+		float ext = width * 0.5f;
+
+		DrawLine(tl + new Vector2(-ext, 0), tl + new Vector2(len, 0), color, width);
+		DrawLine(tl + new Vector2(0, -ext), tl + new Vector2(0, len), color, width);
+		DrawLine(tr + new Vector2(ext, 0), tr + new Vector2(-len, 0), color, width);
+		DrawLine(tr + new Vector2(0, -ext), tr + new Vector2(0, len), color, width);
+		DrawLine(bl + new Vector2(-ext, 0), bl + new Vector2(len, 0), color, width);
+		DrawLine(bl + new Vector2(0, ext), bl + new Vector2(0, -len), color, width);
+		DrawLine(br + new Vector2(ext, 0), br + new Vector2(-len, 0), color, width);
+		DrawLine(br + new Vector2(0, ext), br + new Vector2(0, -len), color, width);
 	}
 
 	/// <summary>
@@ -181,6 +401,7 @@ public partial class GridRenderer : Node2D
 	{
 		var center = rect.GetCenter();
 		float time = (float)Time.GetTicksMsec() / 1000f;
+		float idleAngle = _idleAngles.GetValueOrDefault(block.Id, 0f);
 
 		// Check for sprite override
 		var sprite = GetBlockSprite(block.Type);
@@ -199,17 +420,17 @@ public partial class GridRenderer : Node2D
 				break;
 
 			case BlockType.Builder:
-				DrawGradientBody(rect, palette.BuilderFill, palette.BuilderGradientLight, palette.BuilderGradientDark);
+				DrawBuilderBody(rect, center, palette, idleAngle);
 				break;
 
 			case BlockType.Soldier:
 				DrawGradientBody(rect, palette.SoldierFill, palette.SoldierFill.Lightened(0.15f), palette.SoldierFill.Darkened(0.15f));
-				DrawSoldierAnimated(block, rect, center, palette, time);
+				DrawSoldierAnimated(block, rect, center, palette, idleAngle);
 				break;
 
 			case BlockType.Stunner:
 				DrawStunnerBody(rect, palette);
-				DrawStunnerAnimated(rect, center, palette, time);
+				DrawStunnerAnimated(rect, center, palette, idleAngle);
 				break;
 
 			case BlockType.Warden:
@@ -262,51 +483,77 @@ public partial class GridRenderer : Node2D
 	}
 
 	/// <summary>
-	/// Soldier: two thick diagonal lines forming an X (crossed swords).
-	/// HP controls how many arms (4→2→1→0). Staggered fast spin.
+	/// Builder: the whole block rotates 90° revolutions when idle, with ease in/out.
 	/// </summary>
-	private void DrawSoldierAnimated(Block block, Rect2 rect, Vector2 center, PlayerPalette palette, float time)
+	private void DrawBuilderBody(Rect2 rect, Vector2 center, PlayerPalette palette, float idleAngle)
+	{
+		// Angle snaps to nearest 90° multiple — rotation is purely cosmetic
+		float rev = idleAngle / (Mathf.Pi * 0.5f);
+		float frac = rev - Mathf.Floor(rev);
+		float ease = frac < 0.5f ? 4 * frac * frac * frac : 1 - Mathf.Pow(-2 * frac + 2, 3) / 2;
+		float angle = (Mathf.Floor(rev) + ease) * Mathf.Pi * 0.5f;
+
+		float half = rect.Size.X * 0.5f;
+		var pts = new Vector2[4];
+		for (int i = 0; i < 4; i++)
+		{
+			float a = angle + Mathf.Pi * 0.25f + i * Mathf.Pi * 0.5f;
+			pts[i] = center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * half;
+		}
+
+		// Gradient: light at corner 0 (top-left-ish), dark at corner 2
+		DrawPolygon(pts, new Color[]
+		{
+			palette.BuilderGradientLight,
+			palette.BuilderFill.Lightened(0.05f),
+			palette.BuilderGradientDark,
+			palette.BuilderFill.Lightened(0.05f)
+		});
+	}
+
+	/// <summary>
+	/// Soldier: 4 individual sword arms radiating from center, each drawn separately.
+	/// 1 arm lost per HP lost (4 at full, 0 at 0). Pulsing glow. Idle spin only.
+	/// </summary>
+	private void DrawSoldierAnimated(Block block, Rect2 rect, Vector2 center, PlayerPalette palette, float idleAngle)
 	{
 		var gold = palette.SoldierArmsColor;
-		float armLen = rect.Size.X * 0.42f; // reach toward corners
+		float armLen = rect.Size.X * 0.42f;
 
-		// Fast spin with hard acceleration: period 2.5s, spin lasts 0.35s
-		float stagger = (block.Id % 8) * 0.31f;
-		float cycle = (time + stagger) % 2.5f;
+		// Idle spin: fast with ease in/out per quarter-turn
 		float spinAngle = 0f;
-		if (cycle < 0.35f)
+		if (idleAngle > 0.001f)
 		{
-			float t = cycle / 0.35f;
-			// Cubic ease in-out
-			float ease = t < 0.5f ? 4 * t * t * t : 1 - Mathf.Pow(-2 * t + 2, 3) / 2;
-			spinAngle = ease * Mathf.Pi * 0.5f;
+			float rev = idleAngle / (Mathf.Pi * 0.5f);
+			float frac = rev - Mathf.Floor(rev);
+			float ease = frac < 0.5f ? 4 * frac * frac * frac : 1 - Mathf.Pow(-2 * frac + 2, 3) / 2;
+			spinAngle = (Mathf.Floor(rev) + ease) * Mathf.Pi * 0.5f;
 		}
 
 		int visibleArms = Mathf.Clamp(block.Hp, 0, 4);
 		if (visibleArms == 0) return;
 
-		// X = two lines at 45° and 135°, each going both ways from center
-		// Arm 0: NE-SW axis   Arm 1: NW-SE axis   (HP drops remove arms pairwise)
-		bool showAxis0 = visibleArms >= 2; // NE + SW
-		bool showAxis1 = visibleArms >= 1; // NW + SE always last
+		// Pulsing glow
+		float glowPulse = 0.2f + 0.15f * Mathf.Sin((float)Time.GetTicksMsec() * 0.005f);
+		var glowColor = palette.SoldierArmsGlow with { A = glowPulse };
 
-		float a0 = Mathf.Pi * 0.25f + spinAngle;  // NE direction
-		float a1 = Mathf.Pi * 0.75f + spinAngle;  // NW direction
+		// 4 individual arms at 90° intervals (NE, NW, SW, SE)
+		// Remove arms one at a time: arm 0 (NE) lost first, then 2 (SW), then 1 (NW), then 3 (SE)
+		int[] armOrder = { 0, 2, 1, 3 }; // order of removal (least important first)
+		for (int i = 0; i < 4; i++)
+		{
+			// Check if this arm is still alive
+			int removalIndex = Array.IndexOf(armOrder, i);
+			if (removalIndex >= 4 - visibleArms) continue; // this arm has been removed
 
-		// Draw glow layer first, then solid line on top
-		if (showAxis0)
-		{
-			var ne = center + new Vector2(Mathf.Cos(a0), Mathf.Sin(a0)) * armLen;
-			var sw = center - new Vector2(Mathf.Cos(a0), Mathf.Sin(a0)) * armLen;
-			DrawLine(ne, sw, palette.SoldierArmsGlow, 8f);
-			DrawLine(ne, sw, gold, 3f);
-		}
-		if (showAxis1)
-		{
-			var nw = center + new Vector2(Mathf.Cos(a1), Mathf.Sin(a1)) * armLen;
-			var se = center - new Vector2(Mathf.Cos(a1), Mathf.Sin(a1)) * armLen;
-			DrawLine(nw, se, palette.SoldierArmsGlow, 8f);
-			DrawLine(nw, se, gold, 3f);
+			float baseAngle = Mathf.Pi * 0.25f + i * Mathf.Pi * 0.5f;
+			float a = baseAngle + spinAngle;
+			var tip = center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * armLen;
+
+			// Glow layer
+			DrawLine(center, tip, glowColor, 8f);
+			// Solid arm
+			DrawLine(center, tip, gold, 3f);
 		}
 
 		// Bright center dot
@@ -315,29 +562,22 @@ public partial class GridRenderer : Node2D
 
 	/// <summary>
 	/// Stunner: Outer diamond (player color) + inner diamond (white highlight).
-	/// Periodic 4-second spin cycle matching Soldier timing. Subtle pulse glow.
+	/// Spins constantly when idle. Subtle pulse glow.
 	/// </summary>
-	private void DrawStunnerAnimated(Rect2 rect, Vector2 center, PlayerPalette palette, float time)
+	private void DrawStunnerAnimated(Rect2 rect, Vector2 center, PlayerPalette palette, float idleAngle)
 	{
 		float size = rect.Size.X * 0.22f;
-		float pulse = 0.85f + 0.15f * Mathf.Sin(time * 2.5f);
+		float pulse = 0.85f + 0.15f * Mathf.Sin((float)Time.GetTicksMsec() * 0.0025f);
 
-		// Periodic spin: same timing as soldier (4s cycle, brief spin)
-		float cycle = time % 4f;
-		float spinAngle = 0f;
-		if (cycle < 0.5f)
-		{
-			float t = cycle / 0.5f;
-			float ease = t < 0.5f ? 4 * t * t * t : 1 - Mathf.Pow(-2 * t + 2, 3) / 2;
-			spinAngle = ease * Mathf.Pi * 0.5f;
-		}
+		// Constant spin from idle angle (no easing — smooth continuous rotation)
+		float spinAngle = idleAngle;
 
 		// Soft glow circle behind diamond
 		DrawCircle(center, size * 1.6f, palette.StunnerGlow with { A = 0.12f * pulse });
 		// Outer diamond (team color, lightened)
 		DrawRotatedDiamond(center, size, spinAngle, palette.StunnerDiamondOuter with { A = pulse });
-		// Inner diamond (white highlight, static orientation)
-		DrawRotatedDiamond(center, size * 0.5f, 0, palette.StunnerDiamondInner with { A = 0.5f * pulse });
+		// Inner diamond (white highlight, counter-rotates)
+		DrawRotatedDiamond(center, size * 0.5f, -spinAngle * 0.5f, palette.StunnerDiamondInner with { A = 0.5f * pulse });
 		// Tiny bright center dot
 		DrawCircle(center, 1.5f, Colors.White with { A = 0.9f * pulse });
 	}
@@ -354,72 +594,186 @@ public partial class GridRenderer : Node2D
 	}
 
 	/// <summary>
-	/// Warden: Compact filled circle with ring border. Periodic flash.
-	/// Looks like a shield/orb — matching reference visual.
+	/// Warden: Builder-shaded body with a white glowing shield icon.
 	/// </summary>
 	private void DrawWardenAnimated(Rect2 rect, Vector2 center, PlayerPalette palette, float time)
 	{
-		float r = rect.Size.X * 0.32f;
+		// Body: same gradient as builder
+		DrawGradientBody(rect, palette.BuilderFill, palette.BuilderGradientLight, palette.BuilderGradientDark);
 
-		// 4-second cycle with 500ms flash
-		float cycle = time % 4f;
-		float flashIntensity = 0;
-		if (cycle < 0.5f)
+		// Shield icon: simple shield shape (rounded top, pointed bottom)
+		float shieldW = rect.Size.X * 0.32f;
+		float shieldH = rect.Size.Y * 0.38f;
+
+		// Glow pulse
+		float pulse = 0.6f + 0.3f * Mathf.Sin(time * 2.5f);
+
+		// Shield outline points: top-left, top-right, mid-right, bottom point, mid-left
+		var shieldTop = center + new Vector2(0, -shieldH * 0.45f);
+		var stl = shieldTop + new Vector2(-shieldW, 0);
+		var str = shieldTop + new Vector2(shieldW, 0);
+		var smr = center + new Vector2(shieldW * 0.85f, shieldH * 0.1f);
+		var sml = center + new Vector2(-shieldW * 0.85f, shieldH * 0.1f);
+		var sbot = center + new Vector2(0, shieldH * 0.55f);
+
+		var shieldPts = new Vector2[] { stl, str, smr, sbot, sml };
+		var shieldColor = new Color(1f, 1f, 1f, 0.7f * pulse);
+
+		// Glow behind shield
+		DrawColoredPolygon(shieldPts, new Color(1f, 1f, 1f, 0.15f * pulse));
+		// Shield border
+		for (int i = 0; i < shieldPts.Length; i++)
 		{
-			float t = cycle / 0.5f;
-			flashIntensity = t < 0.5f ? 4 * t * t * t : 1 - Mathf.Pow(-2 * t + 2, 3) / 2;
+			var a = shieldPts[i];
+			var b = shieldPts[(i + 1) % shieldPts.Length];
+			DrawLine(a, b, shieldColor, 1.5f);
 		}
-
-		// Breathing bob: ±2% vertical sway
-		float bob = Mathf.Sin(time * 1.5f) * r * 0.04f;
-		var bobCenter = center + new Vector2(0, bob);
-
-		// Scale pulse with flash
-		float scale = 1f + flashIntensity * 0.06f;
-		float sr = r * scale;
-
-		// Soft outer glow
-		DrawCircle(bobCenter, sr * 1.3f, palette.WardenGlow with { A = 0.08f + flashIntensity * 0.1f });
-		// Filled circle body
-		DrawCircle(bobCenter, sr, palette.WardenFill with { A = 0.5f + flashIntensity * 0.2f });
-		// Bright ring border
-		var ringColor = palette.WardenRing.Lightened(flashIntensity * 0.3f);
-		DrawArc(bobCenter, sr, 0, Mathf.Tau, 24, ringColor, 2f);
-		// Inner bright highlight
-		DrawCircle(bobCenter, sr * 0.4f, palette.WardenInnerHighlight with { A = 0.6f + flashIntensity * 0.3f });
+		// Bright center line (cross on shield)
+		DrawLine(center + new Vector2(0, -shieldH * 0.25f), center + new Vector2(0, shieldH * 0.25f),
+			shieldColor, 1.2f);
+		DrawLine(center + new Vector2(-shieldW * 0.4f, -shieldH * 0.05f), center + new Vector2(shieldW * 0.4f, -shieldH * 0.05f),
+			shieldColor, 1.2f);
 	}
 
 	/// <summary>
-	/// Jumper: Radial gradient circle. HP scaling: 3=100%, 2=60%, 1=20%.
-	/// Slow 2-second pulse glow.
+	/// Jumper: Lava ball that shrinks with HP loss. Not a square — drawn as circle.
 	/// </summary>
 	private void DrawJumperAnimated(Block block, Rect2 rect, Vector2 center, PlayerPalette palette, float time)
 	{
-		float maxSize = rect.Size.X * 0.38f;
+		float maxRadius = rect.Size.X * 0.44f;
 
-		// HP scaling
+		// HP scaling — smooth shrink per HP lost
 		float hpScale = block.Hp switch
 		{
 			>= 3 => 1f,
-			2 => 0.6f,
-			1 => 0.2f,
-			_ => 0.1f
+			2 => 0.75f,
+			1 => 0.45f,
+			_ => 0.2f
 		};
-		float radius = maxSize * hpScale;
+		float radius = maxRadius * hpScale;
 
-		// 2-second pulse glow
-		float pulse = 0.5f + 0.5f * Mathf.Sin(time * Mathf.Pi);
+		// Lava pulse — churning, faster than other blocks
+		float pulse1 = Mathf.Sin(time * 3.5f);
+		float pulse2 = Mathf.Sin(time * 5.1f + 1.3f);
 
-		// Radial gradient: bright highlight → core → dark rim
-		// Outer ring (dark rim)
+		// Outer glow (heat haze)
+		DrawCircle(center, radius * 1.25f, palette.JumperPulseGlow with { A = 0.06f + 0.04f * pulse1 });
+
+		// Dark rim (cooled rock shell)
 		DrawCircle(center, radius, palette.JumperDark);
-		// Core
-		DrawCircle(center, radius * 0.7f, palette.JumperCore);
-		// Bright highlight
-		DrawCircle(center, radius * 0.35f, palette.JumperBright with { A = 0.6f + pulse * 0.3f });
 
-		// Pulse glow overlay
-		DrawCircle(center, radius * 1.2f, palette.JumperPulseGlow with { A = 0.05f + pulse * 0.08f });
+		// Lava core — wobbles slightly
+		float coreOffset = 0.8f * pulse2;
+		var coreCenter = center + new Vector2(coreOffset, -coreOffset * 0.5f);
+		DrawCircle(coreCenter, radius * 0.72f, palette.JumperCore);
+
+		// Hot bright spot — shifts position for lava churn effect
+		float brightOffset = radius * 0.12f * pulse1;
+		var brightCenter = center + new Vector2(-brightOffset, brightOffset * 0.7f);
+		DrawCircle(brightCenter, radius * 0.4f, palette.JumperBright with { A = 0.65f + 0.25f * pulse1 });
+
+		// Tiny white-hot center
+		DrawCircle(center, radius * 0.15f, Colors.White with { A = 0.5f + 0.3f * pulse2 });
+	}
+
+	/// <summary>
+	/// Ghost trails: fading afterimages for jumper movement and jumps.
+	/// </summary>
+	private void DrawGhostTrails()
+	{
+		float now = (float)Time.GetTicksMsec() / 1000f;
+		foreach (var ghost in _ghostTrails)
+		{
+			float maxLife = ghost.IsJump ? 0.3f : 0.5f;
+			float age = now - ghost.StartTime;
+			float t = Mathf.Clamp(age / maxLife, 0, 1);
+			float alpha = (1f - t) * (ghost.IsJump ? 0.5f : 0.3f);
+			float radius = CellSize * 0.3f * (ghost.IsJump ? (1f - t * 0.5f) : (1f - t));
+
+			if (radius < 0.5f) continue;
+
+			// Ghost circle
+			DrawCircle(ghost.Pos, radius, ghost.Color with { A = alpha * 0.4f });
+			DrawCircle(ghost.Pos, radius * 0.5f, ghost.Color with { A = alpha });
+
+			if (ghost.IsJump)
+			{
+				// Motion blur: stretched ellipse effect via horizontal/vertical lines
+				float blurLen = CellSize * 0.2f * (1f - t);
+				DrawLine(ghost.Pos - new Vector2(blurLen, 0), ghost.Pos + new Vector2(blurLen, 0),
+					ghost.Color with { A = alpha * 0.5f }, 3f);
+				DrawLine(ghost.Pos - new Vector2(0, blurLen), ghost.Pos + new Vector2(0, blurLen),
+					ghost.Color with { A = alpha * 0.5f }, 3f);
+			}
+		}
+	}
+
+	/// <summary>
+	/// Draws terrain wall cells as inset blocks with appropriate styling.
+	/// Called during cell background rendering for Terrain/BreakableWall/FragileWall cells.
+	/// </summary>
+	private void DrawTerrainWallBlock(Rect2 cellRect, GroundType ground)
+	{
+		var rect = new Rect2(
+			cellRect.Position.X + BlockInset,
+			cellRect.Position.Y + BlockInset,
+			cellRect.Size.X - BlockInset * 2,
+			cellRect.Size.Y - BlockInset * 2
+		);
+
+		// Color grades: SolidWall darkest, CrackedWall medium, WeakWall lightest
+		var (fill, highlight, shadow, inner) = ground switch
+		{
+			GroundType.Terrain => (
+				new Color(0.25f, 0.25f, 0.28f),    // dark gray
+				new Color(0.35f, 0.35f, 0.38f),
+				new Color(0.12f, 0.12f, 0.14f),
+				new Color(0.20f, 0.20f, 0.22f)
+			),
+			GroundType.BreakableWall => (
+				new Color(0.32f, 0.32f, 0.35f),    // medium gray
+				new Color(0.42f, 0.42f, 0.45f),
+				new Color(0.18f, 0.18f, 0.20f),
+				new Color(0.27f, 0.27f, 0.29f)
+			),
+			_ => (                                   // FragileWall — lightest
+				new Color(0.38f, 0.38f, 0.40f),
+				new Color(0.48f, 0.48f, 0.50f),
+				new Color(0.24f, 0.24f, 0.26f),
+				new Color(0.33f, 0.33f, 0.35f)
+			)
+		};
+
+		// Solid fill
+		DrawRect(rect, fill);
+		// Inner bevel
+		DrawLine(rect.Position, new Vector2(rect.End.X, rect.Position.Y), highlight, 1.5f);
+		DrawLine(rect.Position, new Vector2(rect.Position.X, rect.End.Y), highlight, 1.5f);
+		DrawLine(rect.End, new Vector2(rect.End.X, rect.Position.Y), shadow, 1.5f);
+		DrawLine(rect.End, new Vector2(rect.Position.X, rect.End.Y), shadow, 1.5f);
+		// Inner rect for depth
+		var innerRect = rect.Grow(-3f);
+		DrawRect(innerRect, inner);
+
+		// Obsidian stripes for SolidWall (Terrain)
+		if (ground == GroundType.Terrain)
+		{
+			var stripeColor = new Color(0.15f, 0.12f, 0.18f, 0.35f);
+			float spacing = 7f;
+			// Diagonal stripes (static, 45°)
+			for (float d = 0; d <= rect.Size.X + rect.Size.Y; d += spacing)
+			{
+				float x0 = Mathf.Max(0, d - rect.Size.Y);
+				float y0 = d - x0;
+				float x1 = Mathf.Min(rect.Size.X, d);
+				float y1 = d - x1;
+				if (x0 < rect.Size.X && x1 > 0)
+				{
+					DrawLine(rect.Position + new Vector2(x0, y0),
+						rect.Position + new Vector2(x1, y1), stripeColor, 2f);
+				}
+			}
+		}
 	}
 
 	private void DrawChevron(Vector2 center, Direction dir, Color color, float armLen)
