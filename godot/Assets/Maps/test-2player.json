@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "name": "Test 2-Player",
+    "version": 1,
+    "width": 21,
+    "height": 15,
+    "slots": 2
+  },
+  "ground": [
+    { "x": 3, "y": 7, "type": "boot" },
+    { "x": 4, "y": 7, "type": "boot" },
+    { "x": 5, "y": 7, "type": "boot" },
+    { "x": 15, "y": 7, "type": "boot" },
+    { "x": 16, "y": 7, "type": "boot" },
+    { "x": 17, "y": 7, "type": "boot" },
+    { "x": 10, "y": 7, "type": "overload" }
+  ],
+  "terrain": [
+    { "x": 10, "y": 3, "type": "terrain" },
+    { "x": 10, "y": 4, "type": "terrain" },
+    { "x": 10, "y": 10, "type": "terrain" },
+    { "x": 10, "y": 11, "type": "terrain" }
+  ],
+  "units": [
+    { "x": 2, "y": 7, "type": "builder", "slot": 1 },
+    { "x": 3, "y": 6, "type": "builder", "slot": 1 },
+    { "x": 3, "y": 8, "type": "builder", "slot": 1 },
+    { "x": 18, "y": 7, "type": "builder", "slot": 2 },
+    { "x": 17, "y": 6, "type": "builder", "slot": 2 },
+    { "x": 17, "y": 8, "type": "builder", "slot": 2 }
+  ]
+}
