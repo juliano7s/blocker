@@ -1,6 +1,7 @@
 using Blocker.Game.Config;
 using Blocker.Game.Input;
 using Blocker.Game.Rendering;
+using Blocker.Game.UI;
 using Blocker.Simulation.Core;
 using Blocker.Simulation.Maps;
 using Godot;
@@ -28,19 +29,29 @@ public partial class GameManager : Node2D
 		Config ??= GameConfig.CreateDefault();
 		Constants.Initialize(Config.ToSimulationConfig());
 
-		// Load map
-		var absolutePath = ProjectSettings.GlobalizePath(MapPath);
-		if (!Godot.FileAccess.FileExists(MapPath) && !System.IO.File.Exists(absolutePath))
+		// Load map — either from GameLaunchData (Play vs AI flow) or legacy file
+		GameState gameState;
+		if (GameLaunchData.MapData != null && GameLaunchData.Assignments != null)
 		{
-			// Try finding it relative to the project
-			absolutePath = System.IO.Path.Combine(
-				System.IO.Path.GetDirectoryName(ProjectSettings.GlobalizePath("res://"))!,
-				"..", "maps", "test-small.txt"
-			);
+			gameState = MapLoader.Load(GameLaunchData.MapData, GameLaunchData.Assignments);
+			GD.Print($"Map loaded from launcher: {GameLaunchData.MapData.Name} " +
+			         $"{gameState.Grid.Width}x{gameState.Grid.Height}, {gameState.Blocks.Count} blocks");
+			GameLaunchData.MapData = null;
+			GameLaunchData.Assignments = null;
 		}
-
-		GD.Print($"Loading map from: {absolutePath}");
-		var gameState = MapLoader.LoadFromFile(absolutePath);
+		else
+		{
+			var absolutePath = ProjectSettings.GlobalizePath(MapPath);
+			if (!Godot.FileAccess.FileExists(MapPath) && !System.IO.File.Exists(absolutePath))
+			{
+				absolutePath = System.IO.Path.Combine(
+					System.IO.Path.GetDirectoryName(ProjectSettings.GlobalizePath("res://"))!,
+					"..", "maps", "test-small.txt"
+				);
+			}
+			GD.Print($"Loading map from: {absolutePath}");
+			gameState = MapLoader.LoadFromFile(absolutePath);
+		}
 		GD.Print($"Map loaded: {gameState.Grid.Width}x{gameState.Grid.Height}, {gameState.Blocks.Count} blocks, {gameState.Players.Count} players");
 		foreach (var block in gameState.Blocks)
 			GD.Print($"  Block id={block.Id} {block.Type} P{block.PlayerId} at {block.Pos}");
