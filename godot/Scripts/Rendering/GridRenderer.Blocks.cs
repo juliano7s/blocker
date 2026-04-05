@@ -155,8 +155,8 @@ public partial class GridRenderer : Node2D
 	{
 		float diagLen = (gridCorner - blockCorner).Length();
 		int segments = 6;
-		float maxWidth = 1.8f;
-		float minWidth = 0.4f;
+		float maxWidth = 1.0f;
+		float minWidth = 0.2f;
 
 		for (int i = 0; i < segments; i++)
 		{
@@ -580,7 +580,7 @@ public partial class GridRenderer : Node2D
 		float cycle = 4000f;
 		float spinDur = 500f;
 		// We don't have block.Id here, but idleAngle is already staggered — use it for offset
-		float phase = (now % cycle) / spinDur;
+		float phase = now % cycle / spinDur;
 		float angle = idleAngle; // fallback to existing idle system which already handles spin
 
 		// Outer diamond: equilateral (same width and height), filled with player color
@@ -777,7 +777,7 @@ public partial class GridRenderer : Node2D
 	/// Draws terrain wall cells as inset blocks with appropriate styling.
 	/// Called during cell background rendering for Terrain/BreakableWall/FragileWall cells.
 	/// </summary>
-	private void DrawTerrainWallBlock(Rect2 cellRect, GroundType ground)
+	private void DrawTerrainWallBlock(Rect2 cellRect, TerrainType terrain)
 	{
 		var rect = new Rect2(
 			cellRect.Position.X + BlockInset,
@@ -787,15 +787,15 @@ public partial class GridRenderer : Node2D
 		);
 
 		// Color grades: SolidWall darkest, CrackedWall medium, WeakWall lightest
-		var (fill, highlight, shadow, inner) = ground switch
+		var (fill, highlight, shadow, inner) = terrain switch
 		{
-			GroundType.Terrain => (
+			TerrainType.Terrain => (
 				new Color(0.25f, 0.25f, 0.28f),    // dark gray
 				new Color(0.35f, 0.35f, 0.38f),
 				new Color(0.12f, 0.12f, 0.14f),
 				new Color(0.20f, 0.20f, 0.22f)
 			),
-			GroundType.BreakableWall => (
+			TerrainType.BreakableWall => (
 				new Color(0.32f, 0.32f, 0.35f),    // medium gray
 				new Color(0.42f, 0.42f, 0.45f),
 				new Color(0.18f, 0.18f, 0.20f),
@@ -821,7 +821,7 @@ public partial class GridRenderer : Node2D
 		DrawRect(innerRect, inner);
 
 		// Obsidian stripes for SolidWall (Terrain)
-		if (ground == GroundType.Terrain)
+		if (terrain == TerrainType.Terrain)
 		{
 			var stripeColor = new Color(0.15f, 0.12f, 0.18f, 0.35f);
 			float spacing = 7f;

@@ -253,8 +253,8 @@ public partial class GridRenderer : Node2D
 				DrawRect(rect, _config.GetGroundColor(cell.Ground));
 
 				// Draw terrain walls as inset blocks (after background, before grid lines)
-				if (cell.Ground is GroundType.Terrain or GroundType.BreakableWall or GroundType.FragileWall)
-					DrawTerrainWallBlock(rect, cell.Ground);
+				if (cell.Terrain != TerrainType.None)
+					DrawTerrainWallBlock(rect, cell.Terrain);
 			}
 		}
 
@@ -305,14 +305,6 @@ public partial class GridRenderer : Node2D
 			if (_selectedIds.Contains(block.Id))
 			{
 				DrawDashedRect(rect.Grow(1f), _config.SelectionBorderColor, 0.7f, _config.SelectionDashLength, _config.SelectionGapLength);
-
-				// Rooting progress bar above block
-				if (block.State == BlockState.Rooting || block.State == BlockState.Uprooting)
-				{
-					float rootProgress = (float)block.RootProgress / Constants.RootTicks;
-					var barRect = new Rect2(rect.Position.X, rect.Position.Y - 5f, rect.Size.X * rootProgress, 3f);
-					DrawRect(barRect, Colors.Yellow);
-				}
 			}
 		}
 
