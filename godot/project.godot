@@ -50,3 +50,4 @@ pan_right={
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
+viewport/hdr_2d=true

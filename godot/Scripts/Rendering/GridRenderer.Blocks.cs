@@ -482,38 +482,13 @@ public partial class GridRenderer : Node2D
 	/// </summary>
 	private void DrawBuilderBody(Rect2 rect, Vector2 center, PlayerPalette palette, float idleAngle, int playerId)
 	{
-		float quarterTurn = Mathf.Pi * 0.5f;
-		float rev = idleAngle / quarterTurn;
-		float frac = rev - Mathf.Floor(rev);
-		float ease = frac < 0.5f ? 4 * frac * frac * frac : 1 - Mathf.Pow(-2 * frac + 2, 3) / 2;
-		float angle = (Mathf.Floor(rev) + ease) * quarterTurn;
-
 		var sprite = SpriteFactory.GetSprite(BlockType.Builder, playerId);
 		if (sprite != null)
 		{
-			DrawSetTransform(center, angle);
+			DrawSetTransform(center, 0);
 			var halfSize = rect.Size * 0.5f;
 			DrawTextureRect(sprite, new Rect2(-halfSize, rect.Size), false);
 			DrawSetTransform(Vector2.Zero, 0);
-		}
-		else
-		{
-			float hx = rect.Size.X * 0.5f;
-			float hy = rect.Size.Y * 0.5f;
-			float cos = Mathf.Cos(angle);
-			float sin = Mathf.Sin(angle);
-			Vector2[] offsets = { new(-hx, -hy), new(hx, -hy), new(hx, hy), new(-hx, hy) };
-			var pts = new Vector2[4];
-			for (int i = 0; i < 4; i++)
-			{
-				var o = offsets[i];
-				pts[i] = center + new Vector2(o.X * cos - o.Y * sin, o.X * sin + o.Y * cos);
-			}
-			DrawPolygon(pts, new Color[]
-			{
-				palette.BuilderGradientLight, palette.BuilderFill,
-				palette.BuilderGradientDark, palette.BuilderFill
-			});
 		}
 	}
 
@@ -566,21 +541,21 @@ public partial class GridRenderer : Node2D
 
 		// Glow layer (wide, faint)
 		float glowPulse = 0.25f + 0.2f * Mathf.Sin(now * 0.004f + block.Id * 2.1f);
-		var glowColor = gold with { A = glowPulse * 1.22f };
+		var glowColor = gold with { A = glowPulse * 1f };
 
-		if (armTL) QueueGlowLine(tl, center, glowColor, 4.5f, true);
-		if (armBR) QueueGlowLine(center, br, glowColor, 4.5f, true);
-		if (armTR) QueueGlowLine(tr, center, glowColor, 4.5f, true);
-		if (armBL) QueueGlowLine(center, bl, glowColor, 4.5f, true);
+		if (armTL) QueueGlowLine(tl, center, glowColor, 2.0f, false);
+		if (armBR) QueueGlowLine(center, br, glowColor, 2.0f, false);
+		if (armTR) QueueGlowLine(tr, center, glowColor, 2.0f, false);
+		if (armBL) QueueGlowLine(center, bl, glowColor, 2.0f, false);
 
 		// Core swords (thin, solid)
-		if (armTL) DrawRoundLine(tl, center, gold, 2f);
-		if (armBR) DrawRoundLine(center, br, gold, 2f);
-		if (armTR) DrawRoundLine(tr, center, gold, 2f);
-		if (armBL) DrawRoundLine(center, bl, gold, 2f);
+		if (armTL) DrawRoundLine(tl, center, gold, 1.5f);
+		if (armBR) DrawRoundLine(center, br, gold, 1.5f);
+		if (armTR) DrawRoundLine(tr, center, gold, 1.5f);
+		if (armBL) DrawRoundLine(center, bl, gold, 1.5f);
 
 		// Center dot
-		DrawCircle(center, 2f, gold);
+		DrawCircle(center, 1f, gold);
 	}
 
 	/// <summary>

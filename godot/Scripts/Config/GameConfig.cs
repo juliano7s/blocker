@@ -229,9 +229,9 @@ public partial class GameConfig : Resource
         GroundType.Boot => BootGroundColor,
         GroundType.Overload => OverloadGroundColor,
         GroundType.Proto => ProtoGroundColor,
-        GroundType.Terrain => TerrainGroundColor,
-        GroundType.BreakableWall => BreakableWallGroundColor,
-        GroundType.FragileWall => FragileWallGroundColor,
+        GroundType.Terrain => NormalGroundColor,
+        GroundType.BreakableWall => NormalGroundColor,
+        GroundType.FragileWall => NormalGroundColor,
         _ => NormalGroundColor
     };
 

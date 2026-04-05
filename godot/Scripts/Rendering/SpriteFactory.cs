@@ -331,7 +331,7 @@ public static class SpriteFactory
     private static void PaintWallStuds(Image image, int s)
     {
         float studSize = s * 0.25f;
-        float studGap = s * 0.08f;
+        float studGap = s * 0.09f;
         float cx = s / 2f;
         float cy = s / 2f;
 

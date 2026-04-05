@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Program Files/Godot/GodotSharp/Api//**)",
+      "Read(//c/Program Files/Godot/GodotSharp/Tools//**)",
+      "Bash(unzip -l \"/c/Program Files/Godot/GodotSharp/Tools/nupkgs/Godot.NET.Sdk.4.6.1.nupkg\")",
+      "Bash(unzip:*)",
+      "Bash(dotnet new:*)",
+      "Bash(dotnet sln:*)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command // \"\"' | { read -r cmd; if echo \"$cmd\" | grep -qE '^cd '; then echo '{\"decision\":\"block\",\"reason\":\"Do not use cd — use absolute paths instead. Working directory is already D:/claude/blocker.\"}'; fi; }",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

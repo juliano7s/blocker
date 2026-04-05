@@ -18,5 +18,5 @@ godot/.mono/
 Thumbs.db
 .DS_Store
 
-# Local settings
-.claude/settings.local.json
+# superpowers
+docs/superpowers/

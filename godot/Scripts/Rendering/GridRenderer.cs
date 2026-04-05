@@ -167,7 +167,7 @@ public partial class GridRenderer : Node2D
 					// Stunner: constant smooth spin when idle
 					if (block.Type == BlockType.Stunner)
 					{
-						_idleAngles[block.Id] += 2.2f * dt;
+						_idleAngles[block.Id] += 1.5f * dt;
 						continue;
 					}
 
@@ -304,7 +304,7 @@ public partial class GridRenderer : Node2D
 			// Selection border (dashed, at visual position)
 			if (_selectedIds.Contains(block.Id))
 			{
-				DrawDashedRect(rect.Grow(1f), _config.SelectionBorderColor, 2f, _config.SelectionDashLength, _config.SelectionGapLength);
+				DrawDashedRect(rect.Grow(1f), _config.SelectionBorderColor, 0.7f, _config.SelectionDashLength, _config.SelectionGapLength);
 
 				// Rooting progress bar above block
 				if (block.State == BlockState.Rooting || block.State == BlockState.Uprooting)

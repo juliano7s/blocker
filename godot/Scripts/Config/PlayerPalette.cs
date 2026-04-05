@@ -139,9 +139,9 @@ public partial class PlayerPalette : Resource
         if (JumperDark == default) JumperDark = b.Darkened(0.3f);
         if (JumperPulseGlow == default) JumperPulseGlow = b;
 
-        if (WallFill == default) WallFill = b.Darkened(0.5f);
+        if (WallFill == default) WallFill = b.Darkened(0.4f);
         if (WallHighlight == default) WallHighlight = b.Darkened(0.2f);
-        if (WallShadow == default) WallShadow = b.Darkened(0.7f);
+        if (WallShadow == default) WallShadow = b.Darkened(0.5f);
         if (WallInner == default) WallInner = b.Darkened(0.35f);
 
         if (BuilderNestOutline == default) BuilderNestOutline = b.Lightened(0.2f);
