@@ -103,7 +103,7 @@ public class JumperTests
     public void Jump_StopsAtTerrain()
     {
         var state = CreateState();
-        state.Grid[6, 7].Ground = GroundType.Terrain;
+        state.Grid[6, 7].Terrain = TerrainType.Terrain;
 
         var jumper = state.AddBlock(BlockType.Jumper, 0, new GridPos(3, 7));
 

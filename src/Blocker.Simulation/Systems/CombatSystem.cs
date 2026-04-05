@@ -244,7 +244,7 @@ public static class CombatSystem
             for (int x = 0; x < state.Grid.Width; x++)
             {
                 var cell = state.Grid[x, y];
-                if (cell.Ground != GroundType.FragileWall) continue;
+                if (cell.Terrain != TerrainType.FragileWall) continue;
 
                 var pos = new GridPos(x, y);
                 int adjacentSoldiers = 0;

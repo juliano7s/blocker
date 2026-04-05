@@ -148,7 +148,7 @@ public class PushTests
         pusher.IsPushing = true;
         pusher.PushDirection = Direction.Right;
 
-        state.Grid[7, 7].Ground = GroundType.Terrain;
+        state.Grid[7, 7].Terrain = TerrainType.Terrain;
 
         var target = state.AddBlock(BlockType.Builder, 1, new GridPos(8, 7));
         var startPos = target.Pos;

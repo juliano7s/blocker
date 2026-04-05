@@ -52,9 +52,9 @@ public class PathfindingTests
         var state = CreateState();
         // Place a wall blocking direct path
         // From (0,2) to (4,2), wall at (2,1), (2,2), (2,3)
-        state.Grid[2, 1].Ground = GroundType.Terrain;
-        state.Grid[2, 2].Ground = GroundType.Terrain;
-        state.Grid[2, 3].Ground = GroundType.Terrain;
+        state.Grid[2, 1].Terrain = TerrainType.Terrain;
+        state.Grid[2, 2].Terrain = TerrainType.Terrain;
+        state.Grid[2, 3].Terrain = TerrainType.Terrain;
 
         var from = new GridPos(0, 2);
         var target = new GridPos(4, 2);
@@ -91,7 +91,7 @@ public class PathfindingTests
         for (int x = 0; x < 5; x++)
             for (int y = 0; y < 5; y++)
                 if (x != 0 || y != 0)
-                    state.Grid[x, y].Ground = GroundType.Terrain;
+                    state.Grid[x, y].Terrain = TerrainType.Terrain;
 
         var from = new GridPos(0, 0);
         var target = new GridPos(4, 4);
@@ -119,9 +119,9 @@ public class PathfindingTests
         state.Players.Add(new Player { Id = 0, TeamId = 0 });
 
         // Place a terrain wall between start and target
-        state.Grid[3, 0].Ground = GroundType.Terrain;
-        state.Grid[3, 1].Ground = GroundType.Terrain;
-        state.Grid[3, 2].Ground = GroundType.Terrain;
+        state.Grid[3, 0].Terrain = TerrainType.Terrain;
+        state.Grid[3, 1].Terrain = TerrainType.Terrain;
+        state.Grid[3, 2].Terrain = TerrainType.Terrain;
 
         var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(1, 1));
         builder.MoveTarget = new GridPos(5, 1);

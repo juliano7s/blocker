@@ -31,11 +31,11 @@ public class MapLoaderTests
         Assert.Equal(3, state.Grid.Height);
         Assert.Equal(GroundType.Normal, state.Grid[0, 0].Ground);
         Assert.Equal(GroundType.Boot, state.Grid[1, 0].Ground);
-        Assert.Equal(GroundType.Terrain, state.Grid[2, 0].Ground);
+        Assert.Equal(TerrainType.Terrain, state.Grid[2, 0].Terrain);
         Assert.Equal(GroundType.Overload, state.Grid[0, 1].Ground);
         Assert.Equal(GroundType.Proto, state.Grid[2, 1].Ground);
-        Assert.Equal(GroundType.BreakableWall, state.Grid[0, 2].Ground);
-        Assert.Equal(GroundType.FragileWall, state.Grid[1, 2].Ground);
+        Assert.Equal(TerrainType.BreakableWall, state.Grid[0, 2].Terrain);
+        Assert.Equal(TerrainType.FragileWall, state.Grid[1, 2].Terrain);
     }
 
     [Fact]

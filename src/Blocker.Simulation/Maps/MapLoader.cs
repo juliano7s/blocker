@@ -43,6 +43,7 @@ public static class MapLoader
             {
                 char c = x < line.Length ? line[x] : '.';
                 grid[x, y].Ground = ParseGround(c);
+                grid[x, y].Terrain = ParseTerrain(c);
             }
         }
 
@@ -89,14 +90,18 @@ public static class MapLoader
 
     private static GroundType ParseGround(char c) => c switch
     {
-        '.' => GroundType.Normal,
         'f' => GroundType.Boot,
         'o' => GroundType.Overload,
         'p' => GroundType.Proto,
-        '#' => GroundType.Terrain,
-        '~' => GroundType.BreakableWall,
-        '=' => GroundType.FragileWall,
-        _ => GroundType.Normal // Unknown chars default to normal
+        _ => GroundType.Normal
+    };
+
+    private static TerrainType ParseTerrain(char c) => c switch
+    {
+        '#' => TerrainType.Terrain,
+        '~' => TerrainType.BreakableWall,
+        '=' => TerrainType.FragileWall,
+        _ => TerrainType.None
     };
 
     private static void TryParseBlock(char c, GameState state, GridPos pos)
