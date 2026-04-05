@@ -55,6 +55,10 @@ public partial class MapEditorScene : Node2D
     private bool _isPanning;
     private Vector2 _panStart;
 
+    // Guide lines
+    private bool _showGuides;
+    private Node2D _guideOverlay = null!;
+
     // Camera settings
     private const float PanSpeed = 500f;
     private const float ZoomMin = 0.3f;
@@ -100,6 +104,11 @@ public partial class MapEditorScene : Node2D
         _toolbar.BackRequested += OnBackRequested;
         _toolbar.MapNameChanged += name => _mapName = name;
         _toolbar.SlotCountChanged += count => _slotCount = count;
+        _toolbar.GuidesToggled += OnGuidesToggled;
+
+        // Guide overlay (draws on top of grid)
+        _guideOverlay = new GuideOverlay { Name = "GuideOverlay" };
+        AddChild(_guideOverlay);
 
         RefreshRenderer();
     }
@@ -480,6 +489,7 @@ public partial class MapEditorScene : Node2D
 
         CenterCamera();
         RefreshRenderer();
+        RefreshGuides();
     }
 
     // --- Toolbar event handlers ---
@@ -511,6 +521,7 @@ public partial class MapEditorScene : Node2D
         _toolbar.SetSlotCount(slots);
         CenterCamera();
         RefreshRenderer();
+        RefreshGuides();
     }
 
     private void OnSaveRequested()
@@ -532,10 +543,59 @@ public partial class MapEditorScene : Node2D
         GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
     }
 
+    private void OnGuidesToggled(bool show)
+    {
+        _showGuides = show;
+        if (_guideOverlay is GuideOverlay overlay)
+        {
+            overlay.ShowGuides = show;
+            overlay.MapWidth = _mapWidth;
+            overlay.MapHeight = _mapHeight;
+            overlay.QueueRedraw();
+        }
+    }
+
     private static string SanitizeFileName(string name)
     {
         var invalid = System.IO.Path.GetInvalidFileNameChars();
         var sanitized = string.Join("_", name.Split(invalid, System.StringSplitOptions.RemoveEmptyEntries));
         return string.IsNullOrWhiteSpace(sanitized) ? "Untitled" : sanitized.Trim();
+    }
+
+    private void RefreshGuides()
+    {
+        if (_guideOverlay is GuideOverlay overlay)
+        {
+            overlay.MapWidth = _mapWidth;
+            overlay.MapHeight = _mapHeight;
+            overlay.QueueRedraw();
+        }
+    }
+}
+
+/// <summary>
+/// Draws center guide lines over the grid when enabled.
+/// </summary>
+public partial class GuideOverlay : Node2D
+{
+    public bool ShowGuides { get; set; }
+    public int MapWidth { get; set; }
+    public int MapHeight { get; set; }
+
+    private static readonly Color GuideColor = new(1f, 1f, 0f, 0.5f);
+
+    public override void _Draw()
+    {
+        if (!ShowGuides || MapWidth == 0 || MapHeight == 0) return;
+
+        float gridW = MapWidth * GridRenderer.CellSize;
+        float gridH = MapHeight * GridRenderer.CellSize;
+        float centerX = gridW * 0.5f;
+        float centerY = gridH * 0.5f;
+
+        // Vertical center line
+        DrawLine(new Vector2(centerX, 0), new Vector2(centerX, gridH), GuideColor, 2f);
+        // Horizontal center line
+        DrawLine(new Vector2(0, centerY), new Vector2(gridW, centerY), GuideColor, 2f);
     }
 }

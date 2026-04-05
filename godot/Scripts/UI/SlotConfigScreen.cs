@@ -128,12 +128,13 @@ public partial class SlotConfigScreen : Control
         if (_mapData == null) return;
 
         var assignments = new List<SlotAssignment>();
+        int nextPlayerId = 1; // Player gets 0, AI gets sequential 1, 2, 3...
         for (int i = 1; i <= _mapData.SlotCount; i++)
         {
             if (_slotAssignments[i] == "Player")
                 assignments.Add(new SlotAssignment(i, 0));
             else
-                assignments.Add(new SlotAssignment(i, i));
+                assignments.Add(new SlotAssignment(i, nextPlayerId++));
         }
 
         GameLaunchData.MapData = _mapData;

@@ -39,10 +39,13 @@ public class SymmetryMirror
             }
             if (Mode.HasFlag(SymmetryMode.DiagonalTLBR))
             {
-                if (pos.Y < mapWidth && pos.X < mapHeight)
+                // Swap X↔Y; only valid if mirrored coords are in bounds
+                int dx = pos.Y;
+                int dy = pos.X;
+                if (dx >= 0 && dx < mapWidth && dy >= 0 && dy < mapHeight)
                 {
                     int mirrorSlot = GetMirrorSlot(pos.Slot);
-                    results.Add((pos.Y, pos.X, mirrorSlot));
+                    results.Add((dx, dy, mirrorSlot));
                 }
             }
             if (Mode.HasFlag(SymmetryMode.DiagonalTRBL))

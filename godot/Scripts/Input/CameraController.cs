@@ -18,6 +18,7 @@ public partial class CameraController : Camera2D
 
 	private int _gridWidth;
 	private int _gridHeight;
+	private bool _isMiddleDragging;
 
 	public void SetGridSize(int width, int height)
 	{
@@ -61,20 +62,37 @@ public partial class CameraController : Camera2D
 
 	public override void _UnhandledInput(InputEvent @event)
 	{
-		if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed)
+		if (@event is InputEventMouseButton mouseButton)
 		{
-			float newZoom = Zoom.X;
-
-			if (mouseButton.ButtonIndex == MouseButton.WheelUp)
-				newZoom = Mathf.Min(Zoom.X + ZoomStep, ZoomMax);
-			else if (mouseButton.ButtonIndex == MouseButton.WheelDown)
-				newZoom = Mathf.Max(Zoom.X - ZoomStep, ZoomMin);
-
-			if (newZoom != Zoom.X)
+			if (mouseButton.Pressed)
 			{
-				Zoom = new Vector2(newZoom, newZoom);
-				ClampPosition();
+				float newZoom = Zoom.X;
+
+				if (mouseButton.ButtonIndex == MouseButton.WheelUp)
+					newZoom = Mathf.Min(Zoom.X + ZoomStep, ZoomMax);
+				else if (mouseButton.ButtonIndex == MouseButton.WheelDown)
+					newZoom = Mathf.Max(Zoom.X - ZoomStep, ZoomMin);
+
+				if (newZoom != Zoom.X)
+				{
+					Zoom = new Vector2(newZoom, newZoom);
+					ClampPosition();
+				}
 			}
+
+			// Middle-mouse drag panning
+			if (mouseButton.ButtonIndex == MouseButton.Middle)
+			{
+				_isMiddleDragging = mouseButton.Pressed;
+				GetViewport().SetInputAsHandled();
+			}
+		}
+
+		if (@event is InputEventMouseMotion motion && _isMiddleDragging)
+		{
+			Position -= motion.Relative / Zoom.X;
+			ClampPosition();
+			GetViewport().SetInputAsHandled();
 		}
 	}
 

@@ -24,6 +24,7 @@ public partial class EditorToolbar : Control
     public event Action? BackRequested;
     public event Action<string>? MapNameChanged;
     public event Action<int>? SlotCountChanged;
+    public event Action<bool>? GuidesToggled;
 
     // Top bar controls
     private LineEdit _mapNameEdit = null!;
@@ -219,6 +220,11 @@ public partial class EditorToolbar : Control
         _symDiagTLBR.Toggled += _ => EmitSymmetry();
         _symDiagTRBL.Toggled += _ => EmitSymmetry();
 
+        // Guides
+        AddSectionLabel(vbox, "Guides");
+        var guidesCheck = AddCheckbox(vbox, "Center Lines");
+        guidesCheck.Toggled += pressed => GuidesToggled?.Invoke(pressed);
+
         AddChild(sidePanel);
     }
 
@@ -249,10 +255,10 @@ public partial class EditorToolbar : Control
         var vbox = new VBoxContainer();
         vbox.AddThemeConstantOverride("separation", 8);
 
-        var widthSpin = new SpinBox { MinValue = 10, MaxValue = 80, Value = 41, Step = 1, Prefix = "Width:" };
+        var widthSpin = new SpinBox { MinValue = 10, MaxValue = 500, Value = 41, Step = 1, Prefix = "Width:" };
         vbox.AddChild(widthSpin);
 
-        var heightSpin = new SpinBox { MinValue = 10, MaxValue = 60, Value = 25, Step = 1, Prefix = "Height:" };
+        var heightSpin = new SpinBox { MinValue = 10, MaxValue = 500, Value = 25, Step = 1, Prefix = "Height:" };
         vbox.AddChild(heightSpin);
 
         var slotsSpin = new SpinBox { MinValue = 2, MaxValue = 6, Value = 2, Step = 1, Prefix = "Slots:" };
