@@ -49,7 +49,7 @@ public partial class GridRenderer : Node2D
 					if (alpha < 0.005f) continue;
 
 					var cellRect = new Rect2(cx * CellSize, cy * CellSize, CellSize, CellSize);
-					DrawRect(cellRect, playerColor with { A = alpha });
+					QueueGlowCircle(cellRect.GetCenter(), CellSize * 0.35f, playerColor with { A = alpha });
 				}
 			}
 		}

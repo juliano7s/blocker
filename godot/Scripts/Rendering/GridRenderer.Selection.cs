@@ -35,7 +35,7 @@ public partial class GridRenderer : Node2D
 		{
 			var segLen = Mathf.Min(drawing ? dashLen : gapLen, totalLen - pos);
 			if (drawing)
-				DrawLine(from + dir * pos, from + dir * (pos + segLen), color, lineWidth);
+				DrawLine(from + dir * pos, from + dir * (pos + segLen), color, lineWidth, true);
 			pos += segLen;
 			drawing = !drawing;
 		}

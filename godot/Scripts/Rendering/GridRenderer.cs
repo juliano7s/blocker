@@ -13,20 +13,32 @@ public partial class GridRenderer : Node2D
 {
 	public const float CellSize = 28f;
 	public const float GridLineWidth = 1f;
-	public const float BlockInset = 3f;
+	public const float BlockInset = 2.5f;
 
 	private GameConfig _config = GameConfig.CreateDefault();
 	private GameState? _gameState;
 	private float _tickInterval = 1f / 12f; // Updated by GameManager
+	private GlowLayer? _glowLayer;
+
+	public override void _Ready()
+	{
+		_glowLayer = new GlowLayer { Name = "GlowLayer" };
+		AddChild(_glowLayer);
+	}
 
 	public void SetTickInterval(float interval) => _tickInterval = interval;
-	public void SetConfig(GameConfig config) => _config = config;
+	public void SetConfig(GameConfig config)
+	{
+		_config = config;
+		SpriteFactory.Build(config);
+	}
 
 	// Per-block visual positions in world coords — driven at constant speed toward actual pos
 	private readonly Dictionary<int, Vector2> _visualPositions = new();
 
-	// Per-block idle spin angle — only advances when block is idle
+	// Per-block idle spin state — angle + cooldown until next spin
 	private readonly Dictionary<int, float> _idleAngles = new();
+	private readonly Dictionary<int, float> _idleCooldowns = new(); // seconds until next spin burst
 
 	// Jumper ghost trails — position + start time for fading afterimages
 	private record struct GhostTrail(Vector2 Pos, Color Color, float StartTime, bool IsJump);
@@ -136,30 +148,73 @@ public partial class GridRenderer : Node2D
 				_visualPositions[block.Id] = vp.MoveToward(target, speed * dt);
 			}
 
-			// Advance idle angles — only when block is idle
+			// Advance idle angles — burst spin when idle, with random cooldown between spins
 			foreach (var block in _gameState.Blocks)
 			{
 				bool idle = block.IsMobile && block.MoveTarget == null && !block.IsStunned;
 				if (!_idleAngles.ContainsKey(block.Id))
+				{
 					_idleAngles[block.Id] = 0f;
+					// Stagger initial cooldown by block ID for variety
+					_idleCooldowns[block.Id] = 0.5f + (block.Id % 7) * 0.4f;
+				}
 
 				if (idle)
 				{
-					float idleSpeed = block.Type switch
+					float current = _idleAngles[block.Id];
+					float cooldown = _idleCooldowns.GetValueOrDefault(block.Id, 0f);
+
+					// Stunner: constant smooth spin when idle
+					if (block.Type == BlockType.Stunner)
 					{
-						BlockType.Builder => 1.8f,  // moderate
-						BlockType.Soldier => 4.5f,  // fast
-						BlockType.Stunner => 2.2f,  // constant
-						_ => 0f
-					};
-					_idleAngles[block.Id] += idleSpeed * dt;
+						_idleAngles[block.Id] += 2.2f * dt;
+						continue;
+					}
+
+					// Builder/Soldier: burst spin then wait
+					// Check if we're mid-spin (not at a clean stop angle)
+					float targetAngle = block.Type == BlockType.Builder
+						? Mathf.Pi * 0.5f   // 90° per burst
+						: Mathf.Tau * 2.5f;  // 2.5 full 360s per burst
+
+					float snapUnit = block.Type == BlockType.Builder
+						? Mathf.Pi * 0.5f
+						: Mathf.Tau;
+
+					float snapped = Mathf.Round(current / snapUnit) * snapUnit;
+					bool atRest = Mathf.Abs(current - snapped) < 0.01f;
+
+					if (atRest)
+					{
+						_idleAngles[block.Id] = snapped; // clean up drift
+						cooldown -= dt;
+						_idleCooldowns[block.Id] = cooldown;
+						if (cooldown <= 0)
+						{
+							// Start a new burst — nudge angle slightly to begin
+							_idleAngles[block.Id] += 0.02f;
+							// Pseudo-random next cooldown: 3-7 seconds
+							_idleCooldowns[block.Id] = 3f + ((block.Id * 7 + (int)(now * 3)) % 13) * 0.3f;
+						}
+					}
+					else
+					{
+						// Mid-spin: advance toward next target
+						float speed = block.Type == BlockType.Builder ? 3.5f : 18f;
+						_idleAngles[block.Id] += speed * dt;
+					}
 				}
 				else
 				{
-					// Snap to nearest completed 90° so rotation doesn't freeze mid-turn
-					float quarterTurn = Mathf.Pi * 0.5f;
+					// Snap to nearest rest position
+					float snapUnit = block.Type switch
+					{
+						BlockType.Builder => Mathf.Pi * 0.5f,
+						BlockType.Soldier => Mathf.Tau,
+						_ => Mathf.Pi * 0.5f
+					};
 					float current = _idleAngles[block.Id];
-					_idleAngles[block.Id] = Mathf.Round(current / quarterTurn) * quarterTurn;
+					_idleAngles[block.Id] = Mathf.Round(current / snapUnit) * snapUnit;
 				}
 			}
 
@@ -171,7 +226,10 @@ public partial class GridRenderer : Node2D
 			foreach (var id in _visualPositions.Keys.Except(liveIds).ToList())
 				_visualPositions.Remove(id);
 			foreach (var id in _idleAngles.Keys.Except(liveIds).ToList())
+			{
 				_idleAngles.Remove(id);
+				_idleCooldowns.Remove(id);
+			}
 		}
 
 		QueueRedraw();
@@ -180,6 +238,7 @@ public partial class GridRenderer : Node2D
 	public override void _Draw()
 	{
 		if (_gameState == null) return;
+		_glowLayer?.BeginFrame();
 
 		var nestMemberIds = _gameState.Nests.SelectMany(n => n.MemberIds).ToHashSet();
 		var grid = _gameState.Grid;
@@ -228,16 +287,11 @@ public partial class GridRenderer : Node2D
 				CellSize - BlockInset * 2
 			);
 
-			// Subtle glow behind block for luminous feel
-			DrawRect(rect.Grow(2f), color with { A = 0.15f });
-			DrawRect(rect, color);
-
-			// Draw type indicator
+			// Draw type indicator (each type draws its own body)
 			DrawBlockTypeIndicator(block, rect, color);
 
-			// Rooting visual: corner anchors — suppressed when in formation/nest
-			if (!block.IsInFormation && !nestMemberIds.Contains(block.Id))
-				DrawRootingVisual(block, rect);
+			// Rooting visual: corner anchors, stripes, tendrils
+			DrawRootingVisual(block, rect);
 
 			// Frozen/stunned overlay
 			if (block.IsStunned)
@@ -282,6 +336,8 @@ public partial class GridRenderer : Node2D
 
 		// Draw death effects (explosions, fragments)
 		DrawDeathEffects();
+
+		_glowLayer?.EndFrame();
 	}
 
 	public static Vector2 GridToWorld(GridPos pos) =>
@@ -291,4 +347,34 @@ public partial class GridRenderer : Node2D
 		new((int)Mathf.Floor(world.X / CellSize), (int)Mathf.Floor(world.Y / CellSize));
 
 	private Color GetPlayerColor(int playerId) => _config.GetPalette(playerId).Base;
+
+	private void DrawRoundLine(Vector2 from, Vector2 to, Color color, float width)
+	{
+		DrawLine(from, to, color, width, true);
+		DrawCircle(from, width * 0.5f, color);
+		DrawCircle(to, width * 0.5f, color);
+	}
+
+	private void DrawGlowRadial(Vector2 center, float radius, Color color)
+	{
+		var tex = SpriteFactory.GetRadialGlow();
+		var rect = new Rect2(center - Vector2.One * radius, Vector2.One * radius * 2f);
+		DrawTextureRect(tex, rect, false, color);
+	}
+
+	private void QueueGlowLine(Vector2 from, Vector2 to, Color color, float width, bool roundCaps = false)
+	{
+		_glowLayer?.Add(GlowLayer.GlowCommand.MakeLine(from, to, color, width, roundCaps));
+	}
+
+	private void QueueGlowCircle(Vector2 center, float radius, Color color)
+	{
+		_glowLayer?.Add(GlowLayer.GlowCommand.MakeCircle(center, radius, color));
+	}
+
+	private void QueueGlowRadial(Vector2 center, float radius, Color color)
+	{
+		_glowLayer?.Add(GlowLayer.GlowCommand.MakeTexture(
+			new Rect2(center - Vector2.One * radius, Vector2.One * radius * 2f), color));
+	}
 }
