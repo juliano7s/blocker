@@ -14,8 +14,6 @@ public partial class HudOverlay : CanvasLayer
 	private GameState? _gameState;
 	private GameConfig _config = GameConfig.CreateDefault();
 	private int _controllingPlayer;
-	private IReadOnlyList<Block>? _selectedBlocks;
-
 	private static readonly Color BgColor = new(0.05f, 0.05f, 0.08f, 0.85f);
 	private static readonly Color TextColor = new(0.85f, 0.85f, 0.85f);
 	private static readonly Color DimTextColor = new(0.5f, 0.5f, 0.55f);
@@ -38,11 +36,9 @@ public partial class HudOverlay : CanvasLayer
 	public void SetGameState(GameState state) => _gameState = state;
 	public void SetConfig(GameConfig config) => _config = config;
 	public void SetControllingPlayer(int playerId) => _controllingPlayer = playerId;
-	public void SetSelectedBlocks(IReadOnlyList<Block> blocks) => _selectedBlocks = blocks;
 
 	public GameState? GetGameState() => _gameState;
 	public int GetControllingPlayer() => _controllingPlayer;
-	public IReadOnlyList<Block>? GetSelectedBlocks() => _selectedBlocks;
 
 	/// <summary>Inner Control that handles the actual drawing.</summary>
 	private partial class HudDrawControl : Control
@@ -100,58 +96,6 @@ public partial class HudOverlay : CanvasLayer
 
 			// Block count ratio bar (bottom of top bar)
 			DrawBlockRatioBar(state, new Rect2(0, barHeight, viewport.X, ratioBarHeight));
-
-			// Selection info and keybind hints (bottom-left)
-			DrawSelectionInfo(state, viewport, font, fontSize);
-		}
-
-		private void DrawSelectionInfo(GameState state, Vector2 viewport, Font font, int fontSize)
-		{
-			var selected = _hud.GetSelectedBlocks();
-			if (selected == null || selected.Count == 0) return;
-
-			const float padding = 10f;
-			float y = viewport.Y - 80f;
-
-			// Background panel
-			DrawRect(new Rect2(0, y - 5, 200, 85), BgColor);
-
-			// Count by type
-			var typeCounts = new Dictionary<BlockType, int>();
-			foreach (var block in selected)
-			{
-				typeCounts.TryGetValue(block.Type, out int count);
-				typeCounts[block.Type] = count + 1;
-			}
-
-			string selText = string.Join(", ", typeCounts.Select(kv => $"{kv.Value} {kv.Key}"));
-			DrawString(font, new Vector2(padding, y + 12), selText, HorizontalAlignment.Left, -1, fontSize, TextColor);
-
-			// Keybind hints based on selected types
-			var hints = new List<string>();
-			if (typeCounts.ContainsKey(BlockType.Builder))
-			{
-				hints.Add("F:Root  W:Wall  B:Blueprint");
-				hints.Add("G:Push");
-			}
-			if (typeCounts.ContainsKey(BlockType.Soldier))
-				hints.Add("F:Root  D:Self-Destruct  T:Tower");
-			if (typeCounts.ContainsKey(BlockType.Stunner))
-				hints.Add("F:Root  S:Stun  D:Explode  T:Tower");
-			if (typeCounts.ContainsKey(BlockType.Warden))
-				hints.Add("F:Root  D:Magnet Pull");
-			if (typeCounts.ContainsKey(BlockType.Jumper))
-				hints.Add("F:Jump");
-
-			hints.Add("A:Attack-Move  Shift:Queue");
-
-			float hintY = y + 28;
-			int smallFont = 11;
-			foreach (var hint in hints.Take(3)) // Max 3 lines
-			{
-				DrawString(font, new Vector2(padding, hintY), hint, HorizontalAlignment.Left, -1, smallFont, DimTextColor);
-				hintY += 16;
-			}
 		}
 
 		private void DrawBlockRatioBar(GameState state, Rect2 rect)

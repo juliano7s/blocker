@@ -21,6 +21,7 @@ public partial class GameManager : Node2D
 	private SelectionManager _selectionManager = null!;
 	private TickRunner _tickRunner = null!;
 	private HudOverlay _hud = null!;
+	private HudBar _hudBar = null!;
 	private PostProcessingManager _postProcessing = null!;
 
 	public override void _Ready()
@@ -82,6 +83,13 @@ public partial class GameManager : Node2D
 		_hud.SetConfig(Config);
 		_hud.SetControllingPlayer(0);
 
+		// Set up bottom HUD bar with minimap
+		_hudBar = new HudBar();
+		AddChild(_hudBar);
+		_hudBar.SetGameState(gameState);
+		_hudBar.SetConfig(Config);
+		_hudBar.MinimapCameraJump += pos => _camera.JumpTo(pos);
+
 		// Set up post-processing
 		_postProcessing = GetNode<PostProcessingManager>("PostProcessing");
 		_postProcessing.SetGameState(gameState);
@@ -107,9 +115,12 @@ public partial class GameManager : Node2D
 	{
 		// Keep HUD in sync with controlling player and selection
 		_hud.SetControllingPlayer(_selectionManager.ControllingPlayer);
-		_hud.SetSelectedBlocks(_selectionManager.SelectedBlocks);
 
 		// Pass selected IDs to renderer so selection border tracks visual position
 		_gridRenderer.SetSelectedIds(_selectionManager.SelectedBlocks);
+
+		// Feed camera position and visible area to HudBar minimap
+		var viewSize = GetViewportRect().Size / _camera.Zoom;
+		_hudBar.SetCameraView(_camera.Position, viewSize);
 	}
 }
