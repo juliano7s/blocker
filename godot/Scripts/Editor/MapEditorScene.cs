@@ -64,9 +64,10 @@ public partial class MapEditorScene : Node2D
 
 	// Camera settings
 	private const float PanSpeed = 500f;
-	private const float ZoomMin = 0.3f;
-	private const float ZoomMax = 3.0f;
-	private const float ZoomStep = 0.1f;
+	// Discrete zoom levels — CellSize * zoom is always an integer for pixel-aligned grid lines
+	private static readonly float[] ZoomLevels =
+		[0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f];
+	private int _zoomIndex = 2; // start at 1.0
 
 	public override void _Ready()
 	{
@@ -178,16 +179,18 @@ public partial class MapEditorScene : Node2D
 		{
 			if (mouseButton.Pressed)
 			{
-				if (mouseButton.ButtonIndex == MouseButton.WheelUp)
+				if (mouseButton.ButtonIndex == MouseButton.WheelUp && _zoomIndex < ZoomLevels.Length - 1)
 				{
-					_camera.Zoom = Vector2.One * Mathf.Min(_camera.Zoom.X + ZoomStep, ZoomMax);
+					_zoomIndex++;
+					_camera.Zoom = Vector2.One * ZoomLevels[_zoomIndex];
 					ClampCamera();
 					GetViewport().SetInputAsHandled();
 					return;
 				}
-				if (mouseButton.ButtonIndex == MouseButton.WheelDown)
+				if (mouseButton.ButtonIndex == MouseButton.WheelDown && _zoomIndex > 0)
 				{
-					_camera.Zoom = Vector2.One * Mathf.Max(_camera.Zoom.X - ZoomStep, ZoomMin);
+					_zoomIndex--;
+					_camera.Zoom = Vector2.One * ZoomLevels[_zoomIndex];
 					ClampCamera();
 					GetViewport().SetInputAsHandled();
 					return;
@@ -435,12 +438,16 @@ public partial class MapEditorScene : Node2D
 	{
 		var gridPixelW = _mapWidth * GridRenderer.CellSize;
 		var gridPixelH = _mapHeight * GridRenderer.CellSize;
-		var halfView = GetViewportRect().Size / (2f * _camera.Zoom);
+		var effectiveViewW = GetViewportRect().Size.X / _camera.Zoom.X;
+		var effectiveViewH = GetViewportRect().Size.Y / _camera.Zoom.Y;
 
-		float minX = halfView.X * 2 >= gridPixelW ? gridPixelW * 0.5f : halfView.X;
-		float maxX = halfView.X * 2 >= gridPixelW ? gridPixelW * 0.5f : gridPixelW - halfView.X;
-		float minY = halfView.Y * 2 >= gridPixelH ? gridPixelH * 0.5f : halfView.Y;
-		float maxY = halfView.Y * 2 >= gridPixelH ? gridPixelH * 0.5f : gridPixelH - halfView.Y;
+		float marginX = effectiveViewW * 0.25f;
+		float marginY = effectiveViewH * 0.25f;
+
+		float minX = effectiveViewW >= gridPixelW ? gridPixelW * 0.5f : effectiveViewW * 0.5f - marginX;
+		float maxX = effectiveViewW >= gridPixelW ? gridPixelW * 0.5f : gridPixelW - effectiveViewW * 0.5f + marginX;
+		float minY = effectiveViewH >= gridPixelH ? gridPixelH * 0.5f : effectiveViewH * 0.5f - marginY;
+		float maxY = effectiveViewH >= gridPixelH ? gridPixelH * 0.5f : gridPixelH - effectiveViewH * 0.5f + marginY;
 
 		_camera.Position = new Vector2(
 			Mathf.Clamp(_camera.Position.X, minX, maxX),

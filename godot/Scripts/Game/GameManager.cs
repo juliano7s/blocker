@@ -90,6 +90,11 @@ public partial class GameManager : Node2D
 		_hudBar.SetConfig(Config);
 		_hudBar.MinimapCameraJump += pos => _camera.JumpTo(pos);
 
+		// Tell camera about HUD coverage so it offsets the visible area
+		// Top bar: 32px bar + 6px ratio bar = 38px. Bottom bar: 150px.
+		_camera.SetHudInsets(38f, 150f);
+		_camera.CenterOnGrid();
+
 		// Set up post-processing
 		_postProcessing = GetNode<PostProcessingManager>("PostProcessing");
 		_postProcessing.SetGameState(gameState);

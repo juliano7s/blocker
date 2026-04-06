@@ -12,24 +12,52 @@ public partial class CameraController : Camera2D
 	[Export] public float PanSpeed = 500f;
 	[Export] public float EdgeScrollMargin = 20f;
 	[Export] public float EdgeScrollSpeed = 400f;
-	[Export] public float ZoomMin = 0.5f;
-	[Export] public float ZoomMax = 3.0f;
-	[Export] public float ZoomStep = 0.1f;
+
+	// Discrete zoom levels — chosen so CellSize * zoom is always an integer,
+	// which keeps grid lines pixel-aligned at every level.
+	private static readonly float[] ZoomLevels =
+		[0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f];
+	private int _zoomIndex = 2; // start at 1.0
 
 	private int _gridWidth;
 	private int _gridHeight;
 	private bool _isMiddleDragging;
 
+	// HUD insets in screen pixels — the camera treats the viewport as smaller
+	// so grid content isn't hidden behind HUD elements
+	private float _hudInsetTop;
+	private float _hudInsetBottom;
+
 	public void SetGridSize(int width, int height)
 	{
 		_gridWidth = width;
 		_gridHeight = height;
+		CenterOnGrid();
+	}
 
-		// Center camera on grid
+	public void CenterOnGrid()
+	{
 		var gridPixelW = _gridWidth * GridRenderer.CellSize;
 		var gridPixelH = _gridHeight * GridRenderer.CellSize;
-		Position = new Vector2(gridPixelW * 0.5f, gridPixelH * 0.5f);
-		GD.Print($"Camera centered at {Position} for grid {width}x{height} ({gridPixelW}x{gridPixelH}px)");
+
+		// Offset Y to account for asymmetric HUD (top bar vs bottom bar)
+		float insetTopWorld = _hudInsetTop / Zoom.Y;
+		float insetBottomWorld = _hudInsetBottom / Zoom.Y;
+		float centerOffsetY = (insetTopWorld - insetBottomWorld) * 0.5f;
+
+		Position = new Vector2(gridPixelW * 0.5f, gridPixelH * 0.5f + centerOffsetY);
+		GD.Print($"Camera centered at {Position} for grid {_gridWidth}x{_gridHeight}");
+	}
+
+	/// <summary>
+	/// Tell the camera how much screen space is covered by HUD overlays.
+	/// The camera offsets its center and clamp bounds so grid content
+	/// remains visible between the HUD bars.
+	/// </summary>
+	public void SetHudInsets(float top, float bottom)
+	{
+		_hudInsetTop = top;
+		_hudInsetBottom = bottom;
 	}
 
 	public void JumpTo(Vector2 worldPos)
@@ -72,16 +100,18 @@ public partial class CameraController : Camera2D
 		{
 			if (mouseButton.Pressed)
 			{
-				float newZoom = Zoom.X;
+				int newIndex = _zoomIndex;
 
 				if (mouseButton.ButtonIndex == MouseButton.WheelUp)
-					newZoom = Mathf.Min(Zoom.X + ZoomStep, ZoomMax);
+					newIndex = Mathf.Min(_zoomIndex + 1, ZoomLevels.Length - 1);
 				else if (mouseButton.ButtonIndex == MouseButton.WheelDown)
-					newZoom = Mathf.Max(Zoom.X - ZoomStep, ZoomMin);
+					newIndex = Mathf.Max(_zoomIndex - 1, 0);
 
-				if (newZoom != Zoom.X)
+				if (newIndex != _zoomIndex)
 				{
-					Zoom = new Vector2(newZoom, newZoom);
+					_zoomIndex = newIndex;
+					float z = ZoomLevels[_zoomIndex];
+					Zoom = new Vector2(z, z);
 					ClampPosition();
 				}
 			}
@@ -108,29 +138,47 @@ public partial class CameraController : Camera2D
 
 		var gridPixelW = _gridWidth * GridRenderer.CellSize;
 		var gridPixelH = _gridHeight * GridRenderer.CellSize;
-		var halfView = GetViewportRect().Size / (2f * Zoom);
+		var viewportSize = GetViewportRect().Size;
 
-		// If viewport is larger than grid, center on grid
+		// Convert HUD insets from screen pixels to world units
+		float insetTopWorld = _hudInsetTop / Zoom.Y;
+		float insetBottomWorld = _hudInsetBottom / Zoom.Y;
+
+		// The effective visible area (between HUD bars) in world units
+		float effectiveViewW = viewportSize.X / Zoom.X;
+		float effectiveViewH = (viewportSize.Y - _hudInsetTop - _hudInsetBottom) / Zoom.Y;
+
+		// The camera center is offset from the middle of the effective area
+		// because the top bar and bottom bar have different heights.
+		// Camera "center" in world is shifted down by (insetTop - insetBottom) / 2
+		// relative to the true viewport center.
+		float centerOffsetY = (insetTopWorld - insetBottomWorld) * 0.5f;
+
+		// Allow panning ~quarter-viewport past each grid edge so corners
+		// are reachable but you don't scroll into pure void.
+		float marginX = effectiveViewW * 0.25f;
+		float marginY = effectiveViewH * 0.25f;
+
 		float minX, maxX, minY, maxY;
 
-		if (halfView.X * 2 >= gridPixelW)
+		if (effectiveViewW >= gridPixelW)
 		{
 			minX = maxX = gridPixelW * 0.5f;
 		}
 		else
 		{
-			minX = halfView.X;
-			maxX = gridPixelW - halfView.X;
+			minX = effectiveViewW * 0.5f - marginX;
+			maxX = gridPixelW - effectiveViewW * 0.5f + marginX;
 		}
 
-		if (halfView.Y * 2 >= gridPixelH)
+		if (effectiveViewH >= gridPixelH)
 		{
-			minY = maxY = gridPixelH * 0.5f;
+			minY = maxY = gridPixelH * 0.5f + centerOffsetY;
 		}
 		else
 		{
-			minY = halfView.Y;
-			maxY = gridPixelH - halfView.Y;
+			minY = effectiveViewH * 0.5f - marginY + centerOffsetY;
+			maxY = gridPixelH - effectiveViewH * 0.5f + marginY + centerOffsetY;
 		}
 
 		Position = new Vector2(
