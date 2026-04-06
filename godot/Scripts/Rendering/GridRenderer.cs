@@ -40,6 +40,10 @@ public partial class GridRenderer : Node2D
 	private readonly Dictionary<int, float> _idleAngles = new();
 	private readonly Dictionary<int, float> _idleCooldowns = new(); // seconds until next spin burst
 
+	// Reusable set for dead-block cleanup — avoids per-frame allocation
+	private readonly HashSet<int> _liveIdSet = new();
+	private readonly List<int> _deadIds = new();
+
 	// Jumper ghost trails — position + start time for fading afterimages
 	private record struct GhostTrail(Vector2 Pos, Color Color, float StartTime, bool IsJump);
 	private readonly List<GhostTrail> _ghostTrails = [];
@@ -79,7 +83,7 @@ public partial class GridRenderer : Node2D
 				// Jumper ghost trails from moves and jumps
 			if (evt.Type == VisualEventType.BlockMoved && evt.BlockId.HasValue)
 			{
-				var movedBlock = _gameState.Blocks.FirstOrDefault(b => b.Id == evt.BlockId.Value);
+				var movedBlock = _gameState.GetBlock(evt.BlockId.Value);
 				if (movedBlock is { Type: BlockType.Jumper })
 				{
 					var ghostPos = _visualPositions.TryGetValue(movedBlock.Id, out var gvp)
@@ -90,7 +94,7 @@ public partial class GridRenderer : Node2D
 			}
 			if (evt.Type == VisualEventType.JumpExecuted && evt.BlockId.HasValue)
 			{
-				var jumper = _gameState.Blocks.FirstOrDefault(b => b.Id == evt.BlockId.Value);
+				var jumper = _gameState.GetBlock(evt.BlockId.Value);
 				if (jumper != null)
 				{
 					var jumpColor = GetPlayerColor(jumper.PlayerId);
@@ -221,11 +225,23 @@ public partial class GridRenderer : Node2D
 			// Clean up ghost trails
 			_ghostTrails.RemoveAll(g => now - g.StartTime > (g.IsJump ? 0.3f : 0.5f));
 
-			// Remove positions for blocks that have died
-			var liveIds = _gameState.Blocks.Select(b => b.Id).ToHashSet();
-			foreach (var id in _visualPositions.Keys.Except(liveIds).ToList())
+			// Remove positions for blocks that have died — no allocations
+			_liveIdSet.Clear();
+			foreach (var block in _gameState.Blocks)
+				_liveIdSet.Add(block.Id);
+
+			_deadIds.Clear();
+			foreach (var id in _visualPositions.Keys)
+				if (!_liveIdSet.Contains(id))
+					_deadIds.Add(id);
+			foreach (var id in _deadIds)
 				_visualPositions.Remove(id);
-			foreach (var id in _idleAngles.Keys.Except(liveIds).ToList())
+
+			_deadIds.Clear();
+			foreach (var id in _idleAngles.Keys)
+				if (!_liveIdSet.Contains(id))
+					_deadIds.Add(id);
+			foreach (var id in _deadIds)
 			{
 				_idleAngles.Remove(id);
 				_idleCooldowns.Remove(id);
@@ -235,18 +251,42 @@ public partial class GridRenderer : Node2D
 		QueueRedraw();
 	}
 
+	/// <summary>
+	/// Computes the visible cell range from the current canvas transform.
+	/// Returns (minX, minY, maxX, maxY) clamped to grid bounds.
+	/// </summary>
+	private (int minX, int minY, int maxX, int maxY) GetVisibleCellRange()
+	{
+		var grid = _gameState!.Grid;
+		var xform = GetCanvasTransform();
+		var invXform = xform.AffineInverse();
+		var vpSize = GetViewportRect().Size;
+
+		// Transform viewport corners to world space
+		var topLeft = invXform * Vector2.Zero;
+		var bottomRight = invXform * vpSize;
+
+		// Convert to cell indices with 1-cell margin for partial visibility
+		int minX = Mathf.Max(0, (int)Mathf.Floor(topLeft.X / CellSize) - 1);
+		int minY = Mathf.Max(0, (int)Mathf.Floor(topLeft.Y / CellSize) - 1);
+		int maxX = Mathf.Min(grid.Width - 1, (int)Mathf.Ceil(bottomRight.X / CellSize) + 1);
+		int maxY = Mathf.Min(grid.Height - 1, (int)Mathf.Ceil(bottomRight.Y / CellSize) + 1);
+
+		return (minX, minY, maxX, maxY);
+	}
+
 	public override void _Draw()
 	{
 		if (_gameState == null) return;
 		_glowLayer?.BeginFrame();
 
-		var nestMemberIds = _gameState.Nests.SelectMany(n => n.MemberIds).ToHashSet();
 		var grid = _gameState.Grid;
+		var (minX, minY, maxX, maxY) = GetVisibleCellRange();
 
-		// Draw cell backgrounds
-		for (int y = 0; y < grid.Height; y++)
+		// Draw cell backgrounds — only visible cells
+		for (int y = minY; y <= maxY; y++)
 		{
-			for (int x = 0; x < grid.Width; x++)
+			for (int x = minX; x <= maxX; x++)
 			{
 				var cell = grid[x, y];
 				var rect = new Rect2(x * CellSize, y * CellSize, CellSize, CellSize);
@@ -258,18 +298,23 @@ public partial class GridRenderer : Node2D
 			}
 		}
 
-		// Draw grid lines
-		for (int x = 0; x <= grid.Width; x++)
+		// Draw grid lines — only visible range, scale width by 1/zoom so lines are always 1 screen pixel
+		float screenPixelWidth = GridLineWidth / GetCanvasTransform().X.X;
+		float gridTop = minY * CellSize;
+		float gridBottom = (maxY + 1) * CellSize;
+		for (int x = minX; x <= maxX + 1; x++)
 		{
-			var from = new Vector2(x * CellSize, 0);
-			var to = new Vector2(x * CellSize, grid.Height * CellSize);
-			DrawLine(from, to, _config.GridLineColor, GridLineWidth);
+			var from = new Vector2(x * CellSize, gridTop);
+			var to = new Vector2(x * CellSize, gridBottom);
+			DrawLine(from, to, _config.GridLineColor, screenPixelWidth, false);
 		}
-		for (int y = 0; y <= grid.Height; y++)
+		float gridLeft = minX * CellSize;
+		float gridRight = (maxX + 1) * CellSize;
+		for (int y = minY; y <= maxY + 1; y++)
 		{
-			var from = new Vector2(0, y * CellSize);
-			var to = new Vector2(grid.Width * CellSize, y * CellSize);
-			DrawLine(from, to, _config.GridLineColor, GridLineWidth);
+			var from = new Vector2(gridLeft, y * CellSize);
+			var to = new Vector2(gridRight, y * CellSize);
+			DrawLine(from, to, _config.GridLineColor, screenPixelWidth, false);
 		}
 
 		// Draw blocks using smooth visual positions (constant-speed interpolation)

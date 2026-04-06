@@ -22,10 +22,17 @@ public partial class MinimapPanel : Control
     private Vector2 _cameraWorldPos;
     private Vector2 _cameraViewSize; // visible world area in pixels
 
+    // How much extra space (as fraction of grid size) to show around the grid
+    private const float MarginFraction = 0.15f;
+
     private static readonly Color BorderColor = new(0.4f, 0.4f, 0.5f, 0.8f);
     private static readonly Color BgColor = new(0.05f, 0.05f, 0.08f, 0.9f);
     private static readonly Color ViewportRectColor = new(1f, 1f, 1f, 0.7f);
     private static readonly Color TerrainColor = new(0.3f, 0.3f, 0.35f);
+    private static readonly Color GridAreaColor = new(0.08f, 0.08f, 0.11f);
+
+    private int _frameCounter;
+    private const int RedrawEveryNFrames = 3;
 
     public void SetGameState(GameState state) => _gameState = state;
     public void SetConfig(GameConfig config) => _config = config;
@@ -36,7 +43,53 @@ public partial class MinimapPanel : Control
         _cameraViewSize = viewSize;
     }
 
-    public override void _Process(double delta) => QueueRedraw();
+    public override void _Ready()
+    {
+        ClipContents = true;
+    }
+
+    public override void _Process(double delta)
+    {
+        _frameCounter++;
+        if (_frameCounter % RedrawEveryNFrames == 0)
+            QueueRedraw();
+    }
+
+    /// <summary>
+    /// Computes the mapping from "world in grid-cell units" to panel pixels.
+    /// The total area is the grid plus MarginFraction on each side.
+    /// Returns (scale, gridOffsetX, gridOffsetY) where gridOffset is
+    /// the panel-pixel position of grid cell (0,0).
+    /// </summary>
+    private (float scale, float gridOffX, float gridOffY) ComputeLayout()
+    {
+        var grid = _gameState!.Grid;
+        var panelSize = Size;
+
+        // Total area in grid-cell units: grid + margin on each side
+        float marginCellsX = grid.Width * MarginFraction;
+        float marginCellsY = grid.Height * MarginFraction;
+        float totalW = grid.Width + marginCellsX * 2;
+        float totalH = grid.Height + marginCellsY * 2;
+
+        // Fit total area into panel with 2px pixel margin
+        const float panelMargin = 2f;
+        float availW = panelSize.X - panelMargin * 2;
+        float availH = panelSize.Y - panelMargin * 2;
+        float scale = Mathf.Min(availW / totalW, availH / totalH);
+
+        // Center the total area in the panel
+        float drawnW = totalW * scale;
+        float drawnH = totalH * scale;
+        float areaOffX = panelMargin + (availW - drawnW) * 0.5f;
+        float areaOffY = panelMargin + (availH - drawnH) * 0.5f;
+
+        // Grid (0,0) starts after the margin cells
+        float gridOffX = areaOffX + marginCellsX * scale;
+        float gridOffY = areaOffY + marginCellsY * scale;
+
+        return (scale, gridOffX, gridOffY);
+    }
 
     public override void _Draw()
     {
@@ -44,23 +97,15 @@ public partial class MinimapPanel : Control
 
         var grid = _gameState.Grid;
         var panelSize = Size;
+        var (scale, gridOffX, gridOffY) = ComputeLayout();
 
-        // Background
+        // Background (entire panel — includes margin area)
         DrawRect(new Rect2(Vector2.Zero, panelSize), BgColor);
 
-        // Calculate scale to fit grid into panel with 2px margin
-        const float margin = 2f;
-        float availW = panelSize.X - margin * 2;
-        float availH = panelSize.Y - margin * 2;
-        float scaleX = availW / grid.Width;
-        float scaleY = availH / grid.Height;
-        float scale = Mathf.Min(scaleX, scaleY);
-
-        // Center the map within the panel
-        float mapW = grid.Width * scale;
-        float mapH = grid.Height * scale;
-        float offsetX = margin + (availW - mapW) * 0.5f;
-        float offsetY = margin + (availH - mapH) * 0.5f;
+        // Grid area background (slightly lighter than margin to distinguish)
+        float gridW = grid.Width * scale;
+        float gridH = grid.Height * scale;
+        DrawRect(new Rect2(gridOffX, gridOffY, gridW, gridH), GridAreaColor);
 
         // Draw ground and terrain
         for (int y = 0; y < grid.Height; y++)
@@ -75,11 +120,11 @@ public partial class MinimapPanel : Control
                 else if (cell.Ground != GroundType.Normal)
                     color = _config.GetGroundColor(cell.Ground);
                 else
-                    continue; // Normal ground — skip, BG covers it
+                    continue; // Normal ground — skip, grid area bg covers it
 
                 var rect = new Rect2(
-                    offsetX + x * scale,
-                    offsetY + y * scale,
+                    gridOffX + x * scale,
+                    gridOffY + y * scale,
                     Mathf.Max(scale, 1f),
                     Mathf.Max(scale, 1f));
                 DrawRect(rect, color);
@@ -91,12 +136,12 @@ public partial class MinimapPanel : Control
         foreach (var block in _gameState.Blocks)
         {
             var bcolor = _config.GetPalette(block.PlayerId).Base;
-            float bx = offsetX + (block.Pos.X + 0.5f) * scale;
-            float by = offsetY + (block.Pos.Y + 0.5f) * scale;
+            float bx = gridOffX + (block.Pos.X + 0.5f) * scale;
+            float by = gridOffY + (block.Pos.Y + 0.5f) * scale;
             DrawRect(new Rect2(bx - dotSize * 0.5f, by - dotSize * 0.5f, dotSize, dotSize), bcolor);
         }
 
-        // Draw camera viewport rectangle
+        // Draw camera viewport rectangle (in grid-cell units, offset from grid origin)
         float cellSize = GridRenderer.CellSize;
         float camLeft = (_cameraWorldPos.X - _cameraViewSize.X * 0.5f) / cellSize;
         float camTop = (_cameraWorldPos.Y - _cameraViewSize.Y * 0.5f) / cellSize;
@@ -104,23 +149,12 @@ public partial class MinimapPanel : Control
         float camH = _cameraViewSize.Y / cellSize;
 
         var vpRect = new Rect2(
-            offsetX + camLeft * scale,
-            offsetY + camTop * scale,
+            gridOffX + camLeft * scale,
+            gridOffY + camTop * scale,
             camW * scale,
             camH * scale);
 
-        // Clamp viewport rect to map bounds
-        float clampedLeft = Mathf.Max(vpRect.Position.X, offsetX);
-        float clampedTop = Mathf.Max(vpRect.Position.Y, offsetY);
-        float clampedRight = Mathf.Min(vpRect.End.X, offsetX + mapW);
-        float clampedBottom = Mathf.Min(vpRect.End.Y, offsetY + mapH);
-
-        if (clampedRight > clampedLeft && clampedBottom > clampedTop)
-        {
-            var clampedVp = new Rect2(clampedLeft, clampedTop,
-                clampedRight - clampedLeft, clampedBottom - clampedTop);
-            DrawRect(clampedVp, ViewportRectColor, false, 1.0f);
-        }
+        DrawRect(vpRect, ViewportRectColor, false, 1.0f);
 
         // Border
         DrawRect(new Rect2(Vector2.Zero, panelSize), BorderColor, false, 1.0f);
@@ -145,24 +179,11 @@ public partial class MinimapPanel : Control
     {
         if (_gameState == null) return;
 
-        var grid = _gameState.Grid;
-        var panelSize = Size;
+        var (scale, gridOffX, gridOffY) = ComputeLayout();
 
-        const float margin = 2f;
-        float availW = panelSize.X - margin * 2;
-        float availH = panelSize.Y - margin * 2;
-        float scaleX = availW / grid.Width;
-        float scaleY = availH / grid.Height;
-        float scale = Mathf.Min(scaleX, scaleY);
-
-        float mapW = grid.Width * scale;
-        float mapH = grid.Height * scale;
-        float offsetX = margin + (availW - mapW) * 0.5f;
-        float offsetY = margin + (availH - mapH) * 0.5f;
-
-        // Convert click to grid coords, then to world coords
-        float gridX = (localPos.X - offsetX) / scale;
-        float gridY = (localPos.Y - offsetY) / scale;
+        // Convert click to grid coords (can be negative or > grid size in margin area)
+        float gridX = (localPos.X - gridOffX) / scale;
+        float gridY = (localPos.Y - gridOffY) / scale;
 
         float worldX = gridX * GridRenderer.CellSize;
         float worldY = gridY * GridRenderer.CellSize;

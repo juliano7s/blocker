@@ -19,14 +19,11 @@ public partial class GridRenderer : Node2D
 			var (outlineColor, outlineGlow, diamondColor) = GetFormationStyle(formation.Type, palette);
 			float alpha = formation.TeardownTimer > 0 ? 0.45f : 0.9f;
 
-			var members = formation.MemberIds
-				.Select(id => _gameState.GetBlock(id))
-				.Where(b => b != null)
-				.ToList();
-
-			foreach (var block in members)
+			foreach (var id in formation.MemberIds)
 			{
-				var blockRect = GetFormationBlockRect(block!.Pos);
+				var block = _gameState.GetBlock(id);
+				if (block == null) continue;
+				var blockRect = GetFormationBlockRect(block.Pos);
 				DrawFormationBlock(blockRect, outlineColor with { A = alpha }, outlineGlow with { A = alpha * 0.35f }, diamondColor with { A = alpha });
 
 				if (formation.TeardownTimer > 0)
@@ -40,14 +37,11 @@ public partial class GridRenderer : Node2D
 			var (outlineColor, outlineGlow, diamondColor) = GetNestStyle(nest.Type, palette);
 			float alpha = nest.TeardownTimer > 0 ? 0.45f : 0.9f;
 
-			var members = nest.MemberIds
-				.Select(id => _gameState.GetBlock(id))
-				.Where(b => b != null)
-				.ToList();
-
-			foreach (var block in members)
+			foreach (var id in nest.MemberIds)
 			{
-				var blockRect = GetFormationBlockRect(block!.Pos);
+				var block = _gameState.GetBlock(id);
+				if (block == null) continue;
+				var blockRect = GetFormationBlockRect(block.Pos);
 				DrawFormationBlock(blockRect, outlineColor with { A = alpha }, outlineGlow with { A = alpha * 0.35f }, diamondColor with { A = alpha });
 
 				if (nest.TeardownTimer > 0)
