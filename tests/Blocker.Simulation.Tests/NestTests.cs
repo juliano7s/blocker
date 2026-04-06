@@ -126,13 +126,13 @@ public class NestTests
         var center = new GridPos(5, 5);
         SetGroundType(state, center, GroundType.Boot);
 
-        // 3 Builders orthogonal
+        // 3 Builders orthogonal (up, right, down)
         AddRootedBlock(state, BlockType.Builder, 0, new GridPos(5, 4));
         AddRootedBlock(state, BlockType.Builder, 0, new GridPos(6, 5));
         AddRootedBlock(state, BlockType.Builder, 0, new GridPos(5, 6));
-        // 2 Walls diagonal
+        // 2 Walls on same side: upper-right + lower-right (valid cross pattern)
         AddRootedBlock(state, BlockType.Wall, 0, new GridPos(6, 4));
-        AddRootedBlock(state, BlockType.Wall, 0, new GridPos(4, 6));
+        AddRootedBlock(state, BlockType.Wall, 0, new GridPos(6, 6));
 
         NestSystem.DetectNests(state);
 
@@ -149,13 +149,13 @@ public class NestTests
         var center = new GridPos(5, 5);
         SetGroundType(state, center, GroundType.Boot);
 
-        // 3 Soldiers orthogonal
+        // 3 Soldiers orthogonal (up, right, down)
         AddRootedBlock(state, BlockType.Soldier, 0, new GridPos(5, 4));
         AddRootedBlock(state, BlockType.Soldier, 0, new GridPos(6, 5));
         AddRootedBlock(state, BlockType.Soldier, 0, new GridPos(5, 6));
-        // 2 Walls diagonal
+        // 2 Walls on same side: upper-right + lower-right (valid cross pattern)
         AddRootedBlock(state, BlockType.Wall, 0, new GridPos(6, 4));
-        AddRootedBlock(state, BlockType.Wall, 0, new GridPos(4, 6));
+        AddRootedBlock(state, BlockType.Wall, 0, new GridPos(6, 6));
 
         NestSystem.DetectNests(state);
 
@@ -179,9 +179,9 @@ public class NestTests
         NestSystem.DetectNests(state);
         Assert.Equal(NestType.Builder, state.Nests[0].Type);
 
-        // Add walls at diagonals
+        // Add walls on same side: upper-right + lower-right (valid cross pattern)
         AddRootedBlock(state, BlockType.Wall, 0, new GridPos(6, 4));
-        AddRootedBlock(state, BlockType.Wall, 0, new GridPos(4, 6));
+        AddRootedBlock(state, BlockType.Wall, 0, new GridPos(6, 6));
 
         NestSystem.DetectNests(state);
         Assert.Equal(NestType.Soldier, state.Nests[0].Type);

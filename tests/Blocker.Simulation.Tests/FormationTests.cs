@@ -86,12 +86,15 @@ public class FormationTests
     }
 
     [Fact]
-    public void Supply_MobileWalls_NoFormation()
+    public void Supply_BuilderNotWall_NoFormation()
     {
         var state = CreateState();
         AddRootedWall(state, 0, new GridPos(5, 5));
         AddRootedWall(state, 0, new GridPos(6, 5));
-        var w3 = state.AddBlock(BlockType.Wall, 0, new GridPos(5, 6)); // Not rooted
+        // A rooted builder can't substitute for a wall in supply formation
+        var b = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 6));
+        b.State = BlockState.Rooted;
+        b.RootProgress = Constants.RootTicks;
 
         FormationSystem.DetectFormations(state);
 
