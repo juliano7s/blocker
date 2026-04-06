@@ -32,6 +32,12 @@ public partial class CameraController : Camera2D
 		GD.Print($"Camera centered at {Position} for grid {width}x{height} ({gridPixelW}x{gridPixelH}px)");
 	}
 
+	public void JumpTo(Vector2 worldPos)
+	{
+		Position = worldPos;
+		ClampPosition();
+	}
+
 	public override void _Process(double delta)
 	{
 		var dt = (float)delta;
