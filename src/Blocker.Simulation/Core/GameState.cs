@@ -17,6 +17,9 @@ public class GameState
     public List<VisualEvent> VisualEvents { get; } = [];
     public int TickNumber { get; private set; }
 
+    // O(1) block lookup by ID — maintained by AddBlock/RemoveBlock
+    private readonly Dictionary<int, Block> _blockById = new();
+
     public GameState(Grid grid)
     {
         Grid = grid;
@@ -29,7 +32,7 @@ public class GameState
         return blockId.HasValue ? GetBlock(blockId.Value) : null;
     }
 
-    public Block? GetBlock(int id) => Blocks.Find(b => b.Id == id);
+    public Block? GetBlock(int id) => _blockById.GetValueOrDefault(id);
 
     public int GetPopulation(int playerId) =>
         Blocks.Where(b => b.PlayerId == playerId).Sum(b => b.PopCost);
@@ -50,6 +53,7 @@ public class GameState
             }
         };
         Blocks.Add(block);
+        _blockById[block.Id] = block;
         Grid[pos].BlockId = block.Id;
         return block;
     }
@@ -59,6 +63,7 @@ public class GameState
         if (Grid.InBounds(block.Pos) && Grid[block.Pos].BlockId == block.Id)
             Grid[block.Pos].BlockId = null;
         Blocks.Remove(block);
+        _blockById.Remove(block.Id);
     }
 
     /// <summary>
