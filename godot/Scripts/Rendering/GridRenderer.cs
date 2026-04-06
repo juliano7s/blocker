@@ -55,7 +55,9 @@ public partial class GridRenderer : Node2D
 
 	public void SetSelectedIds(IReadOnlyList<Blocker.Simulation.Blocks.Block> selected)
 	{
-		_selectedIds = [.. selected.Select(b => b.Id)];
+		_selectedIds.Clear();
+		foreach (var b in selected)
+			_selectedIds.Add(b.Id);
 	}
 
 	// Death effect tracking
@@ -136,30 +138,30 @@ public partial class GridRenderer : Node2D
 			_deathEffects.RemoveAll(e => now - e.StartTime > e.Duration);
 			_fragments.RemoveAll(f => now - f.StartTime > _config.FragmentLifetime);
 
-			// Smooth visual positions: move each block toward its actual grid pos at constant speed
+			// Single pass: smooth visual positions + idle spin angles + build live ID set
 			float dt = (float)delta;
+			_liveIdSet.Clear();
 			foreach (var block in _gameState.Blocks)
 			{
+				_liveIdSet.Add(block.Id);
+
+				// --- Visual position interpolation ---
 				var target = GridToWorld(block.Pos);
 				if (!_visualPositions.TryGetValue(block.Id, out var vp))
 				{
-					// New block — snap immediately
 					_visualPositions[block.Id] = target;
-					continue;
 				}
-				// Speed = 1 cell per (MoveInterval * tickInterval) seconds
-				float speed = CellSize / (block.EffectiveMoveInterval * _tickInterval);
-				_visualPositions[block.Id] = vp.MoveToward(target, speed * dt);
-			}
+				else
+				{
+					float speed = CellSize / (block.EffectiveMoveInterval * _tickInterval);
+					_visualPositions[block.Id] = vp.MoveToward(target, speed * dt);
+				}
 
-			// Advance idle angles — burst spin when idle, with random cooldown between spins
-			foreach (var block in _gameState.Blocks)
-			{
+				// --- Idle spin angles ---
 				bool idle = block.IsMobile && block.MoveTarget == null && !block.IsStunned;
 				if (!_idleAngles.ContainsKey(block.Id))
 				{
 					_idleAngles[block.Id] = 0f;
-					// Stagger initial cooldown by block ID for variety
 					_idleCooldowns[block.Id] = 0.5f + (block.Id % 7) * 0.4f;
 				}
 
@@ -168,18 +170,11 @@ public partial class GridRenderer : Node2D
 					float current = _idleAngles[block.Id];
 					float cooldown = _idleCooldowns.GetValueOrDefault(block.Id, 0f);
 
-					// Stunner: constant smooth spin when idle
 					if (block.Type == BlockType.Stunner)
 					{
 						_idleAngles[block.Id] += 1.5f * dt;
 						continue;
 					}
-
-					// Builder/Soldier: burst spin then wait
-					// Check if we're mid-spin (not at a clean stop angle)
-					float targetAngle = block.Type == BlockType.Builder
-						? Mathf.Pi * 0.5f   // 90° per burst
-						: Mathf.Tau * 2.5f;  // 2.5 full 360s per burst
 
 					float snapUnit = block.Type == BlockType.Builder
 						? Mathf.Pi * 0.5f
@@ -190,27 +185,23 @@ public partial class GridRenderer : Node2D
 
 					if (atRest)
 					{
-						_idleAngles[block.Id] = snapped; // clean up drift
+						_idleAngles[block.Id] = snapped;
 						cooldown -= dt;
 						_idleCooldowns[block.Id] = cooldown;
 						if (cooldown <= 0)
 						{
-							// Start a new burst — nudge angle slightly to begin
 							_idleAngles[block.Id] += 0.02f;
-							// Pseudo-random next cooldown: 3-7 seconds
 							_idleCooldowns[block.Id] = 3f + ((block.Id * 7 + (int)(now * 3)) % 13) * 0.3f;
 						}
 					}
 					else
 					{
-						// Mid-spin: advance toward next target
 						float speed = block.Type == BlockType.Builder ? 3.5f : 18f;
 						_idleAngles[block.Id] += speed * dt;
 					}
 				}
 				else
 				{
-					// Snap to nearest rest position
 					float snapUnit = block.Type switch
 					{
 						BlockType.Builder => Mathf.Pi * 0.5f,
@@ -224,11 +215,6 @@ public partial class GridRenderer : Node2D
 
 			// Clean up ghost trails
 			_ghostTrails.RemoveAll(g => now - g.StartTime > (g.IsJump ? 0.3f : 0.5f));
-
-			// Remove positions for blocks that have died — no allocations
-			_liveIdSet.Clear();
-			foreach (var block in _gameState.Blocks)
-				_liveIdSet.Add(block.Id);
 
 			_deadIds.Clear();
 			foreach (var id in _visualPositions.Keys)
@@ -317,14 +303,24 @@ public partial class GridRenderer : Node2D
 			DrawLine(from, to, _config.GridLineColor, screenPixelWidth, false);
 		}
 
-		// Draw blocks using smooth visual positions (constant-speed interpolation)
+		// Draw blocks — viewport cull using visible cell range with extra margin
+		float blockViewMinX = (minX - 1) * CellSize;
+		float blockViewMaxX = (maxX + 2) * CellSize;
+		float blockViewMinY = (minY - 1) * CellSize;
+		float blockViewMaxY = (maxY + 2) * CellSize;
+
 		foreach (var block in _gameState.Blocks)
 		{
-			var color = _config.GetPalette(block.PlayerId).Base;
 			var worldPos = _visualPositions.TryGetValue(block.Id, out var vp)
 				? vp
 				: GridToWorld(block.Pos);
 
+			// Skip blocks outside visible area
+			if (worldPos.X < blockViewMinX || worldPos.X > blockViewMaxX ||
+				worldPos.Y < blockViewMinY || worldPos.Y > blockViewMaxY)
+				continue;
+
+			var color = _config.GetPalette(block.PlayerId).Base;
 			var rect = new Rect2(
 				worldPos.X - CellSize / 2f + BlockInset,
 				worldPos.Y - CellSize / 2f + BlockInset,

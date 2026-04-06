@@ -228,32 +228,52 @@ public static class NestSystem
         TryFormBuilderNest(state, center, orthoBlocks);
     }
 
+    /// <summary>
+    /// 5-block cross pattern (game bible Section 6.2):
+    ///   [a][w]
+    ///      [a]  ← center (nest zone)
+    ///   [a][w]
+    /// 2 walls must be on the same side (adjacent diagonals).
+    /// 3 main units fill the 3 orthogonal positions facing the walls.
+    /// </summary>
     private static bool TryFormCrossNest(GameState state, GridPos center,
         List<Block> orthoBlocks, List<Block> diagBlocks,
         BlockType mainType, NestType nestType, int mainNeeded)
     {
-        // Group orthogonal main-type blocks by player
-        var playerGroups = orthoBlocks
-            .Where(b => b.Type == mainType)
-            .GroupBy(b => b.PlayerId);
-
-        foreach (var group in playerGroups)
+        // The 4 valid cross orientations: (wall diag 1, wall diag 2, required ortho 1, ortho 2, ortho 3)
+        var crossPatterns = new (GridPos wallD1, GridPos wallD2, GridPos o1, GridPos o2, GridPos o3)[]
         {
-            var mainBlocks = group.ToList();
-            if (mainBlocks.Count < mainNeeded) continue;
+            // Walls right:  diag(1,-1),(1,1)  ortho: up, right, down
+            (new(1,-1), new(1,1), new(0,-1), new(1,0), new(0,1)),
+            // Walls left:   diag(-1,-1),(-1,1)  ortho: up, left, down
+            (new(-1,-1), new(-1,1), new(0,-1), new(-1,0), new(0,1)),
+            // Walls up:     diag(-1,-1),(1,-1)  ortho: left, up, right
+            (new(-1,-1), new(1,-1), new(-1,0), new(0,-1), new(1,0)),
+            // Walls down:   diag(-1,1),(1,1)  ortho: left, down, right
+            (new(-1,1), new(1,1), new(-1,0), new(0,1), new(1,0)),
+        };
 
-            int playerId = group.Key;
+        foreach (var (wallD1, wallD2, o1, o2, o3) in crossPatterns)
+        {
+            var w1 = diagBlocks.FirstOrDefault(b =>
+                b.Pos == center + wallD1 && b.Type == BlockType.Wall);
+            var w2 = diagBlocks.FirstOrDefault(b =>
+                b.Pos == center + wallD2 && b.Type == BlockType.Wall);
+            if (w1 == null || w2 == null) continue;
+            if (w1.PlayerId != w2.PlayerId) continue;
 
-            // Find 2 walls in diagonal positions owned by same player
-            var walls = diagBlocks
-                .Where(b => b.Type == BlockType.Wall && b.PlayerId == playerId)
-                .Take(2)
-                .ToList();
+            int playerId = w1.PlayerId;
 
-            if (walls.Count < 2) continue;
+            var m1 = orthoBlocks.FirstOrDefault(b =>
+                b.Pos == center + o1 && b.Type == mainType && b.PlayerId == playerId);
+            var m2 = orthoBlocks.FirstOrDefault(b =>
+                b.Pos == center + o2 && b.Type == mainType && b.PlayerId == playerId);
+            var m3 = orthoBlocks.FirstOrDefault(b =>
+                b.Pos == center + o3 && b.Type == mainType && b.PlayerId == playerId);
+            if (m1 == null || m2 == null || m3 == null) continue;
 
             // Form the nest
-            var members = mainBlocks.Take(mainNeeded).Concat(walls).ToList();
+            var members = new List<Block> { m1, m2, m3, w1, w2 };
             var nest = new Nest
             {
                 Type = nestType,
@@ -269,7 +289,7 @@ public static class NestSystem
             state.Nests.Add(nest);
             state.VisualEvents.Add(new VisualEvent(
                 VisualEventType.FormationFormed, center, playerId));
-            return true; // One nest per center
+            return true;
         }
 
         return false;
@@ -309,40 +329,43 @@ public static class NestSystem
     }
 
     /// <summary>
-    /// Auto-upgrade Builder Nest → Soldier Nest when 2 Walls appear at diagonals (Section 6.3).
+    /// Auto-upgrade Builder Nest → Soldier Nest when 2 Walls appear at adjacent
+    /// diagonals forming a valid cross pattern (Section 6.3).
     /// </summary>
     private static void CheckAutoUpgrades(GameState state)
     {
+        // Adjacent diagonal pairs (same side)
+        var adjacentDiagPairs = new (GridPos, GridPos)[]
+        {
+            (new(1,-1), new(1,1)),   // right side
+            (new(-1,-1), new(-1,1)), // left side
+            (new(-1,-1), new(1,-1)), // top side
+            (new(-1,1), new(1,1)),   // bottom side
+        };
+
         foreach (var nest in state.Nests.ToList())
         {
             if (nest.Type != NestType.Builder) continue;
 
-            // Check diagonal positions for 2 walls owned by same player
-            var walls = new List<Block>();
-            foreach (var offset in GridPos.DiagonalOffsets)
+            foreach (var (d1, d2) in adjacentDiagPairs)
             {
-                var block = state.GetBlockAt(nest.Center + offset);
-                if (block != null && block.Type == BlockType.Wall
-                    && block.PlayerId == nest.PlayerId
-                    && block.IsFullyRooted && !block.IsInFormation)
-                {
-                    walls.Add(block);
-                }
-            }
+                var w1 = state.GetBlockAt(nest.Center + d1);
+                var w2 = state.GetBlockAt(nest.Center + d2);
+                if (w1 == null || w2 == null) continue;
+                if (w1.Type != BlockType.Wall || w2.Type != BlockType.Wall) continue;
+                if (w1.PlayerId != nest.PlayerId || w2.PlayerId != nest.PlayerId) continue;
+                if (!w1.IsFullyRooted || !w2.IsFullyRooted) continue;
+                if (w1.IsInFormation || w2.IsInFormation) continue;
 
-            if (walls.Count >= 2)
-            {
                 // Upgrade to Soldier Nest
                 nest.Type = NestType.Soldier;
-                var upgradeWalls = walls.Take(2).ToList();
-                foreach (var wall in upgradeWalls)
-                {
-                    wall.FormationId = nest.Id;
-                    nest.MemberIds.Add(wall.Id);
-                }
-                // Preserve spawn progress (partial progress carries over)
+                w1.FormationId = nest.Id;
+                w2.FormationId = nest.Id;
+                nest.MemberIds.Add(w1.Id);
+                nest.MemberIds.Add(w2.Id);
                 state.VisualEvents.Add(new VisualEvent(
                     VisualEventType.FormationFormed, nest.Center, nest.PlayerId));
+                break;
             }
         }
     }

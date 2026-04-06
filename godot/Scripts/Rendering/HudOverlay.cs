@@ -44,10 +44,32 @@ public partial class HudOverlay : CanvasLayer
 	private partial class HudDrawControl : Control
 	{
 		private readonly HudOverlay _hud;
+		private int _frameCounter;
+		private float _fps;
+		private float _fpsAccum;
+		private int _fpsFrames;
+		private float _fpsTimer;
 
 		public HudDrawControl(HudOverlay hud) => _hud = hud;
 
-		public override void _Process(double delta) => QueueRedraw();
+		public override void _Process(double delta)
+		{
+			// FPS tracking — update reading every 0.5s for stability
+			_fpsAccum += (float)delta;
+			_fpsFrames++;
+			_fpsTimer += (float)delta;
+			if (_fpsTimer >= 0.5f)
+			{
+				_fps = _fpsFrames / _fpsAccum;
+				_fpsAccum = 0;
+				_fpsFrames = 0;
+				_fpsTimer = 0;
+			}
+
+			// Throttle full HUD redraw to every 3 frames
+			if (++_frameCounter % 3 == 0)
+				QueueRedraw();
+		}
 
 		public override void _Draw()
 		{
@@ -93,6 +115,15 @@ public partial class HudOverlay : CanvasLayer
 					DrawString(font, new Vector2(x, 22), popText, HorizontalAlignment.Left, -1, fontSize, TextColor);
 				}
 			}
+
+			// FPS counter (right side, color-coded)
+			string fpsText = $"{_fps:F0} FPS";
+			var fpsColor = _fps >= 55 ? new Color(0.4f, 0.9f, 0.4f) :
+						   _fps >= 30 ? new Color(0.9f, 0.9f, 0.3f) :
+						   new Color(0.9f, 0.3f, 0.3f);
+			float fpsWidth = font.GetStringSize(fpsText, HorizontalAlignment.Left, -1, fontSize).X;
+			DrawString(font, new Vector2(viewport.X - fpsWidth - padding, 22), fpsText,
+				HorizontalAlignment.Left, -1, fontSize, fpsColor);
 
 			// Block count ratio bar (bottom of top bar)
 			DrawBlockRatioBar(state, new Rect2(0, barHeight, viewport.X, ratioBarHeight));

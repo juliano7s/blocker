@@ -45,6 +45,8 @@ public class GameState
             PlayerId = playerId,
             Pos = pos,
             PrevPos = pos,
+            State = type == BlockType.Wall ? BlockState.Rooted : BlockState.Mobile,
+            RootProgress = type == BlockType.Wall ? Constants.RootTicks : 0,
             Hp = type switch
             {
                 BlockType.Soldier => Constants.SoldierMaxHp,

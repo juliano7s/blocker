@@ -22,6 +22,8 @@ When code and docs disagree, figure out which is wrong and fix it — but discus
 
 ## Architecture — hard rules
 
+Responsiveness and smoothness is critical. This is a somewhat minimalist graphics game, so the player experience must be very smooth. Simulation and Rendering code needs to be optimal to handle 400+ blocks on large maps (200 x 200 cells).
+
 ### Layer separation
 
 Three layers, strictly separated:

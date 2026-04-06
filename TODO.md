@@ -1,6 +1,11 @@
 
 # Controls
  - builder should not have an attack move command
+ - queuing commands with shift not always work: if a block is rooting or uprooting, the next shift commands are not queued.
+   - Also, if a block is rooting/uprooting any normal command on top of that should be queued, similar to the wall command.
+
+# Camera
+ - When zooming, depending on the zoom level, not all grid lines show. Can we calculate which zoom levels will guarantee showing the grid lines and only use those?
 
 # Visuals
  - Stun rays:
@@ -25,10 +30,6 @@
  - a stunned unit should have it's abilities paused while stunned. stunned units in formations should disable that formation (no spawn; no ray shooting) while stunned
  - instead of the stunner cooldown making it immobile, let's make the cooldown mobile but with 1/3 of the speed
  - stun ray should penetrate units - it currently doesn't; it should stop only at walls (and kill the first encountered wall)
- - formation detection: Formations are not being detect at game start (walls in an L pattern don't become supplies for ex). Soldier nests are wrongly just requiring adjacent walls. They should only form when it has this shape:
-  [w][b]
-  [b]
-  [w][b]
  - pathfinding: units are preferring to go in a large L path instead of "diagonally" (zigzagging)
 
 # Hud
