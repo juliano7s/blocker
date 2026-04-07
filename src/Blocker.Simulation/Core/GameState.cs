@@ -64,7 +64,17 @@ public class GameState
     {
         if (Grid.InBounds(block.Pos) && Grid[block.Pos].BlockId == block.Id)
             Grid[block.Pos].BlockId = null;
-        Blocks.Remove(block);
+
+        // Swap-with-last + remove-at-end: O(1) instead of O(n) array shift
+        int index = Blocks.IndexOf(block);
+        if (index >= 0)
+        {
+            int last = Blocks.Count - 1;
+            if (index < last)
+                Blocks[index] = Blocks[last];
+            Blocks.RemoveAt(last);
+        }
+
         _blockById.Remove(block.Id);
     }
 

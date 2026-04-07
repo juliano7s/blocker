@@ -10,6 +10,15 @@ public static class PathfindingSystem
 {
     private const int MaxSearchNodes = 500;
 
+    // Per-thread reusable collections — zero allocations after first call per thread.
+    // Production is single-threaded (one sim); [ThreadStatic] handles xUnit parallelism.
+    [ThreadStatic]
+    private static PriorityQueue<GridPos, int>? _openSet;
+    [ThreadStatic]
+    private static Dictionary<GridPos, GridPos>? _cameFrom;
+    [ThreadStatic]
+    private static Dictionary<GridPos, int>? _gScore;
+
     /// <summary>
     /// Find the next cell to step to when moving from <paramref name="from"/> toward <paramref name="target"/>.
     /// Returns null if no path exists. The returned cell is guaranteed to be passable and unoccupied
@@ -23,25 +32,25 @@ public static class PathfindingSystem
         if (from.ManhattanDistance(target) == 1 && CanMoveTo(state, target))
             return target;
 
-        // A* search (orthogonal only)
-        var openSet = new PriorityQueue<GridPos, int>();
-        var cameFrom = new Dictionary<GridPos, GridPos>();
-        var gScore = new Dictionary<GridPos, int>();
+        // A* search (orthogonal only) — reuse per-thread collections
+        (_openSet ??= new PriorityQueue<GridPos, int>()).Clear();
+        (_cameFrom ??= new Dictionary<GridPos, GridPos>()).Clear();
+        (_gScore ??= new Dictionary<GridPos, int>()).Clear();
 
-        gScore[from] = 0;
-        openSet.Enqueue(from, Heuristic(from, target));
+        _gScore[from] = 0;
+        _openSet.Enqueue(from, Heuristic(from, target));
 
         int nodesExpanded = 0;
 
-        while (openSet.Count > 0 && nodesExpanded < MaxSearchNodes)
+        while (_openSet.Count > 0 && nodesExpanded < MaxSearchNodes)
         {
-            var current = openSet.Dequeue();
+            var current = _openSet.Dequeue();
             nodesExpanded++;
 
             if (current == target)
-                return ReconstructFirstStep(cameFrom, current, from);
+                return ReconstructFirstStep(current, from);
 
-            int currentG = gScore[current];
+            int currentG = _gScore[current];
 
             foreach (var offset in GridPos.OrthogonalOffsets)
             {
@@ -54,12 +63,12 @@ public static class PathfindingSystem
 
                 int tentativeG = currentG + 1;
 
-                if (!gScore.TryGetValue(neighbor, out int existingG) || tentativeG < existingG)
+                if (!_gScore.TryGetValue(neighbor, out int existingG) || tentativeG < existingG)
                 {
-                    cameFrom[neighbor] = current;
-                    gScore[neighbor] = tentativeG;
+                    _cameFrom[neighbor] = current;
+                    _gScore[neighbor] = tentativeG;
                     int fScore = tentativeG + Heuristic(neighbor, target);
-                    openSet.Enqueue(neighbor, fScore);
+                    _openSet.Enqueue(neighbor, fScore);
                 }
             }
         }
@@ -68,10 +77,10 @@ public static class PathfindingSystem
         return GreedyStep(state, from, target);
     }
 
-    private static GridPos? ReconstructFirstStep(Dictionary<GridPos, GridPos> cameFrom, GridPos current, GridPos start)
+    private static GridPos? ReconstructFirstStep(GridPos current, GridPos start)
     {
         var step = current;
-        while (cameFrom.TryGetValue(step, out var prev))
+        while (_cameFrom!.TryGetValue(step, out var prev))
         {
             if (prev == start)
                 return step;
@@ -93,29 +102,25 @@ public static class PathfindingSystem
     /// <summary>Greedy fallback: try axis-aligned steps toward target.</summary>
     private static GridPos? GreedyStep(GameState state, GridPos from, GridPos target)
     {
-        var dx = Math.Sign(target.X - from.X);
-        var dy = Math.Sign(target.Y - from.Y);
-
-        // Prefer the axis with greater distance
-        var candidates = new List<GridPos>();
+        int dx = Math.Sign(target.X - from.X);
+        int dy = Math.Sign(target.Y - from.Y);
         int adx = Math.Abs(target.X - from.X);
         int ady = Math.Abs(target.Y - from.Y);
 
+        // Try primary axis first, then secondary — no allocation needed
         if (adx >= ady)
         {
-            if (dx != 0) candidates.Add(new GridPos(from.X + dx, from.Y));
-            if (dy != 0) candidates.Add(new GridPos(from.X, from.Y + dy));
+            if (dx != 0 && CanMoveTo(state, new GridPos(from.X + dx, from.Y)))
+                return new GridPos(from.X + dx, from.Y);
+            if (dy != 0 && CanMoveTo(state, new GridPos(from.X, from.Y + dy)))
+                return new GridPos(from.X, from.Y + dy);
         }
         else
         {
-            if (dy != 0) candidates.Add(new GridPos(from.X, from.Y + dy));
-            if (dx != 0) candidates.Add(new GridPos(from.X + dx, from.Y));
-        }
-
-        foreach (var c in candidates)
-        {
-            if (CanMoveTo(state, c))
-                return c;
+            if (dy != 0 && CanMoveTo(state, new GridPos(from.X, from.Y + dy)))
+                return new GridPos(from.X, from.Y + dy);
+            if (dx != 0 && CanMoveTo(state, new GridPos(from.X + dx, from.Y)))
+                return new GridPos(from.X + dx, from.Y);
         }
 
         return null;
