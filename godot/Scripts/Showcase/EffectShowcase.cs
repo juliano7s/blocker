@@ -173,8 +173,128 @@ public partial class EffectShowcase : Node2D
     private static float EaseOutCubic(float t) => 1f - MathF.Pow(1f - t, 3f);
 
     // --- Placeholder spawn methods (implemented in later tasks) ---
-    private void SpawnElectricLightning() { }
-    private void SpawnWavePulse() { }
+
+    private static (List<LightSegment> Segments, float MaxDist) BuildLightning(
+        List<(int Ix, int Iy, int Dx, int Dy)> seeds, int maxSegs, float contProb, float branchProb)
+    {
+        var rng = new Random();
+        var segments = new List<LightSegment>();
+        var visited = new HashSet<long>();
+        var frontier = new List<(int Ix, int Iy, int Dx, int Dy, int Dist, float Cp)>();
+        foreach (var s in seeds)
+            frontier.Add((s.Ix, s.Iy, s.Dx, s.Dy, 0, contProb));
+        float maxDist = 0;
+
+        while (frontier.Count > 0 && segments.Count < maxSegs)
+        {
+            int idx = rng.Next(frontier.Count);
+            var item = frontier[idx];
+            frontier.RemoveAt(idx);
+
+            int nx = item.Ix + item.Dx;
+            int ny = item.Iy + item.Dy;
+            if (nx < -2 || nx > GridWidth + 2 || ny < -2 || ny > GridHeight + 2) continue;
+
+            int minX = Math.Min(item.Ix, nx), minY = Math.Min(item.Iy, ny);
+            int maxX = Math.Max(item.Ix, nx), maxY = Math.Max(item.Iy, ny);
+            long key = ((long)minX << 48) | ((long)minY << 32) | ((long)maxX << 16) | (long)(maxY & 0xFFFF);
+            if (!visited.Add(key)) continue;
+
+            segments.Add(new LightSegment { X1 = item.Ix, Y1 = item.Iy, X2 = nx, Y2 = ny, Dist = item.Dist });
+            if (item.Dist > maxDist) maxDist = item.Dist;
+
+            if (rng.NextSingle() < item.Cp)
+                frontier.Add((nx, ny, item.Dx, item.Dy, item.Dist + 1, item.Cp * 0.82f));
+
+            if (rng.NextSingle() < branchProb)
+            {
+                var (pdx, pdy) = item.Dy == 0
+                    ? (rng.NextSingle() < 0.5f ? (0, 1) : (0, -1))
+                    : (rng.NextSingle() < 0.5f ? (1, 0) : (-1, 0));
+                frontier.Add((nx, ny, pdx, pdy, item.Dist + 1, item.Cp * 0.55f));
+            }
+        }
+
+        return (segments, maxDist);
+    }
+
+    private static List<(int Ix, int Iy, int Dx, int Dy)> AllEdgeSeeds(int cx, int cy)
+    {
+        return new List<(int Ix, int Iy, int Dx, int Dy)>
+        {
+            (cx + 1, cy, 1, 0), (cx + 1, cy + 1, 1, 0),
+            (cx, cy, -1, 0), (cx, cy + 1, -1, 0),
+            (cx, cy + 1, 0, 1), (cx + 1, cy + 1, 0, 1),
+            (cx, cy, 0, -1), (cx + 1, cy, 0, -1),
+        };
+    }
+
+    private void SpawnElectricLightning()
+    {
+        var seeds = AllEdgeSeeds(CenterX, CenterY);
+        var (segments, maxDist) = BuildLightning(seeds, 60, 0.90f, 0.55f);
+        AddEffect(new GridEffect
+        {
+            Segments = segments, MaxDist = maxDist,
+            T = 0, Duration = 1200, TrailDist = 3f,
+            Color = new Color(0.3f, 0.8f, 1f), // cyan
+        });
+    }
+
+    private void SpawnWavePulse()
+    {
+        var rng = new Random();
+        var segments = new List<LightSegment>();
+        float maxDist = 0;
+
+        // Radiate grid lines outward from center, with sine-wave perpendicular displacement
+        for (int dir = 0; dir < 4; dir++)
+        {
+            int dx = dir == 0 ? 1 : dir == 1 ? -1 : 0;
+            int dy = dir == 2 ? 1 : dir == 3 ? -1 : 0;
+
+            for (int dist = 0; dist < 12; dist++)
+            {
+                // Main line along grid
+                float bx = CenterX + 0.5f + dx * dist;
+                float by = CenterY + 0.5f + dy * dist;
+
+                // Perpendicular displacement: sine wave
+                float perpAmt = 0.3f * MathF.Sin(dist * 1.2f + rng.NextSingle() * 0.5f);
+                float px = dy != 0 ? perpAmt : 0;
+                float py = dx != 0 ? perpAmt : 0;
+
+                float x1 = bx + px;
+                float y1 = by + py;
+                float x2 = bx + dx + px * 1.1f;
+                float y2 = by + dy + py * 1.1f;
+
+                segments.Add(new LightSegment { X1 = x1, Y1 = y1, X2 = x2, Y2 = y2, Dist = dist });
+                if (dist > maxDist) maxDist = dist;
+
+                // Side branches with wobble
+                if (rng.NextSingle() < 0.4f)
+                {
+                    float bpx = dy == 0 ? 0 : (rng.NextSingle() < 0.5f ? 1 : -1);
+                    float bpy = dx == 0 ? 0 : (rng.NextSingle() < 0.5f ? 1 : -1);
+                    float wobble = 0.2f * (rng.NextSingle() - 0.5f);
+                    segments.Add(new LightSegment
+                    {
+                        X1 = x2, Y1 = y2,
+                        X2 = x2 + bpx + wobble, Y2 = y2 + bpy + wobble,
+                        Dist = dist + 0.5f,
+                    });
+                }
+            }
+        }
+
+        AddEffect(new GridEffect
+        {
+            Segments = segments, MaxDist = maxDist,
+            T = 0, Duration = 1500, TrailDist = 4f,
+            Color = new Color(0.2f, 0.85f, 0.75f), // teal
+        });
+    }
     private void SpawnGhostFlicker() { }
     private void SpawnDigitalCascade() { }
     private void SpawnSpiralTrace() { }
