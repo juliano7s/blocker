@@ -295,14 +295,336 @@ public partial class EffectShowcase : Node2D
             Color = new Color(0.2f, 0.85f, 0.75f), // teal
         });
     }
-    private void SpawnGhostFlicker() { }
-    private void SpawnDigitalCascade() { }
-    private void SpawnSpiralTrace() { }
-    private void SpawnCircuitTrace() { }
-    private void SpawnShockwaveRing() { }
-    private void SpawnJitterBurst() { }
-    private void SpawnConvergingDrain() { }
-    private void SpawnArcChain() { }
+    private void SpawnGhostFlicker()
+    {
+        var rng = new Random();
+        var segments = new List<LightSegment>();
+        float maxDist = 0;
+        int radius = 6;
+
+        // Scatter grid-line segments randomly in a radius around center
+        for (int dy = -radius; dy <= radius; dy++)
+        {
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                float dist = MathF.Max(MathF.Abs(dx), MathF.Abs(dy));
+                if (dist > radius) continue;
+
+                int gx = CenterX + dx;
+                int gy = CenterY + dy;
+
+                // Randomly include horizontal and vertical segments
+                if (rng.NextSingle() < 0.35f)
+                {
+                    float wobble = (rng.NextSingle() - 0.5f) * 0.15f;
+                    segments.Add(new LightSegment
+                    {
+                        X1 = gx + wobble, Y1 = gy + wobble,
+                        X2 = gx + 1 + wobble, Y2 = gy + wobble,
+                        Dist = dist + rng.NextSingle() * 3f, // randomized dist for phase variation
+                    });
+                }
+                if (rng.NextSingle() < 0.35f)
+                {
+                    float wobble = (rng.NextSingle() - 0.5f) * 0.15f;
+                    segments.Add(new LightSegment
+                    {
+                        X1 = gx + wobble, Y1 = gy + wobble,
+                        X2 = gx + wobble, Y2 = gy + 1 + wobble,
+                        Dist = dist + rng.NextSingle() * 3f,
+                    });
+                }
+            }
+        }
+
+        maxDist = radius + 3f;
+
+        AddEffect(new GridEffect
+        {
+            Segments = segments, MaxDist = maxDist,
+            T = 0, Duration = 2000, TrailDist = 2f,
+            Color = new Color(0.75f, 0.6f, 1f), // pale violet
+            FlickerMode = true,
+        });
+    }
+    private void SpawnDigitalCascade()
+    {
+        var rng = new Random();
+        var segments = new List<LightSegment>();
+        float maxDist = 0;
+
+        // Multiple vertical "rain" columns near center
+        int columns = 8;
+        for (int c = 0; c < columns; c++)
+        {
+            int colX = CenterX - 4 + rng.Next(9);
+            int startY = CenterY - 2 + rng.Next(3);
+            int length = 6 + rng.Next(8);
+            float yOffset = (rng.NextSingle() - 0.5f) * 0.2f; // slight drift
+
+            for (int i = 0; i < length; i++)
+            {
+                int gy = startY + i;
+                if (gy < 0 || gy >= GridHeight) continue;
+
+                float dist = i + c * 2f; // stagger columns
+                segments.Add(new LightSegment
+                {
+                    X1 = colX + yOffset, Y1 = gy,
+                    X2 = colX + yOffset, Y2 = gy + 1,
+                    Dist = dist,
+                });
+                if (dist > maxDist) maxDist = dist;
+
+                // Random horizontal branches at intersections
+                if (rng.NextSingle() < 0.3f)
+                {
+                    int branchDir = rng.NextSingle() < 0.5f ? 1 : -1;
+                    int branchLen = 1 + rng.Next(3);
+                    for (int b = 0; b < branchLen; b++)
+                    {
+                        segments.Add(new LightSegment
+                        {
+                            X1 = colX + branchDir * b, Y1 = gy,
+                            X2 = colX + branchDir * (b + 1), Y2 = gy,
+                            Dist = dist + b * 0.5f,
+                        });
+                    }
+                }
+            }
+        }
+
+        AddEffect(new GridEffect
+        {
+            Segments = segments, MaxDist = maxDist,
+            T = 0, Duration = 1800, TrailDist = 5f,
+            Color = new Color(0.2f, 1f, 0.4f), // green/lime
+        });
+    }
+
+    private void SpawnSpiralTrace()
+    {
+        var segments = new List<LightSegment>();
+        int x = CenterX + 1, y = CenterY + 1;
+        int dx = 1, dy = 0;
+        int stepsInLeg = 1, stepsTaken = 0, turnsAtLen = 0;
+        int maxSegs = 48;
+
+        for (int i = 0; i < maxSegs; i++)
+        {
+            int nx = x + dx, ny = y + dy;
+            segments.Add(new LightSegment { X1 = x, Y1 = y, X2 = nx, Y2 = ny, Dist = i });
+            x = nx; y = ny;
+            stepsTaken++;
+            if (stepsTaken >= stepsInLeg)
+            {
+                int tmp = dx; dx = -dy; dy = tmp; // turn clockwise
+                stepsTaken = 0;
+                turnsAtLen++;
+                if (turnsAtLen >= 2) { turnsAtLen = 0; stepsInLeg++; }
+            }
+        }
+
+        AddEffect(new GridEffect
+        {
+            Segments = segments, MaxDist = maxSegs - 1,
+            T = 0, Duration = 1800, TrailDist = 4f,
+            Color = new Color(1f, 0.8f, 0.2f), // gold
+        });
+    }
+
+    private void SpawnCircuitTrace()
+    {
+        var rng = new Random();
+        var segments = new List<LightSegment>();
+        float maxDist = 0;
+
+        // BFS-like right-angle paths from center
+        var frontier = new List<(float X, float Y, int Dx, int Dy, float Dist)>();
+        frontier.Add((CenterX + 1, CenterY + 0.5f, 1, 0, 0));
+        frontier.Add((CenterX, CenterY + 0.5f, -1, 0, 0));
+        frontier.Add((CenterX + 0.5f, CenterY + 1, 0, 1, 0));
+        frontier.Add((CenterX + 0.5f, CenterY, 0, -1, 0));
+
+        int maxSegs = 50;
+        while (frontier.Count > 0 && segments.Count < maxSegs)
+        {
+            int idx = rng.Next(frontier.Count);
+            var item = frontier[idx];
+            frontier.RemoveAt(idx);
+
+            float nx = item.X + item.Dx;
+            float ny = item.Y + item.Dy;
+
+            segments.Add(new LightSegment
+            {
+                X1 = item.X, Y1 = item.Y, X2 = nx, Y2 = ny,
+                Dist = item.Dist,
+            });
+            if (item.Dist > maxDist) maxDist = item.Dist;
+
+            // Continue forward
+            if (rng.NextSingle() < 0.7f)
+                frontier.Add((nx, ny, item.Dx, item.Dy, item.Dist + 1));
+
+            // Right-angle branch
+            if (rng.NextSingle() < 0.35f)
+            {
+                var (pdx, pdy) = item.Dy == 0
+                    ? (0, rng.NextSingle() < 0.5f ? 1 : -1)
+                    : (rng.NextSingle() < 0.5f ? 1 : -1, 0);
+                frontier.Add((nx, ny, pdx, pdy, item.Dist + 1));
+            }
+        }
+
+        AddEffect(new GridEffect
+        {
+            Segments = segments, MaxDist = maxDist,
+            T = 0, Duration = 1400, TrailDist = 2.5f,
+            Color = new Color(1f, 0.6f, 0.2f), // warm orange
+        });
+    }
+
+    private void SpawnShockwaveRing()
+    {
+        var segments = new List<LightSegment>();
+        int maxRings = 10;
+
+        for (int ring = 1; ring <= maxRings; ring++)
+        {
+            // Square perimeter at Chebyshev distance 'ring' from center
+            int tlx = CenterX - ring, tly = CenterY - ring;
+            int brx = CenterX + 1 + ring, bry = CenterY + 1 + ring;
+
+            // Top edge
+            for (int x = tlx; x < brx; x++)
+                segments.Add(new LightSegment { X1 = x, Y1 = tly, X2 = x + 1, Y2 = tly, Dist = ring });
+            // Right edge
+            for (int y = tly; y < bry; y++)
+                segments.Add(new LightSegment { X1 = brx, Y1 = y, X2 = brx, Y2 = y + 1, Dist = ring });
+            // Bottom edge
+            for (int x = brx; x > tlx; x--)
+                segments.Add(new LightSegment { X1 = x, Y1 = bry, X2 = x - 1, Y2 = bry, Dist = ring });
+            // Left edge
+            for (int y = bry; y > tly; y--)
+                segments.Add(new LightSegment { X1 = tlx, Y1 = y, X2 = tlx, Y2 = y - 1, Dist = ring });
+        }
+
+        AddEffect(new GridEffect
+        {
+            Segments = segments, MaxDist = maxRings,
+            T = 0, Duration = 1000, TrailDist = 2f,
+            Color = new Color(0.9f, 0.9f, 1f), // white/silver
+        });
+    }
+
+    private void SpawnJitterBurst()
+    {
+        var rng = new Random();
+        var segments = new List<LightSegment>();
+        float maxDist = 0;
+        var seeds = AllEdgeSeeds(CenterX, CenterY);
+        int armCount = 10;
+        int armLen = 4;
+
+        for (int a = 0; a < armCount; a++)
+        {
+            var seed = seeds[a % seeds.Count];
+            float x = seed.Ix, y = seed.Iy;
+            int sdx = seed.Dx, sdy = seed.Dy;
+
+            for (int i = 0; i < armLen; i++)
+            {
+                if (i > 0 && rng.NextSingle() < 0.6f)
+                {
+                    if (sdx == 0) { sdx = rng.NextSingle() < 0.5f ? 1 : -1; sdy = 0; }
+                    else { sdy = rng.NextSingle() < 0.5f ? 1 : -1; sdx = 0; }
+                }
+                // Add jitter overshoot
+                float jx = (rng.NextSingle() - 0.5f) * 0.3f;
+                float jy = (rng.NextSingle() - 0.5f) * 0.3f;
+                float nx = x + sdx + jx;
+                float ny = y + sdy + jy;
+
+                segments.Add(new LightSegment { X1 = x, Y1 = y, X2 = nx, Y2 = ny, Dist = i });
+                if (i > maxDist) maxDist = i;
+                x = nx; y = ny;
+            }
+        }
+
+        AddEffect(new GridEffect
+        {
+            Segments = segments, MaxDist = maxDist,
+            T = 0, Duration = 400, TrailDist = 1f,
+            Color = new Color(1f, 0.25f, 0.2f), // red/crimson
+        });
+    }
+
+    private void SpawnConvergingDrain()
+    {
+        var seeds = AllEdgeSeeds(CenterX, CenterY);
+        var (segments, maxDist) = BuildLightning(seeds, 50, 0.85f, 0.50f);
+
+        AddEffect(new GridEffect
+        {
+            Segments = segments, MaxDist = maxDist,
+            T = 0, Duration = 1000, TrailDist = 2f,
+            Color = new Color(0.8f, 0.3f, 1f), // purple/magenta
+            Reverse = true,
+        });
+    }
+
+    private void SpawnArcChain()
+    {
+        var rng = new Random();
+        var segments = new List<LightSegment>();
+        float maxDist = 0;
+        int arcCount = 8;
+        float dist = 0;
+
+        // Start at center
+        float cx = CenterX + 0.5f, cy = CenterY + 0.5f;
+
+        for (int a = 0; a < arcCount; a++)
+        {
+            // Pick random target intersection nearby
+            float tx = CenterX + rng.Next(-5, 6) + 0.5f;
+            float ty = CenterY + rng.Next(-5, 6) + 0.5f;
+
+            // Approximate arc with 3-4 segments (slight curve via midpoint offset)
+            int subSegs = 3 + rng.Next(2);
+            float midOffX = (rng.NextSingle() - 0.5f) * 2f;
+            float midOffY = (rng.NextSingle() - 0.5f) * 2f;
+
+            for (int i = 0; i < subSegs; i++)
+            {
+                float t0 = (float)i / subSegs;
+                float t1 = (float)(i + 1) / subSegs;
+
+                // Quadratic bezier: P0=current, P1=midpoint+offset, P2=target
+                float midX = (cx + tx) / 2f + midOffX;
+                float midY = (cy + ty) / 2f + midOffY;
+
+                float x0 = (1 - t0) * (1 - t0) * cx + 2 * (1 - t0) * t0 * midX + t0 * t0 * tx;
+                float y0 = (1 - t0) * (1 - t0) * cy + 2 * (1 - t0) * t0 * midY + t0 * t0 * ty;
+                float x1 = (1 - t1) * (1 - t1) * cx + 2 * (1 - t1) * t1 * midX + t1 * t1 * tx;
+                float y1 = (1 - t1) * (1 - t1) * cy + 2 * (1 - t1) * t1 * midY + t1 * t1 * ty;
+
+                segments.Add(new LightSegment { X1 = x0, Y1 = y0, X2 = x1, Y2 = y1, Dist = dist });
+                dist += 1;
+            }
+
+            cx = tx; cy = ty;
+            if (dist > maxDist) maxDist = dist;
+        }
+
+        AddEffect(new GridEffect
+        {
+            Segments = segments, MaxDist = maxDist,
+            T = 0, Duration = 1200, TrailDist = 1.5f,
+            Color = new Color(1f, 0.95f, 0.4f), // electric yellow
+        });
+    }
 
     // --- Rendering ---
     private void DrawAllEffects()
