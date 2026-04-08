@@ -14,7 +14,8 @@ public partial class EffectShowcase : Node2D
 
 	private static readonly Color BackgroundColor = new(0.06f, 0.06f, 0.1f);
 	private static readonly Color GridLineColor = new(0.15f, 0.15f, 0.22f);
-	private static readonly Color CenterCellColor = new(0.2f, 0.2f, 0.3f);
+	private static readonly Color CenterCellColor = new(0.06f, 0.06f, 0.1f);
+	// private static readonly Color CenterCellColor = new(0.2f, 0.2f, 0.3f);
 
 	// Glow layer for additive blending
 	private GlowNode? _glowNode;
