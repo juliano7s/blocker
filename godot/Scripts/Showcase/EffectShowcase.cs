@@ -19,6 +19,9 @@ public partial class EffectShowcase : Node2D
 	// Glow layer for additive blending
 	private GlowNode? _glowNode;
 
+	// Shared RNG — avoids per-frame allocations
+	private readonly Random _rng = new();
+
 	// Active effects
 	private readonly List<GridEffect> _effects = new();
 
@@ -118,6 +121,7 @@ public partial class EffectShowcase : Node2D
 			var e = _effects[i];
 			e.T += dt / e.Duration;
 			e.Age += dt;
+			e.VisibleDirty = true; // invalidate cache
 
 			// Update sparks
 			for (int j = e.Sparks.Count - 1; j >= 0; j--)
@@ -204,6 +208,11 @@ public partial class EffectShowcase : Node2D
 		public bool FlickerMode; // for ghost flicker
 		public LineStyle Style;  // how lines are rendered
 		public bool Looping;     // wraps T back to 0 instead of expiring
+		public float BaseAlpha;  // minimum alpha for all segments (ZoC persistent visibility)
+
+		// Per-frame cache: computed once, used by both glow and core passes
+		public readonly List<VisibleSegment> VisibleCache = new();
+		public bool VisibleDirty = true;
 	}
 
 	private static float EaseOutCubic(float t) => 1f - MathF.Pow(1f - t, 3f);
@@ -902,6 +911,7 @@ public partial class EffectShowcase : Node2D
 			T = 0, Duration = 3000, TrailDist = 2f,
 			Color = new Color(0.25f, 0.55f, 1f), // warden blue
 			Looping = true,
+			BaseAlpha = 0.15f, // zone always visible
 		});
 	}
 
@@ -936,6 +946,7 @@ public partial class EffectShowcase : Node2D
 			Color = new Color(0.25f, 0.55f, 1f), // warden blue
 			Style = LineStyle.SineWave,
 			Looping = true,
+			BaseAlpha = 0.15f, // zone always visible
 		});
 	}
 
@@ -1012,27 +1023,97 @@ public partial class EffectShowcase : Node2D
 			Color = new Color(0.25f, 0.55f, 1f), // warden blue
 			Style = LineStyle.Dashed,
 			Looping = true,
+			BaseAlpha = 0.12f, // zone always visible
 		});
 	}
 
 	// --- Rendering ---
+
+	private struct VisibleSegment
+	{
+		public float Px1, Py1, Px2, Py2;
+		public float Ba;
+		public float Brightness;
+	}
+
+	/// <summary>
+	/// Compute visible segments once per frame per effect, cache in effect.VisibleCache.
+	/// </summary>
+	private void EnsureVisibleSegments(GridEffect e)
+	{
+		if (!e.VisibleDirty) return;
+		e.VisibleDirty = false;
+		e.VisibleCache.Clear();
+
+		float p = EaseOutCubic(MathF.Min(e.T, 1f));
+		float md = MathF.Max(e.MaxDist, 1f);
+		float shimmer = 0.8f + 0.2f * MathF.Sin(e.Age * 0.006f);
+		bool looping = e.Looping;
+		float baseAlpha = e.BaseAlpha;
+
+		foreach (var seg in e.Segments)
+		{
+			float brightness;
+			if (e.FlickerMode)
+			{
+				float phase = MathF.Sin(e.Age * 0.01f + seg.Dist * 2.7f + seg.X1 * 1.3f);
+				brightness = phase > 0.2f ? MathF.Abs(phase) * (1f - e.T * 0.5f) : 0f;
+			}
+			else if (e.Reverse)
+			{
+				float wavePos = p * (md + e.TrailDist);
+				float invertedDist = md - seg.Dist;
+				float diff = wavePos - invertedDist;
+				brightness = diff < 0 ? 0 : MathF.Max(0, 1f - diff / e.TrailDist);
+			}
+			else
+			{
+				float wavePos = p * (md + e.TrailDist);
+				float diff = wavePos - seg.Dist;
+				brightness = diff < 0 ? 0 : MathF.Max(0, 1f - diff / e.TrailDist);
+			}
+
+			// BaseAlpha: always show segments at minimum brightness
+			if (baseAlpha > 0 && brightness < baseAlpha)
+				brightness = baseAlpha;
+
+			if (brightness <= 0.02f) continue;
+
+			float alpha = looping
+				? brightness // looping effects don't fade out over T
+				: brightness * (1f - e.T * 0.7f);
+			float ba = alpha * shimmer;
+
+			e.VisibleCache.Add(new VisibleSegment
+			{
+				Px1 = seg.X1 * CellSize, Py1 = seg.Y1 * CellSize,
+				Px2 = seg.X2 * CellSize, Py2 = seg.Y2 * CellSize,
+				Ba = ba, Brightness = brightness,
+			});
+		}
+	}
+
 	private void DrawAllEffects()
 	{
-		// Non-glow passes: core lines + white tips + sparks
 		foreach (var e in _effects)
+		{
+			EnsureVisibleSegments(e);
 			DrawEffectCore(e);
+		}
 	}
 
 	internal void DrawGlowPass()
 	{
-		// Glow passes: outer + inner bloom (additive blend)
 		foreach (var e in _effects)
+		{
+			EnsureVisibleSegments(e);
 			DrawEffectGlow(e);
+		}
 	}
 
 	private void DrawEffectGlow(GridEffect e)
 	{
-		var visible = ComputeVisibleSegments(e);
+		var visible = e.VisibleCache;
 		if (visible.Count == 0) return;
 
 		float avgBa = 0f;
@@ -1043,7 +1124,6 @@ public partial class EffectShowcase : Node2D
 
 		if (e.Style == LineStyle.Dotted)
 		{
-			// Dotted: glow circles instead of lines
 			foreach (var v in visible)
 			{
 				var mid = new Vector2((v.Px1 + v.Px2) / 2f, (v.Py1 + v.Py2) / 2f);
@@ -1058,24 +1138,19 @@ public partial class EffectShowcase : Node2D
 
 		if (e.Style == LineStyle.PulseBeam)
 		{
-			// Pulsing width modulation
 			float pulse = 0.6f + 0.4f * MathF.Sin(e.Age * 0.008f);
 			outerWidth *= pulse;
 			innerWidth *= pulse;
 		}
 
-		// Pass 1a: outer bloom — wide, faint
+		// Pass 1a: outer bloom
 		foreach (var v in visible)
 		{
 			var (from, to) = GetStyledEndpoints(v, e);
 			if (e.Style == LineStyle.Dashed)
-			{
 				DrawDashedLine(from, to, color with { A = avgBa * 0.06f }, outerWidth, e.Age);
-			}
 			else
-			{
 				DrawLine(from, to, color with { A = avgBa * 0.06f }, outerWidth);
-			}
 		}
 
 		// Pass 1b: inner bloom
@@ -1083,19 +1158,15 @@ public partial class EffectShowcase : Node2D
 		{
 			var (from, to) = GetStyledEndpoints(v, e);
 			if (e.Style == LineStyle.Dashed)
-			{
 				DrawDashedLine(from, to, color with { A = avgBa * 0.15f }, innerWidth, e.Age);
-			}
 			else
-			{
 				DrawLine(from, to, color with { A = avgBa * 0.15f }, innerWidth);
-			}
 		}
 	}
 
 	private void DrawEffectCore(GridEffect e)
 	{
-		var visible = ComputeVisibleSegments(e);
+		var visible = e.VisibleCache;
 		if (visible.Count == 0) return;
 
 		var color = e.Color;
@@ -1114,7 +1185,6 @@ public partial class EffectShowcase : Node2D
 
 		if (e.Style == LineStyle.Dotted)
 		{
-			// Dotted: draw circles at segment midpoints
 			foreach (var v in visible)
 			{
 				var mid = new Vector2((v.Px1 + v.Px2) / 2f, (v.Py1 + v.Py2) / 2f);
@@ -1132,79 +1202,72 @@ public partial class EffectShowcase : Node2D
 				var (from, to) = GetStyledEndpoints(v, e);
 				float segAlpha = v.Ba * 0.8f * shimmer;
 
-				// FadingTrace: segments behind the wave front stay visible longer
 				if (e.Style == LineStyle.FadingTrace)
 					segAlpha = MathF.Max(segAlpha, v.Brightness * 0.3f * (1f - e.T));
 
 				if (e.Style == LineStyle.Dashed)
-				{
 					DrawDashedLine(from, to, color with { A = segAlpha }, coreWidth, e.Age);
-				}
 				else
-				{
 					DrawLine(from, to, color with { A = segAlpha }, coreWidth);
-				}
 			}
 
-			// Pass 3: white-hot tips
-			foreach (var v in visible)
+			// Pass 3: white-hot tips (skip for looping ZoC — too noisy)
+			if (!e.Looping)
 			{
-				if (v.Brightness > 0.55f)
+				foreach (var v in visible)
 				{
-					var tipAlpha = ((v.Brightness - 0.55f) / 0.45f) * v.Ba * 0.6f;
-					var (from, to) = GetStyledEndpoints(v, e);
-
-					if (e.Style == LineStyle.PulseBeam)
-						tipAlpha *= 1.5f; // brighter tips for pulse beam
-
-					if (e.Style == LineStyle.Dashed)
+					if (v.Brightness > 0.55f)
 					{
-						DrawDashedLine(from, to, new Color(1f, 1f, 1f, tipAlpha * shimmer), 1f, e.Age);
-					}
-					else
-					{
-						DrawLine(from, to, new Color(1f, 1f, 1f, tipAlpha * shimmer), 1f);
+						var tipAlpha = ((v.Brightness - 0.55f) / 0.45f) * v.Ba * 0.6f;
+						var (from, to) = GetStyledEndpoints(v, e);
+
+						if (e.Style == LineStyle.PulseBeam)
+							tipAlpha *= 1.5f;
+
+						if (e.Style == LineStyle.Dashed)
+							DrawDashedLine(from, to, new Color(1f, 1f, 1f, tipAlpha * shimmer), 1f, e.Age);
+						else
+							DrawLine(from, to, new Color(1f, 1f, 1f, tipAlpha * shimmer), 1f);
 					}
 				}
 			}
 		}
 
-		// Spawn + draw sparks
-		var rng = new Random();
-		if (e.Sparks.Count < 30)
+		// Sparks (skip for looping effects — too many particles over time)
+		if (!e.Looping)
 		{
-			foreach (var v in visible)
+			if (e.Sparks.Count < 30)
 			{
-				if (v.Brightness > 0.5f && e.Sparks.Count < 30 && rng.NextSingle() < 0.08f * v.Brightness)
+				foreach (var v in visible)
 				{
-					float mx = (v.Px1 + v.Px2) / 2f;
-					float my = (v.Py1 + v.Py2) / 2f;
-					float sd = CellSize * 0.4f;
-					e.Sparks.Add(new Spark
+					if (v.Brightness > 0.5f && e.Sparks.Count < 30 && _rng.NextSingle() < 0.08f * v.Brightness)
 					{
-						X = mx + (rng.NextSingle() - 0.5f) * sd,
-						Y = my + (rng.NextSingle() - 0.5f) * sd,
-						Vx = (rng.NextSingle() - 0.5f) * sd * 1.5f,
-						Vy = (rng.NextSingle() - 0.5f) * sd * 1.5f,
-						Life = 1f,
-						Size = 1f + rng.NextSingle() * 1.5f,
-					});
+						float mx = (v.Px1 + v.Px2) / 2f;
+						float my = (v.Py1 + v.Py2) / 2f;
+						float sd = CellSize * 0.4f;
+						e.Sparks.Add(new Spark
+						{
+							X = mx + (_rng.NextSingle() - 0.5f) * sd,
+							Y = my + (_rng.NextSingle() - 0.5f) * sd,
+							Vx = (_rng.NextSingle() - 0.5f) * sd * 1.5f,
+							Vy = (_rng.NextSingle() - 0.5f) * sd * 1.5f,
+							Life = 1f,
+							Size = 1f + _rng.NextSingle() * 1.5f,
+						});
+					}
 				}
 			}
-		}
 
-		foreach (var s in e.Sparks)
-		{
-			if (s.Life < 0.05f) continue;
-			float sa = s.Life * s.Life * shimmer;
-			DrawRect(new Rect2(s.X - s.Size / 2f, s.Y - s.Size / 2f, s.Size, s.Size),
-				color with { A = sa * 0.7f });
+			foreach (var s in e.Sparks)
+			{
+				if (s.Life < 0.05f) continue;
+				float sa = s.Life * s.Life * shimmer;
+				DrawRect(new Rect2(s.X - s.Size / 2f, s.Y - s.Size / 2f, s.Size, s.Size),
+					color with { A = sa * 0.7f });
+			}
 		}
 	}
 
-	/// <summary>
-	/// Apply per-style endpoint transformations (sine wave displacement, etc.)
-	/// </summary>
 	private static (Vector2 From, Vector2 To) GetStyledEndpoints(VisibleSegment v, GridEffect e)
 	{
 		var from = new Vector2(v.Px1, v.Py1);
@@ -1212,13 +1275,11 @@ public partial class EffectShowcase : Node2D
 
 		if (e.Style == LineStyle.SineWave)
 		{
-			// Animate sine displacement perpendicular to segment direction
 			var dir = (to - from).Normalized();
 			var perp = new Vector2(-dir.Y, dir.X);
 			float wave1 = MathF.Sin(e.Age * 0.005f + v.Px1 * 0.1f + v.Py1 * 0.07f) * CellSize * 0.25f;
 			float wave2 = MathF.Sin(e.Age * 0.005f + v.Px2 * 0.1f + v.Py2 * 0.07f) * CellSize * 0.25f;
-			// Fade the displacement as effect progresses
-			float fadeMult = 1f - e.T * 0.6f;
+			float fadeMult = e.Looping ? 1f : 1f - e.T * 0.6f;
 			from += perp * wave1 * fadeMult;
 			to += perp * wave2 * fadeMult;
 		}
@@ -1226,9 +1287,6 @@ public partial class EffectShowcase : Node2D
 		return (from, to);
 	}
 
-	/// <summary>
-	/// Draw a dashed line with tapered segments — gap fraction animates with age for a crawling feel.
-	/// </summary>
 	private void DrawDashedLine(Vector2 from, Vector2 to, Color color, float width, float age)
 	{
 		var dir = to - from;
@@ -1236,9 +1294,7 @@ public partial class EffectShowcase : Node2D
 		if (len < 0.5f) return;
 
 		int dashes = (int)MathF.Max(2, len / (CellSize * 0.3f));
-		float dashLen = len / dashes;
-		float gapFrac = 0.25f; // 25% gap
-		// Animate the offset so dashes crawl along the line
+		float gapFrac = 0.25f;
 		float crawl = (age * 0.002f) % 1f;
 		var norm = dir / len;
 
@@ -1251,65 +1307,10 @@ public partial class EffectShowcase : Node2D
 			var p0 = from + norm * (t0 * len);
 			var p1 = from + norm * (t1 * len);
 
-			// Taper: thinner toward the end of each dash
 			float taperMid = (t0 + t1) / 2f;
 			float taper = 1f - 0.3f * taperMid;
 			DrawLine(p0, p1, color, width * taper);
 		}
-	}
-
-	private struct VisibleSegment
-	{
-		public float Px1, Py1, Px2, Py2;
-		public float Ba;
-		public float Brightness;
-	}
-
-	private List<VisibleSegment> ComputeVisibleSegments(GridEffect e)
-	{
-		var result = new List<VisibleSegment>();
-		float p = EaseOutCubic(MathF.Min(e.T, 1f));
-		float md = MathF.Max(e.MaxDist, 1f);
-		float shimmer = 0.8f + 0.2f * MathF.Sin(e.Age * 0.006f);
-
-		foreach (var seg in e.Segments)
-		{
-			float brightness;
-			if (e.FlickerMode)
-			{
-				// Ghost flicker: random per-segment visibility based on age + dist
-				float phase = MathF.Sin(e.Age * 0.01f + seg.Dist * 2.7f + seg.X1 * 1.3f);
-				brightness = phase > 0.2f ? MathF.Abs(phase) * (1f - e.T * 0.5f) : 0f;
-			}
-			else if (e.Reverse)
-			{
-				// Converging: wave travels inward (high dist first)
-				float wavePos = p * (md + e.TrailDist);
-				float invertedDist = md - seg.Dist;
-				float diff = wavePos - invertedDist;
-				brightness = diff < 0 ? 0 : MathF.Max(0, 1f - diff / e.TrailDist);
-			}
-			else
-			{
-				float wavePos = p * (md + e.TrailDist);
-				float diff = wavePos - seg.Dist;
-				brightness = diff < 0 ? 0 : MathF.Max(0, 1f - diff / e.TrailDist);
-			}
-
-			if (brightness <= 0.02f) continue;
-
-			float alpha = brightness * (1f - e.T * 0.7f);
-			float ba = alpha * shimmer;
-
-			result.Add(new VisibleSegment
-			{
-				Px1 = seg.X1 * CellSize, Py1 = seg.Y1 * CellSize,
-				Px2 = seg.X2 * CellSize, Py2 = seg.Y2 * CellSize,
-				Ba = ba, Brightness = brightness,
-			});
-		}
-
-		return result;
 	}
 
 	private void AddEffect(GridEffect effect)
