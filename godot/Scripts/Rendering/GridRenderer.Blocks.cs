@@ -248,14 +248,14 @@ public partial class GridRenderer : Node2D
 		var bl = new Vector2(rect.Position.X, rect.End.Y);
 		var br = rect.End;
 
-		DrawRoundLine(tl, tl + new Vector2(-len, 0), color, width);
-		DrawRoundLine(tl, tl + new Vector2(0, -len), color, width);
-		DrawRoundLine(tr, tr + new Vector2(len, 0), color, width);
-		DrawRoundLine(tr, tr + new Vector2(0, -len), color, width);
-		DrawRoundLine(bl, bl + new Vector2(-len, 0), color, width);
-		DrawRoundLine(bl, bl + new Vector2(0, len), color, width);
-		DrawRoundLine(br, br + new Vector2(len, 0), color, width);
-		DrawRoundLine(br, br + new Vector2(0, len), color, width);
+		DrawRoundLine(tl, tl + new Vector2(len, 0), color, width);
+		DrawRoundLine(tl, tl + new Vector2(0, len), color, width);
+		DrawRoundLine(tr, tr + new Vector2(-len, 0), color, width);
+		DrawRoundLine(tr, tr + new Vector2(0, len), color, width);
+		DrawRoundLine(bl, bl + new Vector2(len, 0), color, width);
+		DrawRoundLine(bl, bl + new Vector2(0, -len), color, width);
+		DrawRoundLine(br, br + new Vector2(-len, 0), color, width);
+		DrawRoundLine(br, br + new Vector2(0, -len), color, width);
 	}
 
 	private void DrawFrozenOverlay(Block block, Rect2 rect)

@@ -319,7 +319,7 @@ public class GameState
         {
             if (block.IsImmobile) continue;
             if (block.IsStunned) continue;
-            if (block.IsOnCooldown && block.Type != BlockType.Jumper) continue;
+            if (block.IsOnCooldown && block.Type != BlockType.Jumper && block.Type != BlockType.Stunner) continue;
             if (block.IsOnCooldown && block.Type == BlockType.Jumper && !block.HasCombo) continue;
             if (!block.MoveTarget.HasValue) continue;
             if (block.Pos == block.MoveTarget.Value)
@@ -350,7 +350,7 @@ public class GameState
             if (block.Type == BlockType.Jumper && block.HasCombo)
                 JumperSystem.ConsumeCombo(block);
 
-            // Check if this tick is a move tick — uses EffectiveMoveInterval (ZoC-aware)
+            // Check if this tick is a move tick — uses EffectiveMoveInterval (ZoC + stunner cooldown aware)
             if (TickNumber % block.EffectiveMoveInterval != 0) continue;
 
             // A* pathfinding toward target

@@ -39,13 +39,14 @@ public partial class CameraController : Camera2D
 	{
 		var gridPixelW = _gridWidth * GridRenderer.CellSize;
 		var gridPixelH = _gridHeight * GridRenderer.CellSize;
+		var pad = GridRenderer.GridPadding;
 
 		// Offset Y to account for asymmetric HUD (top bar vs bottom bar)
 		float insetTopWorld = _hudInsetTop / Zoom.Y;
 		float insetBottomWorld = _hudInsetBottom / Zoom.Y;
 		float centerOffsetY = (insetTopWorld - insetBottomWorld) * 0.5f;
 
-		Position = new Vector2(gridPixelW * 0.5f, gridPixelH * 0.5f + centerOffsetY);
+		Position = new Vector2(gridPixelW * 0.5f + pad, gridPixelH * 0.5f + pad + centerOffsetY);
 		GD.Print($"Camera centered at {Position} for grid {_gridWidth}x{_gridHeight}");
 	}
 
@@ -139,6 +140,7 @@ public partial class CameraController : Camera2D
 		var gridPixelW = _gridWidth * GridRenderer.CellSize;
 		var gridPixelH = _gridHeight * GridRenderer.CellSize;
 		var viewportSize = GetViewportRect().Size;
+	var pad = GridRenderer.GridPadding;
 
 		// Convert HUD insets from screen pixels to world units
 		float insetTopWorld = _hudInsetTop / Zoom.Y;
@@ -159,27 +161,12 @@ public partial class CameraController : Camera2D
 		float marginX = effectiveViewW * 0.25f;
 		float marginY = effectiveViewH * 0.25f;
 
-		float minX, maxX, minY, maxY;
-
-		if (effectiveViewW >= gridPixelW)
-		{
-			minX = maxX = gridPixelW * 0.5f;
-		}
-		else
-		{
-			minX = effectiveViewW * 0.5f - marginX;
-			maxX = gridPixelW - effectiveViewW * 0.5f + marginX;
-		}
-
-		if (effectiveViewH >= gridPixelH)
-		{
-			minY = maxY = gridPixelH * 0.5f + centerOffsetY;
-		}
-		else
-		{
-			minY = effectiveViewH * 0.5f - marginY + centerOffsetY;
-			maxY = gridPixelH - effectiveViewH * 0.5f + marginY + centerOffsetY;
-		}
+		// Same clamping formula regardless of whether the grid fits the
+		// viewport — the player can always scroll to reposition the map.
+		float minX = effectiveViewW * 0.5f - marginX + pad;
+		float maxX = gridPixelW - effectiveViewW * 0.5f + marginX + pad;
+		float minY = effectiveViewH * 0.5f - marginY + centerOffsetY + pad;
+		float maxY = gridPixelH - effectiveViewH * 0.5f + marginY + centerOffsetY + pad;
 
 		Position = new Vector2(
 			Mathf.Clamp(Position.X, minX, maxX),

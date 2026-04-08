@@ -14,6 +14,7 @@ public partial class GridRenderer : Node2D
 	public const float CellSize = 28f;
 	public const float GridLineWidth = 1f;
 	public const float BlockInset = 2.5f;
+	public const float GridPadding = CellSize * 1.5f;
 
 	private GameConfig _config = GameConfig.CreateDefault();
 	private GameState? _gameState;
@@ -253,10 +254,10 @@ public partial class GridRenderer : Node2D
 		var bottomRight = invXform * vpSize;
 
 		// Convert to cell indices with 1-cell margin for partial visibility
-		int minX = Mathf.Max(0, (int)Mathf.Floor(topLeft.X / CellSize) - 1);
-		int minY = Mathf.Max(0, (int)Mathf.Floor(topLeft.Y / CellSize) - 1);
-		int maxX = Mathf.Min(grid.Width - 1, (int)Mathf.Ceil(bottomRight.X / CellSize) + 1);
-		int maxY = Mathf.Min(grid.Height - 1, (int)Mathf.Ceil(bottomRight.Y / CellSize) + 1);
+		int minX = Mathf.Max(0, (int)Mathf.Floor((topLeft.X - GridPadding) / CellSize) - 1);
+		int minY = Mathf.Max(0, (int)Mathf.Floor((topLeft.Y - GridPadding) / CellSize) - 1);
+		int maxX = Mathf.Min(grid.Width - 1, (int)Mathf.Ceil((bottomRight.X - GridPadding) / CellSize) + 1);
+		int maxY = Mathf.Min(grid.Height - 1, (int)Mathf.Ceil((bottomRight.Y - GridPadding) / CellSize) + 1);
 
 		return (minX, minY, maxX, maxY);
 	}
@@ -268,6 +269,11 @@ public partial class GridRenderer : Node2D
 
 		var grid = _gameState.Grid;
 		var (minX, minY, maxX, maxY) = GetVisibleCellRange();
+		// Draw padding border around grid
+		var gridBounds = new Rect2(GridPadding, GridPadding, grid.Width * CellSize, grid.Height * CellSize);
+		var paddedBounds = gridBounds.Grow(GridPadding);
+		DrawRect(paddedBounds, _config.NormalGroundColor with { A = 0.5f });
+		DrawRect(gridBounds.GrowIndividual(-0.5f, -0.5f, -0.5f, -0.5f), _config.GridLineColor with { A = 0.3f }, false, 1f);
 
 		// Draw cell backgrounds — only visible cells
 		for (int y = minY; y <= maxY; y++)
@@ -275,7 +281,7 @@ public partial class GridRenderer : Node2D
 			for (int x = minX; x <= maxX; x++)
 			{
 				var cell = grid[x, y];
-				var rect = new Rect2(x * CellSize, y * CellSize, CellSize, CellSize);
+				var rect = new Rect2(x * CellSize + GridPadding, y * CellSize + GridPadding, CellSize, CellSize);
 				DrawRect(rect, _config.GetGroundColor(cell.Ground));
 
 				// Draw terrain walls as inset blocks (after background, before grid lines)
@@ -286,20 +292,20 @@ public partial class GridRenderer : Node2D
 
 		// Draw grid lines — only visible range, scale width by 1/zoom so lines are always 1 screen pixel
 		float screenPixelWidth = GridLineWidth / GetCanvasTransform().X.X;
-		float gridTop = minY * CellSize;
-		float gridBottom = (maxY + 1) * CellSize;
+		float gridTop = minY * CellSize + GridPadding;
+		float gridBottom = (maxY + 1) * CellSize + GridPadding;
 		for (int x = minX; x <= maxX + 1; x++)
 		{
-			var from = new Vector2(x * CellSize, gridTop);
-			var to = new Vector2(x * CellSize, gridBottom);
+			var from = new Vector2(x * CellSize + GridPadding, gridTop);
+			var to = new Vector2(x * CellSize + GridPadding, gridBottom);
 			DrawLine(from, to, _config.GridLineColor, screenPixelWidth, false);
 		}
-		float gridLeft = minX * CellSize;
-		float gridRight = (maxX + 1) * CellSize;
+		float gridLeft = minX * CellSize + GridPadding;
+		float gridRight = (maxX + 1) * CellSize + GridPadding;
 		for (int y = minY; y <= maxY + 1; y++)
 		{
-			var from = new Vector2(gridLeft, y * CellSize);
-			var to = new Vector2(gridRight, y * CellSize);
+			var from = new Vector2(gridLeft, y * CellSize + GridPadding);
+			var to = new Vector2(gridRight, y * CellSize + GridPadding);
 			DrawLine(from, to, _config.GridLineColor, screenPixelWidth, false);
 		}
 
@@ -374,10 +380,12 @@ public partial class GridRenderer : Node2D
 	}
 
 	public static Vector2 GridToWorld(GridPos pos) =>
-		new(pos.X * CellSize + CellSize * 0.5f, pos.Y * CellSize + CellSize * 0.5f);
+		new(pos.X * CellSize + CellSize * 0.5f + GridPadding,
+			pos.Y * CellSize + CellSize * 0.5f + GridPadding);
 
 	public static GridPos WorldToGrid(Vector2 world) =>
-		new((int)Mathf.Floor(world.X / CellSize), (int)Mathf.Floor(world.Y / CellSize));
+		new((int)Mathf.Floor((world.X - GridPadding) / CellSize),
+			(int)Mathf.Floor((world.Y - GridPadding) / CellSize));
 
 	private Color GetPlayerColor(int playerId) => _config.GetPalette(playerId).Base;
 

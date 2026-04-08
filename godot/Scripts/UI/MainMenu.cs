@@ -39,6 +39,10 @@ public partial class MainMenu : Control
 		var editorBtn = new Button { Text = "Map Editor", CustomMinimumSize = new Vector2(0, 50) };
 		editorBtn.Pressed += OnMapEditorPressed;
 		vbox.AddChild(editorBtn);
+
+		var exitBtn = new Button { Text = "Exit Game", CustomMinimumSize = new Vector2(0, 50) };
+		exitBtn.Pressed += OnExitPressed;
+		vbox.AddChild(exitBtn);
 	}
 
 	private void OnPlayTestPressed()
@@ -54,5 +58,10 @@ public partial class MainMenu : Control
 	private void OnMapEditorPressed()
 	{
 		GetTree().ChangeSceneToFile("res://Scenes/MapEditor.tscn");
+	}
+
+	private void OnExitPressed()
+	{
+		GetTree().Quit();
 	}
 }

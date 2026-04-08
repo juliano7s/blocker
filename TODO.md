@@ -1,11 +1,10 @@
 
 # Controls
- - builder should not have an attack move command
  - queuing commands with shift not always work: if a block is rooting or uprooting, the next shift commands are not queued.
    - Also, if a block is rooting/uprooting any normal command on top of that should be queued, similar to the wall command.
 
 # Camera
- - When zooming, depending on the zoom level, not all grid lines show. Can we calculate which zoom levels will guarantee showing the grid lines and only use those?
+
 
 # Visuals
  - Stun rays:
@@ -20,7 +19,6 @@
        - rays come out of the center in all directions, uniformly, respecting the range of the ray
 
  - Blueprints:
-   - they must be team colored, right now they are always blue. Supply is gray, should be team color too.
 
  - Towers: they have no formation visuals (outline + diamond). These need to also be added to the PlayerPalette
 
@@ -33,4 +31,3 @@
  - pathfinding: units are preferring to go in a large L path instead of "diagonally" (zigzagging)
 
 # Hud
- - builder does not have an attack move command, remove it

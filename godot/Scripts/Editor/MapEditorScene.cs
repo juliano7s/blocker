@@ -272,8 +272,8 @@ public partial class MapEditorScene : Node2D
 	private GridPos GetGridPos(Vector2 globalMousePos)
 	{
 		var local = _gridRenderer.ToLocal(GetGlobalMousePosition());
-		int x = (int)Mathf.Floor(local.X / GridRenderer.CellSize);
-		int y = (int)Mathf.Floor(local.Y / GridRenderer.CellSize);
+		int x = (int)Mathf.Floor((local.X - GridRenderer.GridPadding) / GridRenderer.CellSize);
+		int y = (int)Mathf.Floor((local.Y - GridRenderer.GridPadding) / GridRenderer.CellSize);
 		return new GridPos(x, y);
 	}
 
@@ -431,7 +431,7 @@ public partial class MapEditorScene : Node2D
 	{
 		var gridPixelW = _mapWidth * GridRenderer.CellSize;
 		var gridPixelH = _mapHeight * GridRenderer.CellSize;
-		_camera.Position = new Vector2(gridPixelW * 0.5f, gridPixelH * 0.5f);
+		_camera.Position = new Vector2(gridPixelW * 0.5f + GridRenderer.GridPadding, gridPixelH * 0.5f + GridRenderer.GridPadding);
 	}
 
 	private void ClampCamera()
@@ -444,10 +444,10 @@ public partial class MapEditorScene : Node2D
 		float marginX = effectiveViewW * 0.25f;
 		float marginY = effectiveViewH * 0.25f;
 
-		float minX = effectiveViewW >= gridPixelW ? gridPixelW * 0.5f : effectiveViewW * 0.5f - marginX;
-		float maxX = effectiveViewW >= gridPixelW ? gridPixelW * 0.5f : gridPixelW - effectiveViewW * 0.5f + marginX;
-		float minY = effectiveViewH >= gridPixelH ? gridPixelH * 0.5f : effectiveViewH * 0.5f - marginY;
-		float maxY = effectiveViewH >= gridPixelH ? gridPixelH * 0.5f : gridPixelH - effectiveViewH * 0.5f + marginY;
+		float minX = effectiveViewW >= gridPixelW ? gridPixelW * 0.5f : effectiveViewW * 0.5f - marginX + GridRenderer.GridPadding;
+		float maxX = effectiveViewW >= gridPixelW ? gridPixelW * 0.5f : gridPixelW - effectiveViewW * 0.5f + marginX + GridRenderer.GridPadding;
+		float minY = effectiveViewH >= gridPixelH ? gridPixelH * 0.5f : effectiveViewH * 0.5f - marginY + GridRenderer.GridPadding;
+		float maxY = effectiveViewH >= gridPixelH ? gridPixelH * 0.5f : gridPixelH - effectiveViewH * 0.5f + marginY + GridRenderer.GridPadding;
 
 		_camera.Position = new Vector2(
 			Mathf.Clamp(_camera.Position.X, minX, maxX),
@@ -627,12 +627,12 @@ public partial class GuideOverlay : Node2D
 
 		float gridW = MapWidth * GridRenderer.CellSize;
 		float gridH = MapHeight * GridRenderer.CellSize;
-		float centerX = gridW * 0.5f;
-		float centerY = gridH * 0.5f;
+		float centerX = gridW * 0.5f + GridRenderer.GridPadding;
+		float centerY = gridH * 0.5f + GridRenderer.GridPadding;
 
 		// Vertical center line
-		DrawLine(new Vector2(centerX, 0), new Vector2(centerX, gridH), GuideColor, 2f);
+		DrawLine(new Vector2(centerX, GridRenderer.GridPadding), new Vector2(centerX, gridH + GridRenderer.GridPadding), GuideColor, 2f);
 		// Horizontal center line
-		DrawLine(new Vector2(0, centerY), new Vector2(gridW, centerY), GuideColor, 2f);
+		DrawLine(new Vector2(GridRenderer.GridPadding, centerY), new Vector2(gridW + GridRenderer.GridPadding, centerY), GuideColor, 2f);
 	}
 }

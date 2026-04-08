@@ -31,7 +31,43 @@ public static class CombatSystem
             if (toKill.Contains(block.Id)) continue;
 
             int soldiersNeeded = GetSoldiersNeededToKill(block);
-            if (soldiersNeeded <= 0) continue;
+            if (soldiersNeeded <= 0)
+            {
+                // Mobile soldiers attacked by rooted soldiers: 1 rooted soldier kills a mobile one
+                // (mobile-vs-mobile is handled by mutual kill in Pass 3)
+                if (block.Type == BlockType.Soldier && block.IsMobile)
+                {
+                    bool hasRootedEnemySoldier = false;
+                    foreach (var offset in GridPos.OrthogonalOffsets)
+                    {
+                        var neighbor = state.GetBlockAt(block.Pos + offset);
+                        if (neighbor != null && neighbor.Type == BlockType.Soldier
+                            && IsEnemy(block, neighbor) && !neighbor.IsMobile
+                            && !toKill.Contains(neighbor.Id))
+                        {
+                            hasRootedEnemySoldier = true;
+                            break;
+                        }
+                    }
+                    if (hasRootedEnemySoldier)
+                    {
+                        toKill.Add(block.Id);
+                        // HP loss for killing soldiers
+                        foreach (var offset in GridPos.OrthogonalOffsets)
+                        {
+                            var pos = block.Pos + offset;
+                            var neighbor = state.GetBlockAt(pos);
+                            if (neighbor != null && neighbor.Type == BlockType.Soldier
+                                && IsEnemy(block, neighbor) && !neighbor.IsMobile)
+                            {
+                                soldierHpLoss.TryGetValue(neighbor.Id, out int loss);
+                                soldierHpLoss[neighbor.Id] = loss + 1;
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
 
             bool useAll8 = block.State is BlockState.Rooted or BlockState.Rooting or BlockState.Uprooting
                            || block.IsInFormation;
@@ -53,7 +89,7 @@ public static class CombatSystem
             }
         }
 
-        // Pass 3: Soldier mutual kills (uprooted soldier vs uprooted soldier)
+        // Pass 3: Soldier mutual kills (mobile soldier vs mobile soldier)
         var soldierPairs = new HashSet<(int, int)>();
         foreach (var block in state.Blocks)
         {
@@ -67,7 +103,6 @@ public static class CombatSystem
                 var neighbor = state.GetBlockAt(neighborPos);
                 if (neighbor == null) continue;
                 if (neighbor.Type != BlockType.Soldier) continue;
-                if (!neighbor.IsMobile) continue;
                 if (neighbor.PlayerId == block.PlayerId) continue; // Same team
                 if (toKill.Contains(neighbor.Id)) continue;
 
@@ -170,7 +205,7 @@ public static class CombatSystem
                 BlockType.Warden => 1,
                 BlockType.Jumper => 1,
                 BlockType.Stunner => 1,
-                BlockType.Soldier => 0, // Handled by mutual kill
+                BlockType.Soldier => 0, // Handled by mutual kill (Pass 3)
                 _ => 0
             };
         }

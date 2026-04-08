@@ -1,3 +1,4 @@
+using Blocker.Game.Config;
 using Blocker.Game.Rendering;
 using Blocker.Simulation.Blocks;
 using Blocker.Simulation.Commands;
@@ -15,6 +16,7 @@ public partial class SelectionManager : Node2D
 	[Export] public int ControllingPlayer = 0;
 
 	private GameState? _gameState;
+	private GameConfig? _config;
 	private GridPos? _hoveredCell;
 	private readonly List<Block> _selectedBlocks = [];
 	private readonly List<Command> _pendingCommands = [];
@@ -75,6 +77,8 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 	{
 		_gameState = state;
 	}
+
+	public void SetConfig(GameConfig config) => _config = config;
 
 	public override void _Process(double delta)
 	{
@@ -353,10 +357,10 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 	{
 		if (!additive) _selectedBlocks.Clear();
 
-		var minX = (int)Mathf.Floor(Mathf.Min(start.X, end.X) / GridRenderer.CellSize);
-		var maxX = (int)Mathf.Floor(Mathf.Max(start.X, end.X) / GridRenderer.CellSize);
-		var minY = (int)Mathf.Floor(Mathf.Min(start.Y, end.Y) / GridRenderer.CellSize);
-		var maxY = (int)Mathf.Floor(Mathf.Max(start.Y, end.Y) / GridRenderer.CellSize);
+		var minX = (int)Mathf.Floor((Mathf.Min(start.X, end.X) - GridRenderer.GridPadding) / GridRenderer.CellSize);
+		var maxX = (int)Mathf.Floor((Mathf.Max(start.X, end.X) - GridRenderer.GridPadding) / GridRenderer.CellSize);
+		var minY = (int)Mathf.Floor((Mathf.Min(start.Y, end.Y) - GridRenderer.GridPadding) / GridRenderer.CellSize);
+		var maxY = (int)Mathf.Floor((Mathf.Max(start.Y, end.Y) - GridRenderer.GridPadding) / GridRenderer.CellSize);
 
 		var allInBox = new List<Block>();
 		var mobileInBox = new List<Block>();
@@ -676,7 +680,7 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 		if (!_gameState!.Grid.InBounds(gridPos)) return;
 
 		var blockIds = _selectedBlocks
-			.Where(b => b.IsMobile)
+			.Where(b => b.Type == BlockType.Soldier || b.Type == BlockType.Jumper)
 			.Select(b => b.Id)
 			.ToList();
 
@@ -865,15 +869,16 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 		}
 	}
 
-	private static Color GetBlueprintRoleColor(string role) => role switch
+	private Color GetBlueprintRoleColor(string role)
 	{
-		"builder" => new Color(0.2f, 0.4f, 0.9f),
-		"soldier" => new Color(0.9f, 0.6f, 0.2f),
-		"stunner" => new Color(0.8f, 0.3f, 1f),
-		"wall" => new Color(0.5f, 0.5f, 0.5f),
-		"center" => new Color(1f, 1f, 1f),
-		_ => Colors.White
-	};
+		var baseColor = _config?.GetPalette(ControllingPlayer).Base ?? new Color(0.3f, 0.6f, 1f);
+		return role switch
+		{
+			"center" => Colors.White,
+			"wall" => baseColor.Lerp(Colors.Gray, 0.4f),
+			_ => baseColor
+		};
+	}
 
 	/// <summary>Get the grid-coordinate bounds currently visible in the camera viewport.</summary>
 	private (int minX, int minY, int maxX, int maxY) GetVisibleGridBounds()
@@ -886,10 +891,10 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 		var halfView = viewportSize / (2f * camera.Zoom);
 		var camPos = camera.GlobalPosition;
 
-		int minX = (int)Mathf.Floor((camPos.X - halfView.X) / GridRenderer.CellSize);
-		int maxX = (int)Mathf.Floor((camPos.X + halfView.X) / GridRenderer.CellSize);
-		int minY = (int)Mathf.Floor((camPos.Y - halfView.Y) / GridRenderer.CellSize);
-		int maxY = (int)Mathf.Floor((camPos.Y + halfView.Y) / GridRenderer.CellSize);
+		int minX = (int)Mathf.Floor(((camPos.X - halfView.X) - GridRenderer.GridPadding) / GridRenderer.CellSize);
+		int maxX = (int)Mathf.Floor(((camPos.X + halfView.X) - GridRenderer.GridPadding) / GridRenderer.CellSize);
+		int minY = (int)Mathf.Floor(((camPos.Y - halfView.Y) - GridRenderer.GridPadding) / GridRenderer.CellSize);
+		int maxY = (int)Mathf.Floor(((camPos.Y + halfView.Y) - GridRenderer.GridPadding) / GridRenderer.CellSize);
 
 		return (minX, minY, maxX, maxY);
 	}
@@ -902,7 +907,7 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 	}
 
 	private static Rect2 CellRect(GridPos pos) =>
-		new(pos.X * GridRenderer.CellSize, pos.Y * GridRenderer.CellSize,
+		new(pos.X * GridRenderer.CellSize + GridRenderer.GridPadding, pos.Y * GridRenderer.CellSize + GridRenderer.GridPadding,
 			GridRenderer.CellSize, GridRenderer.CellSize);
 
 	private void DrawDashedRect(Rect2 rect, Color color, float width, float dashLen, float gapLen)

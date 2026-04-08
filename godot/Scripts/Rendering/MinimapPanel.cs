@@ -143,8 +143,8 @@ public partial class MinimapPanel : Control
 
         // Draw camera viewport rectangle (in grid-cell units, offset from grid origin)
         float cellSize = GridRenderer.CellSize;
-        float camLeft = (_cameraWorldPos.X - _cameraViewSize.X * 0.5f) / cellSize;
-        float camTop = (_cameraWorldPos.Y - _cameraViewSize.Y * 0.5f) / cellSize;
+        float camLeft = (_cameraWorldPos.X - _cameraViewSize.X * 0.5f - GridRenderer.GridPadding) / cellSize;
+        float camTop = (_cameraWorldPos.Y - _cameraViewSize.Y * 0.5f - GridRenderer.GridPadding) / cellSize;
         float camW = _cameraViewSize.X / cellSize;
         float camH = _cameraViewSize.Y / cellSize;
 
@@ -185,8 +185,8 @@ public partial class MinimapPanel : Control
         float gridX = (localPos.X - gridOffX) / scale;
         float gridY = (localPos.Y - gridOffY) / scale;
 
-        float worldX = gridX * GridRenderer.CellSize;
-        float worldY = gridY * GridRenderer.CellSize;
+        float worldX = gridX * GridRenderer.CellSize + GridRenderer.GridPadding;
+        float worldY = gridY * GridRenderer.CellSize + GridRenderer.GridPadding;
 
         EmitSignal(SignalName.CameraJumpRequested, new Vector2(worldX, worldY));
     }

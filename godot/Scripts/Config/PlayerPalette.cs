@@ -159,7 +159,7 @@ public partial class PlayerPalette : Resource
         if (StunnerNestDiamond == default) StunnerNestDiamond = new Color(0.9f, 0.55f, 1f);
         if (StunnerNestSpawnBar == default) StunnerNestSpawnBar = new Color(0.8f, 0.3f, 1f, 0.35f);
 
-        if (SupplyOutline == default) SupplyOutline = b.Lerp(new Color(0.55f, 0.55f, 0.55f), 0.5f);
+        if (SupplyOutline == default) SupplyOutline = b.Lightened(0.15f);
         if (SupplyOutlineGlow == default) SupplyOutlineGlow = SupplyOutline with { A = 0.35f };
         if (SupplyDiamond == default) SupplyDiamond = Colors.White;
 

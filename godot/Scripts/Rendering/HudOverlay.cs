@@ -20,6 +20,7 @@ public partial class HudOverlay : CanvasLayer
 	private static readonly Color BarBgColor = new(0.15f, 0.15f, 0.18f);
 
 	private Control? _drawControl;
+	private Button? _exitBtn;
 
 	public override void _Ready()
 	{
@@ -31,6 +32,21 @@ public partial class HudOverlay : CanvasLayer
 		_drawControl.AnchorsPreset = (int)Control.LayoutPreset.FullRect;
 		_drawControl.MouseFilter = Control.MouseFilterEnum.Ignore;
 		AddChild(_drawControl);
+
+		// Exit button — anchored to top-right, inside the top bar
+		_exitBtn = new Button
+		{
+			Text = "✕",
+			Size = new Vector2(24, 24),
+			MouseFilter = Control.MouseFilterEnum.Stop
+		};
+		_exitBtn.SetAnchorsPreset(Control.LayoutPreset.TopRight);
+		_exitBtn.OffsetLeft = -34;
+		_exitBtn.OffsetTop = 4;
+		_exitBtn.OffsetRight = -10;
+		_exitBtn.OffsetBottom = 28;
+		_exitBtn.Pressed += () => GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
+		AddChild(_exitBtn);
 	}
 
 	public void SetGameState(GameState state) => _gameState = state;
@@ -122,7 +138,7 @@ public partial class HudOverlay : CanvasLayer
 						   _fps >= 30 ? new Color(0.9f, 0.9f, 0.3f) :
 						   new Color(0.9f, 0.3f, 0.3f);
 			float fpsWidth = font.GetStringSize(fpsText, HorizontalAlignment.Left, -1, fontSize).X;
-			DrawString(font, new Vector2(viewport.X - fpsWidth - padding, 22), fpsText,
+			DrawString(font, new Vector2(viewport.X - fpsWidth - 44, 22), fpsText,
 				HorizontalAlignment.Left, -1, fontSize, fpsColor);
 
 			// Block count ratio bar (bottom of top bar)

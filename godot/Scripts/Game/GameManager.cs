@@ -69,6 +69,7 @@ public partial class GameManager : Node2D
 		// Set up selection
 		_selectionManager = GetNode<SelectionManager>("SelectionManager");
 		_selectionManager.SetGameState(gameState);
+		_selectionManager.SetConfig(Config);
 
 		// Set up tick runner
 		_tickRunner = GetNode<TickRunner>("TickRunner");
@@ -103,17 +104,7 @@ public partial class GameManager : Node2D
 		// Set background color
 		RenderingServer.SetDefaultClearColor(Config.BackgroundColor);
 
-		// Exit button (top-right corner)
-		var exitLayer = new CanvasLayer { Layer = 20 };
-		AddChild(exitLayer);
-		var exitBtn = new Button
-		{
-			Text = "Exit",
-			Position = new Vector2(10, 10),
-			CustomMinimumSize = new Vector2(80, 35)
-		};
-		exitBtn.Pressed += () => GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
-		exitLayer.AddChild(exitBtn);
+		// Exit button handled by HudOverlay
 	}
 
 	public override void _Process(double delta)

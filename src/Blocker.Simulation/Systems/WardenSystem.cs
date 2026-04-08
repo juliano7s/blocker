@@ -16,9 +16,13 @@ public static class WardenSystem
     /// </summary>
     public static void UpdateZoC(GameState state)
     {
-        // Reset all to base interval
+        // Reset all to base interval, then apply stunner cooldown slow
         foreach (var block in state.Blocks)
+        {
             block.EffectiveMoveInterval = block.MoveInterval;
+            if (block.IsOnCooldown && block.Type == BlockType.Stunner)
+                block.EffectiveMoveInterval *= 3;
+        }
 
         // Find all rooted, non-stunned Wardens and apply slow to enemies in range
         foreach (var warden in state.Blocks)

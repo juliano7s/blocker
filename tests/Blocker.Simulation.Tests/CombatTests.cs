@@ -164,6 +164,38 @@ public class CombatTests
     }
 
     [Fact]
+    public void RootedSoldier_KillsMobileBuilder()
+    {
+        var state = CreateState();
+        var target = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 5));
+        var soldier = state.AddBlock(BlockType.Soldier, 1, new GridPos(5, 4));
+        soldier.State = BlockState.Rooted;
+        soldier.RootProgress = Constants.RootTicks;
+
+        CombatSystem.Tick(state);
+
+        Assert.DoesNotContain(target, state.Blocks); // Rooted soldier kills like uprooted
+        Assert.Contains(soldier, state.Blocks);
+        Assert.Equal(Constants.SoldierMaxHp - 1, soldier.Hp); // Loses 1 HP
+    }
+
+    [Fact]
+    public void RootedSoldier_KillsMobileSoldier()
+    {
+        var state = CreateState();
+        var mobileEnemy = state.AddBlock(BlockType.Soldier, 0, new GridPos(5, 5));
+        var rootedSoldier = state.AddBlock(BlockType.Soldier, 1, new GridPos(5, 4));
+        rootedSoldier.State = BlockState.Rooted;
+        rootedSoldier.RootProgress = Constants.RootTicks;
+
+        CombatSystem.Tick(state);
+
+        Assert.DoesNotContain(mobileEnemy, state.Blocks); // Rooted soldier kills enemy soldier
+        Assert.Contains(rootedSoldier, state.Blocks); // Rooted soldier survives (not mutual kill)
+        Assert.Equal(Constants.SoldierMaxHp - 1, rootedSoldier.Hp); // Loses 1 HP
+    }
+
+    [Fact]
     public void FriendlySoldiers_DontKillEachOther()
     {
         var state = CreateState();

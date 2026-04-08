@@ -101,8 +101,8 @@ public partial class PostProcessingManager : CanvasLayer
 
 			// Convert grid position to screen-space UV
 			var worldPos = new Vector2(
-				evt.Position.X * GridRenderer.CellSize + GridRenderer.CellSize * 0.5f,
-				evt.Position.Y * GridRenderer.CellSize + GridRenderer.CellSize * 0.5f
+				evt.Position.X * GridRenderer.CellSize + GridRenderer.CellSize * 0.5f + GridRenderer.GridPadding,
+				evt.Position.Y * GridRenderer.CellSize + GridRenderer.CellSize * 0.5f + GridRenderer.GridPadding
 			);
 			var screenPos = WorldToScreenUV(worldPos);
 
