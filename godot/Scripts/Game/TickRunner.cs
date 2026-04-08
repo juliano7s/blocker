@@ -10,37 +10,37 @@ namespace Blocker.Game;
 /// </summary>
 public partial class TickRunner : Node
 {
-	[Export] public int TickRate = 12;
+    [Export] public int TickRate = 12;
 
-	private GameState? _gameState;
-	private SelectionManager? _selectionManager;
-	private double _accumulator;
+    private GameState? _gameState;
+    private SelectionManager? _selectionManager;
+    private double _accumulator;
 
-	public double TickInterval => 1.0 / TickRate;
+    public double TickInterval => 1.0 / TickRate;
 
-	public float InterpolationFactor =>
-		TickInterval > 0 ? Mathf.Clamp((float)(_accumulator / TickInterval), 0f, 1f) : 1f;
+    public float InterpolationFactor =>
+        TickInterval > 0 ? Mathf.Clamp((float)(_accumulator / TickInterval), 0f, 1f) : 1f;
 
-	public void SetGameState(GameState state)
-	{
-		_gameState = state;
-	}
+    public void SetGameState(GameState state)
+    {
+        _gameState = state;
+    }
 
-	public void SetSelectionManager(SelectionManager sm)
-	{
-		_selectionManager = sm;
-	}
+    public void SetSelectionManager(SelectionManager sm)
+    {
+        _selectionManager = sm;
+    }
 
-	public override void _Process(double delta)
-	{
-		if (_gameState == null) return;
+    public override void _Process(double delta)
+    {
+        if (_gameState == null) return;
 
-		_accumulator += delta;
-		while (_accumulator >= TickInterval)
-		{
-			var commands = _selectionManager?.FlushCommands();
-			_gameState.Tick(commands);
-			_accumulator -= TickInterval;
-		}
-	}
+        _accumulator += delta;
+        while (_accumulator >= TickInterval)
+        {
+            var commands = _selectionManager?.FlushCommands();
+            _gameState.Tick(commands);
+            _accumulator -= TickInterval;
+        }
+    }
 }
