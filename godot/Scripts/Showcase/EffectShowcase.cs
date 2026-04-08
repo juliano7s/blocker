@@ -72,9 +72,16 @@ public partial class EffectShowcase : Node2D
 		AddEffectButton("14. Pulse Beam", () => SpawnPulseBeam());
 		AddEffectButton("15. Dotted Trail", () => SpawnDottedTrail());
 
+		// Separator + Warden ZoC options (looping)
+		_buttonPanel.AddChild(new HSeparator());
+		AddEffectButton("16. ZoC Grid Wave", () => SpawnZocGridWave());
+		AddEffectButton("17. ZoC Sine Rings", () => SpawnZocSineRings());
+		AddEffectButton("18. ZoC Dashed Pulse", () => SpawnZocDashedPulse());
+		AddEffectButton("Stop Looping", () => _effects.RemoveAll(e => e.Looping));
+
 		// Separator + All button
 		_buttonPanel.AddChild(new HSeparator());
-		AddEffectButton("ALL", () =>
+		AddEffectButton("ALL (one-shot)", () =>
 		{
 			SpawnElectricLightning();
 			SpawnWavePulse();
@@ -123,7 +130,11 @@ public partial class EffectShowcase : Node2D
 				else e.Sparks[j] = s;
 			}
 
-			if (e.T >= 1f) _effects.RemoveAt(i);
+			if (e.T >= 1f)
+			{
+				if (e.Looping) e.T -= 1f; // wrap around
+				else _effects.RemoveAt(i);
+			}
 		}
 
 		QueueRedraw();
@@ -192,6 +203,7 @@ public partial class EffectShowcase : Node2D
 		public bool Reverse;     // for converging effects
 		public bool FlickerMode; // for ghost flicker
 		public LineStyle Style;  // how lines are rendered
+		public bool Looping;     // wraps T back to 0 instead of expiring
 	}
 
 	private static float EaseOutCubic(float t) => 1f - MathF.Pow(1f - t, 3f);
@@ -854,6 +866,152 @@ public partial class EffectShowcase : Node2D
 			T = 0, Duration = 2000, TrailDist = 3f,
 			Color = new Color(0.9f, 0.7f, 1f), // soft lavender
 			Style = LineStyle.Dotted,
+		});
+	}
+
+	// --- Warden ZoC looping effects ---
+
+	private void SpawnZocGridWave()
+	{
+		// Stop any existing looping effects first
+		_effects.RemoveAll(e => e.Looping);
+
+		// Expanding square rings on grid lines, looping continuously
+		// Similar to ShockwaveRing but slower, subtler, and loops
+		var segments = new List<LightSegment>();
+		int zocRadius = 6; // approximate warden ZoC radius
+
+		for (int ring = 1; ring <= zocRadius; ring++)
+		{
+			int tlx = CenterX - ring, tly = CenterY - ring;
+			int brx = CenterX + 1 + ring, bry = CenterY + 1 + ring;
+
+			for (int x = tlx; x < brx; x++)
+				segments.Add(new LightSegment { X1 = x, Y1 = tly, X2 = x + 1, Y2 = tly, Dist = ring });
+			for (int y = tly; y < bry; y++)
+				segments.Add(new LightSegment { X1 = brx, Y1 = y, X2 = brx, Y2 = y + 1, Dist = ring });
+			for (int x = brx; x > tlx; x--)
+				segments.Add(new LightSegment { X1 = x, Y1 = bry, X2 = x - 1, Y2 = bry, Dist = ring });
+			for (int y = bry; y > tly; y--)
+				segments.Add(new LightSegment { X1 = tlx, Y1 = y, X2 = tlx, Y2 = y - 1, Dist = ring });
+		}
+
+		AddEffect(new GridEffect
+		{
+			Segments = segments, MaxDist = zocRadius,
+			T = 0, Duration = 3000, TrailDist = 2f,
+			Color = new Color(0.25f, 0.55f, 1f), // warden blue
+			Looping = true,
+		});
+	}
+
+	private void SpawnZocSineRings()
+	{
+		// Stop any existing looping effects first
+		_effects.RemoveAll(e => e.Looping);
+
+		// Same square ring geometry but with sine wave displacement on the lines
+		var segments = new List<LightSegment>();
+		int zocRadius = 6;
+
+		for (int ring = 1; ring <= zocRadius; ring++)
+		{
+			int tlx = CenterX - ring, tly = CenterY - ring;
+			int brx = CenterX + 1 + ring, bry = CenterY + 1 + ring;
+
+			for (int x = tlx; x < brx; x++)
+				segments.Add(new LightSegment { X1 = x, Y1 = tly, X2 = x + 1, Y2 = tly, Dist = ring });
+			for (int y = tly; y < bry; y++)
+				segments.Add(new LightSegment { X1 = brx, Y1 = y, X2 = brx, Y2 = y + 1, Dist = ring });
+			for (int x = brx; x > tlx; x--)
+				segments.Add(new LightSegment { X1 = x, Y1 = bry, X2 = x - 1, Y2 = bry, Dist = ring });
+			for (int y = bry; y > tly; y--)
+				segments.Add(new LightSegment { X1 = tlx, Y1 = y, X2 = tlx, Y2 = y - 1, Dist = ring });
+		}
+
+		AddEffect(new GridEffect
+		{
+			Segments = segments, MaxDist = zocRadius,
+			T = 0, Duration = 4000, TrailDist = 2.5f,
+			Color = new Color(0.25f, 0.55f, 1f), // warden blue
+			Style = LineStyle.SineWave,
+			Looping = true,
+		});
+	}
+
+	private void SpawnZocDashedPulse()
+	{
+		// Stop any existing looping effects first
+		_effects.RemoveAll(e => e.Looping);
+
+		// Dashed lines along grid within ZoC radius — crawling outward, looping
+		// Uses radial lines (not rings) for a different feel
+		var segments = new List<LightSegment>();
+		int zocRadius = 6;
+		float maxDist = 0;
+
+		// Radial lines in 8 directions (4 cardinal + 4 diagonal approximated as staircase)
+		// Cardinal directions
+		for (int dir = 0; dir < 4; dir++)
+		{
+			int dx = dir == 0 ? 1 : dir == 1 ? -1 : 0;
+			int dy = dir == 2 ? 1 : dir == 3 ? -1 : 0;
+
+			// Two lines per direction (both edges of center cell)
+			for (int lane = 0; lane < 2; lane++)
+			{
+				float offX = dy != 0 ? (lane == 0 ? CenterX : CenterX + 1) : CenterX + 0.5f;
+				float offY = dx != 0 ? (lane == 0 ? CenterY : CenterY + 1) : CenterY + 0.5f;
+
+				for (int i = 0; i < zocRadius; i++)
+				{
+					segments.Add(new LightSegment
+					{
+						X1 = offX + dx * i, Y1 = offY + dy * i,
+						X2 = offX + dx * (i + 1), Y2 = offY + dy * (i + 1),
+						Dist = i,
+					});
+					if (i > maxDist) maxDist = i;
+				}
+			}
+		}
+
+		// Diagonal directions: staircase pattern along grid lines
+		int[] ddx = { 1, 1, -1, -1 };
+		int[] ddy = { 1, -1, 1, -1 };
+		for (int dir = 0; dir < 4; dir++)
+		{
+			int sx = CenterX + (ddx[dir] > 0 ? 1 : 0);
+			int sy = CenterY + (ddy[dir] > 0 ? 1 : 0);
+
+			for (int i = 0; i < zocRadius; i++)
+			{
+				int cx = sx + ddx[dir] * i;
+				int cy = sy + ddy[dir] * i;
+				// Horizontal step then vertical step
+				segments.Add(new LightSegment
+				{
+					X1 = cx, Y1 = cy,
+					X2 = cx + ddx[dir], Y2 = cy,
+					Dist = i * 2,
+				});
+				segments.Add(new LightSegment
+				{
+					X1 = cx + ddx[dir], Y1 = cy,
+					X2 = cx + ddx[dir], Y2 = cy + ddy[dir],
+					Dist = i * 2 + 1,
+				});
+				if (i * 2 + 1 > maxDist) maxDist = i * 2 + 1;
+			}
+		}
+
+		AddEffect(new GridEffect
+		{
+			Segments = segments, MaxDist = maxDist,
+			T = 0, Duration = 3500, TrailDist = 4f,
+			Color = new Color(0.25f, 0.55f, 1f), // warden blue
+			Style = LineStyle.Dashed,
+			Looping = true,
 		});
 	}
 
