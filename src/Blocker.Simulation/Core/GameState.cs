@@ -199,7 +199,7 @@ public class GameState
 
             case CommandType.Jump:
                 if (cmd.Direction.HasValue)
-                    JumperSystem.Jump(this, block, cmd.Direction.Value);
+                    JumperSystem.Jump(this, block, cmd.Direction.Value, CellDistance(block.Pos, cmd.Direction.Value, cmd.TargetPos));
                 break;
         }
     }
@@ -262,7 +262,7 @@ public class GameState
             case CommandType.Jump:
                 if (block.IsOnCooldown && !block.HasCombo) return false;
                 if (cmd.Direction.HasValue)
-                    return JumperSystem.Jump(this, block, cmd.Direction.Value);
+                    return JumperSystem.Jump(this, block, cmd.Direction.Value, CellDistance(block.Pos, cmd.Direction.Value, cmd.TargetPos));
                 return true;
 
             default:
@@ -277,6 +277,18 @@ public class GameState
         if (block.State == BlockState.Rooting) return false;
         if (block.State == BlockState.Uprooting) return false;
         return true;
+    }
+
+    /// <summary>
+    /// Compute cell distance from a target position projected onto a cardinal direction.
+    /// </summary>
+    private static int? CellDistance(GridPos from, Direction dir, GridPos? target)
+    {
+        if (!target.HasValue) return null;
+        var offset = dir.ToOffset();
+        return offset.X != 0
+            ? Math.Abs(target.Value.X - from.X)
+            : Math.Abs(target.Value.Y - from.Y);
     }
 
     /// <summary>
@@ -298,7 +310,16 @@ public class GameState
         // Step 5: Stun — advance rays, apply effects, decay cooldowns
         StunSystem.Tick(this);
 
-        // Step 6: Variant cooldowns — TODO
+        // Step 6: Variant cooldowns — decay Jumper jump cooldowns
+        foreach (var block in Blocks)
+        {
+            if (block.Type == BlockType.Jumper && block.IsOnCooldown)
+            {
+                block.Cooldown--;
+                if (!block.IsOnCooldown)
+                    block.MobileCooldown = false;
+            }
+        }
 
         // Steps 7-8: Push fire + wave advance
         PushSystem.Tick(this);
@@ -320,7 +341,7 @@ public class GameState
             if (block.IsImmobile) continue;
             if (block.IsStunned) continue;
             if (block.IsOnCooldown && block.Type != BlockType.Jumper && block.Type != BlockType.Stunner) continue;
-            if (block.IsOnCooldown && block.Type == BlockType.Jumper && !block.HasCombo) continue;
+            if (block.IsOnCooldown && block.Type == BlockType.Jumper && !block.HasCombo && !block.MobileCooldown) continue;
             if (!block.MoveTarget.HasValue) continue;
             if (block.Pos == block.MoveTarget.Value)
             {

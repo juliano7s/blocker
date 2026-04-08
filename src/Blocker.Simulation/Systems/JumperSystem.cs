@@ -14,7 +14,7 @@ public static class JumperSystem
     /// Execute a jump in a cardinal direction.
     /// Returns true if the command was consumed (even if jump failed).
     /// </summary>
-    public static bool Jump(GameState state, Block jumper, Direction direction)
+    public static bool Jump(GameState state, Block jumper, Direction direction, int? maxRange = null)
     {
         if (jumper.Type != BlockType.Jumper) return false;
         if (jumper.IsStunned) return false;
@@ -29,14 +29,31 @@ public static class JumperSystem
         var offset = direction.ToOffset();
         var pos = jumper.Pos;
         int kills = 0;
+        bool hitObstacle = false;
         GridPos landingPos = pos;
+        int range = Math.Max(1, Math.Min(maxRange ?? Constants.JumperJumpRange, Constants.JumperJumpRange));
 
-        // Travel up to JumperJumpRange cells
-        for (int i = 1; i <= Constants.JumperJumpRange; i++)
+        // Travel up to range cells
+        for (int i = 1; i <= range; i++)
         {
             var nextPos = pos + new GridPos(offset.X * i, offset.Y * i);
 
             if (!state.Grid.InBounds(nextPos)) break;
+
+            // Check terrain
+            if (state.Grid[nextPos].Terrain == TerrainType.Terrain)
+            {
+                hitObstacle = true;
+                break;
+            }
+
+            // Breakable/Fragile wall: hit and stop
+            if (state.Grid[nextPos].HitWall())
+            {
+                hitObstacle = true;
+                break;
+            }
+
             if (!state.Grid[nextPos].IsPassable) break;
 
             var blockAtPos = state.GetBlockAt(nextPos);
@@ -44,10 +61,15 @@ public static class JumperSystem
             {
                 // Walls, formations, rooted blocks, friendly blocks stop the jump
                 if (blockAtPos.Type == BlockType.Wall || blockAtPos.IsInFormation || blockAtPos.IsImmobile)
+                {
+                    hitObstacle = true;
                     break;
+                }
 
                 if (blockAtPos.PlayerId == jumper.PlayerId)
+                {
                     break; // Can't pass through friendlies
+                }
 
                 // Kill enemies in path
                 state.RemoveBlock(blockAtPos);
@@ -77,8 +99,8 @@ public static class JumperSystem
                 BlockId: jumper.Id));
         }
 
-        // Combo: if killed at least 1 and path wasn't blocked
-        if (kills > 0)
+        // Combo: if killed at least 1 and didn't hit an obstacle
+        if (kills > 0 && !hitObstacle)
         {
             // Grant combo — can jump again immediately, NO cooldown yet
             jumper.HasCombo = true;
@@ -110,5 +132,6 @@ public static class JumperSystem
         if (jumper.Type != BlockType.Jumper) return;
         jumper.HasCombo = false;
         jumper.Cooldown = Constants.JumperJumpCooldown;
+        jumper.MobileCooldown = true; // Can still move, just can't jump
     }
 }
