@@ -45,6 +45,10 @@ public partial class GridRenderer : Node2D
 	private readonly HashSet<int> _liveIdSet = new();
 	private readonly List<int> _deadIds = new();
 
+	// Reusable collections for formation joiner rendering — avoids per-frame allocation
+	private readonly List<(int Id, GridPos Pos)> _formationMembers = new();
+	private readonly HashSet<GridPos> _formationPosSet = new();
+
 	// Jumper ghost trails — position + start time for fading afterimages
 	private record struct GhostTrail(Vector2 Pos, Color Color, float StartTime, bool IsJump);
 	private readonly List<GhostTrail> _ghostTrails = [];
@@ -100,12 +104,18 @@ public partial class GridRenderer : Node2D
 				var jumper = _gameState.GetBlock(evt.BlockId.Value);
 				if (jumper != null)
 				{
+					// Snap visual position to landing — jumps are instant, no interpolation
+					var landingWorld = GridToWorld(jumper.Pos);
+					_visualPositions[jumper.Id] = landingWorld;
+
 					var jumpColor = GetPlayerColor(jumper.PlayerId);
 					// Add blur ghosts along the jump path
 					var dir = evt.Direction!.Value;
 					var range = evt.Range ?? 1;
 					var offset = dir.ToOffset();
-					var pos = jumper.PrevPos;
+					// Reconstruct start position from landing + direction (PrevPos is
+					// already overwritten by GameState step 11 at this point)
+					var pos = jumper.Pos - new GridPos(offset.X * range, offset.Y * range);
 					for (int i = 0; i < range; i++)
 					{
 						pos = pos + offset;
@@ -364,9 +374,6 @@ public partial class GridRenderer : Node2D
 		// Draw push waves
 		DrawPushWaves();
 
-		// Draw formation visuals
-		DrawFormations();
-
 		// Draw nest spawn progress
 		DrawNestProgress();
 
@@ -375,6 +382,9 @@ public partial class GridRenderer : Node2D
 
 		// Draw death effects (explosions, fragments)
 		DrawDeathEffects();
+
+		// Draw formation visuals (last so outlines/corners are on top of block sprites)
+		DrawFormations();
 
 		_glowLayer?.EndFrame();
 	}

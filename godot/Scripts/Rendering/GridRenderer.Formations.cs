@@ -11,142 +11,188 @@ namespace Blocker.Game.Rendering;
 /// </summary>
 public partial class GridRenderer : Node2D
 {
-	private void DrawFormations()
-	{
-		foreach (var formation in _gameState!.Formations)
-		{
-			var palette = _config.GetPalette(formation.PlayerId);
-			var (outlineColor, outlineGlow, diamondColor) = GetFormationStyle(formation.Type, palette);
-			float alpha = formation.TeardownTimer > 0 ? 0.45f : 0.9f;
+    private void DrawFormations()
+    {
+        foreach (var formation in _gameState!.Formations)
+        {
+            var palette = _config.GetPalette(formation.PlayerId);
+            var (outlineColor, outlineGlow, diamondColor) = GetFormationStyle(formation.Type, palette);
 
-			foreach (var id in formation.MemberIds)
-			{
-				var block = _gameState.GetBlock(id);
-				if (block == null) continue;
-				var blockRect = GetFormationBlockRect(block.Pos);
-				DrawFormationBlock(blockRect, outlineColor with { A = alpha }, outlineGlow with { A = alpha * 0.35f }, diamondColor with { A = alpha });
+            _formationMembers.Clear();
+            foreach (var id in formation.MemberIds)
+            {
+                var block = _gameState.GetBlock(id);
+                if (block == null) continue;
+                _formationMembers.Add((id, block.Pos));
+                var blockRect = GetFormationBlockRect(block.Pos);
+                DrawFormationBlock(blockRect, outlineColor, outlineGlow, diamondColor);
 
-				if (formation.TeardownTimer > 0)
-					DrawTeardownOverlay(block, formation.TeardownTimer);
-			}
-		}
+                if (formation.TeardownTimer > 0)
+                    DrawTeardownOverlay(block, formation.TeardownTimer);
+            }
 
-		foreach (var nest in _gameState!.Nests)
-		{
-			var palette = _config.GetPalette(nest.PlayerId);
-			var (outlineColor, outlineGlow, diamondColor) = GetNestStyle(nest.Type, palette);
-			float alpha = nest.TeardownTimer > 0 ? 0.45f : 0.9f;
+            DrawFormationJoiners(_formationMembers, outlineColor, 1f);
+        }
 
-			foreach (var id in nest.MemberIds)
-			{
-				var block = _gameState.GetBlock(id);
-				if (block == null) continue;
-				var blockRect = GetFormationBlockRect(block.Pos);
-				DrawFormationBlock(blockRect, outlineColor with { A = alpha }, outlineGlow with { A = alpha * 0.35f }, diamondColor with { A = alpha });
+        foreach (var nest in _gameState!.Nests)
+        {
+            var palette = _config.GetPalette(nest.PlayerId);
+            var (outlineColor, outlineGlow, diamondColor) = GetNestStyle(nest.Type, palette);
+            float alpha = nest.TeardownTimer > 0 ? 0.45f : 0.9f;
 
-				if (nest.TeardownTimer > 0)
-					DrawTeardownOverlay(block, nest.TeardownTimer);
-			}
-		}
-	}
+            _formationMembers.Clear();
+            foreach (var id in nest.MemberIds)
+            {
+                var block = _gameState.GetBlock(id);
+                if (block == null) continue;
+                _formationMembers.Add((id, block.Pos));
+                var blockRect = GetFormationBlockRect(block.Pos);
+                DrawFormationBlock(blockRect, outlineColor with { A = alpha }, outlineGlow with { A = alpha * 0.35f }, diamondColor with { A = alpha });
 
-	private Rect2 GetFormationBlockRect(GridPos pos)
-	{
-		var center = GridToWorld(pos);
-		const float inset = 2f;
-		return new Rect2(
-			center.X - CellSize / 2f + inset,
-			center.Y - CellSize / 2f + inset,
-			CellSize - inset * 2,
-			CellSize - inset * 2);
-	}
+                if (nest.TeardownTimer > 0)
+                    DrawTeardownOverlay(block, nest.TeardownTimer);
+            }
 
-	private void DrawFormationBlock(Rect2 blockRect, Color outlineColor, Color outlineGlow, Color diamondColor)
-	{
-		// Double-stroke glow: outer glow + inner solid (matching game bible 16.13)
-		DrawRect(blockRect.Grow(1f), outlineGlow, false, 4f);
-		DrawRect(blockRect, outlineColor, false, 1.5f);
+            DrawFormationJoiners(_formationMembers, outlineColor, alpha);
+        }
+    }
 
-		// Small corner brackets outside the outline
-		DrawOuterCornerTicks(blockRect, 4f, outlineColor, 1.5f);
+    /// <summary>
+    /// Draws darker joiner rectangles between adjacent formation blocks.
+    /// </summary>
+    private void DrawFormationJoiners(List<(int Id, GridPos Pos)> members, Color outlineColor, float alpha)
+    {
+        if (members.Count < 2) return;
 
-		// Static centered diamond
-		var center = blockRect.GetCenter();
-		DrawFormationGem(center, diamondColor);
-	}
+        _formationPosSet.Clear();
+        foreach (var (_, pos) in members)
+            _formationPosSet.Add(pos);
 
-	/// <summary>
-	/// Formation block: bright gem diamond in center.
-	/// </summary>
-	private void DrawFormationGem(Vector2 center, Color color)
-	{
-		float size = CellSize * 0.16f;
-		// Outer glow (subtle)
-		DrawRotatedDiamond(center, size * 1.3f, 0, color.Lightened(0.3f) with { A = 0.5f });
-		// Main gem (bright)
-		DrawRotatedDiamond(center, size, 0, color.Lightened(0.6f));
-		// Inner highlight
-		DrawRotatedDiamond(center, size * 0.4f, 0, Colors.White with { A = 0.9f });
-	}
+        var joinerColor = outlineColor.Darkened(0.2f) with { A = alpha };
 
-	private void DrawTeardownOverlay(Block block, int teardownTimer)
-	{
-		float tearProgress = (float)teardownTimer / Constants.TeardownTicks;
-		var center = GridToWorld(block.Pos);
-		var rect = new Rect2(
-			center.X - CellSize * tearProgress * 0.5f,
-			center.Y - CellSize * tearProgress * 0.5f,
-			CellSize * tearProgress,
-			CellSize * tearProgress);
-		DrawRect(rect, new Color(0.5f, 0.5f, 0.5f, 0.3f));
-	}
+        foreach (var (_, pos) in members)
+        {
+            var rectA = GetFormationBlockRect(pos);
 
-	private static (Color Outline, Color OutlineGlow, Color Diamond) GetFormationStyle(FormationType type, PlayerPalette palette) =>
-		type switch
-		{
-			FormationType.Supply => (palette.SupplyOutline, palette.SupplyOutlineGlow, palette.SupplyDiamond),
-			_ => (palette.SupplyOutline, palette.SupplyOutlineGlow, palette.SupplyDiamond),
-		};
+            // Check right neighbor
+            var right = new GridPos(pos.X + 1, pos.Y);
+            if (_formationPosSet.Contains(right))
+            {
+                var rectB = GetFormationBlockRect(right);
+                float gapW = rectB.Position.X - rectA.End.X;
+                float halfH = rectA.Size.Y * 0.75f;
+                DrawRect(new Rect2(rectA.End.X, rectA.Position.Y + halfH * 0.16f, gapW, halfH), joinerColor);
+            }
 
-	private static (Color Outline, Color OutlineGlow, Color Diamond) GetNestStyle(NestType type, PlayerPalette palette) =>
-		type switch
-		{
-			NestType.Builder => (palette.BuilderNestOutline, palette.BuilderNestOutlineGlow, palette.BuilderNestDiamond),
-			NestType.Soldier => (palette.SoldierNestOutline, palette.SoldierNestOutlineGlow, palette.SoldierNestDiamond),
-			NestType.Stunner => (palette.StunnerNestOutline, palette.StunnerNestOutlineGlow, palette.StunnerNestDiamond),
-			_ => (palette.BuilderNestOutline, palette.BuilderNestOutlineGlow, palette.BuilderNestDiamond),
-		};
+            // Check bottom neighbor
+            var down = new GridPos(pos.X, pos.Y + 1);
+            if (_formationPosSet.Contains(down))
+            {
+                var rectB = GetFormationBlockRect(down);
+                float gapH = rectB.Position.Y - rectA.End.Y;
+                float halfW = rectA.Size.X * 0.75f;
+                DrawRect(new Rect2(rectA.Position.X + halfW * 0.16f, rectA.End.Y, halfW, gapH), joinerColor);
+            }
+        }
+    }
 
-	private void DrawNestProgress()
-	{
-		foreach (var nest in _gameState!.Nests)
-		{
-			if (nest.IsPaused) continue;
-			if (nest.SpawnProgress <= 0) continue;
+    private Rect2 GetFormationBlockRect(GridPos pos)
+    {
+        var center = GridToWorld(pos);
+        const float inset = 2f;
+        return new Rect2(
+            center.X - CellSize / 2f + inset,
+            center.Y - CellSize / 2f + inset,
+            CellSize - inset * 2,
+            CellSize - inset * 2);
+    }
 
-			var center = GridToWorld(nest.Center);
-			int spawnTicks = nest.GetSpawnTicks(
-				_gameState.Grid.InBounds(nest.Center) ? _gameState.Grid[nest.Center].Ground : GroundType.Normal);
-			if (spawnTicks <= 0) continue;
+    private void DrawFormationBlock(Rect2 blockRect, Color outlineColor, Color outlineGlow, Color diamondColor)
+    {
+        var outlineWidth = 2.2f;
+        var outlineRect = blockRect.Grow(-outlineWidth/2f);
+        DrawRect(outlineRect, outlineColor, false, outlineWidth);
 
-			float progress = (float)nest.SpawnProgress / spawnTicks;
+        // Small corner brackets outside the outline
+        DrawOuterCornerTicks(blockRect, 3f, outlineColor, 1f);
 
-			var palette = _config.GetPalette(nest.PlayerId);
-			Color nestColor = nest.Type switch
-			{
-				NestType.Builder => palette.BuilderNestSpawnBar,
-				NestType.Soldier => palette.SoldierNestSpawnBar,
-				NestType.Stunner => palette.StunnerNestSpawnBar,
-				_ => Colors.White
-			};
+        // Static centered diamond
+        var center = blockRect.GetCenter();
+        DrawFormationGem(center, diamondColor);
+    }
 
-			// Fill the center cell from bottom up
-			var cellLeft = center.X - CellSize / 2f + 2f;
-			var cellInner = CellSize - 4f;
-			var fillHeight = cellInner * progress;
-			var fillY = center.Y + CellSize / 2f - 2f - fillHeight;
-			DrawRect(new Rect2(cellLeft, fillY, cellInner, fillHeight),
-				nestColor with { A = 0.35f });
-		}
-	}
+    /// <summary>
+    /// Formation block: bright gem diamond in center.
+    /// </summary>
+    private void DrawFormationGem(Vector2 center, Color color)
+    {
+        float size = CellSize * 0.16f;
+        // Outer glow (subtle)
+        DrawRotatedDiamond(center, size * 1.3f, 0, color.Lightened(0.3f) with { A = 0.5f });
+        // Main gem (bright)
+        DrawRotatedDiamond(center, size, 0, color.Lightened(0.6f));
+        // Inner highlight
+        DrawRotatedDiamond(center, size * 0.4f, 0, Colors.White with { A = 0.9f });
+    }
+
+    private void DrawTeardownOverlay(Block block, int teardownTimer)
+    {
+        float tearProgress = (float)teardownTimer / Constants.TeardownTicks;
+        var center = GridToWorld(block.Pos);
+        var rect = new Rect2(
+            center.X - CellSize * tearProgress * 0.5f,
+            center.Y - CellSize * tearProgress * 0.5f,
+            CellSize * tearProgress,
+            CellSize * tearProgress);
+        DrawRect(rect, new Color(0.5f, 0.5f, 0.5f, 0.3f));
+    }
+
+    private static (Color Outline, Color OutlineGlow, Color Diamond) GetFormationStyle(FormationType type, PlayerPalette palette) =>
+        type switch
+        {
+            FormationType.Supply => (palette.SupplyOutline, palette.SupplyOutlineGlow, palette.SupplyDiamond),
+            _ => (palette.SupplyOutline, palette.SupplyOutlineGlow, palette.SupplyDiamond),
+        };
+
+    private static (Color Outline, Color OutlineGlow, Color Diamond) GetNestStyle(NestType type, PlayerPalette palette) =>
+        type switch
+        {
+            NestType.Builder => (palette.BuilderNestOutline, palette.BuilderNestOutlineGlow, palette.BuilderNestDiamond),
+            NestType.Soldier => (palette.SoldierNestOutline, palette.SoldierNestOutlineGlow, palette.SoldierNestDiamond),
+            NestType.Stunner => (palette.StunnerNestOutline, palette.StunnerNestOutlineGlow, palette.StunnerNestDiamond),
+            _ => (palette.BuilderNestOutline, palette.BuilderNestOutlineGlow, palette.BuilderNestDiamond),
+        };
+
+    private void DrawNestProgress()
+    {
+        foreach (var nest in _gameState!.Nests)
+        {
+            if (nest.IsPaused) continue;
+            if (nest.SpawnProgress <= 0) continue;
+
+            var center = GridToWorld(nest.Center);
+            int spawnTicks = nest.GetSpawnTicks(
+                _gameState.Grid.InBounds(nest.Center) ? _gameState.Grid[nest.Center].Ground : GroundType.Normal);
+            if (spawnTicks <= 0) continue;
+
+            float progress = (float)nest.SpawnProgress / spawnTicks;
+
+            var palette = _config.GetPalette(nest.PlayerId);
+            Color nestColor = nest.Type switch
+            {
+                NestType.Builder => palette.BuilderNestSpawnBar,
+                NestType.Soldier => palette.SoldierNestSpawnBar,
+                NestType.Stunner => palette.StunnerNestSpawnBar,
+                _ => Colors.White
+            };
+
+            // Fill the center cell from bottom up
+            var cellLeft = center.X - CellSize / 2f + 2f;
+            var cellInner = CellSize - 4f;
+            var fillHeight = cellInner * progress;
+            var fillY = center.Y + CellSize / 2f - 2f - fillHeight;
+            DrawRect(new Rect2(cellLeft, fillY, cellInner, fillHeight),
+                nestColor with { A = 0.35f });
+        }
+    }
 }
