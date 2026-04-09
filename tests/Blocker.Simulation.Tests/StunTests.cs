@@ -159,7 +159,7 @@ public class StunTests
         stunner.State = BlockState.Rooted;
         stunner.RootProgress = Constants.RootTicks;
 
-        StunSystem.SelfDestruct(state, stunner);
+        ExplosionSystem.SelfDestruct(state, stunner);
 
         Assert.DoesNotContain(stunner, state.Blocks);
         Assert.True(state.Rays.Count > 0); // Rays were created
@@ -172,7 +172,7 @@ public class StunTests
         var stunner = state.AddBlock(BlockType.Stunner, 0, new GridPos(7, 7));
         // Not rooted
 
-        var result = StunSystem.SelfDestruct(state, stunner);
+        var result = ExplosionSystem.SelfDestruct(state, stunner);
 
         Assert.False(result);
         Assert.Contains(stunner, state.Blocks);

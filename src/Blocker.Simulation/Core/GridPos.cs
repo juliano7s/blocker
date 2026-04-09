@@ -20,6 +20,14 @@ public readonly record struct GridPos(int X, int Y)
         new(1, -1), new(1, 1), new(-1, 1), new(-1, -1)
     ];
 
+    /// <summary>Convert an offset to the nearest cardinal direction.</summary>
+    public Direction ToDirection()
+    {
+        if (Math.Abs(Y) >= Math.Abs(X))
+            return Y < 0 ? Direction.Up : Direction.Down;
+        return X < 0 ? Direction.Left : Direction.Right;
+    }
+
     /// <summary>All 8 neighbors: orthogonal + diagonal.</summary>
     public static readonly GridPos[] AllOffsets =
     [

@@ -25,11 +25,15 @@ public partial class EffectManager : Node2D
     private readonly List<GpuEffect> _effects = new();
     private const int MaxEffects = 60;
 
+    // The local player — used to filter private vs global effects
+    private int _controllingPlayer;
+
     // Selection tracking: detect newly selected blocks and fire one-shot effects
     private readonly HashSet<int> _prevSelectedIds = new();
 
     public void SetGameState(GameState state) => _gameState = state;
     public void SetConfig(GameConfig config) => _config = config;
+    public void SetControllingPlayer(int playerId) => _controllingPlayer = playerId;
 
     public override void _Ready()
     {
@@ -64,7 +68,7 @@ public partial class EffectManager : Node2D
 
     /// <summary>
     /// Called by GameManager each frame with current selected block IDs.
-    /// Spawns SelectSquares on newly selected blocks.
+    /// Spawns SelectSquares on newly selected blocks — LOCAL PLAYER ONLY.
     /// Bible §16.5: Selection — 3 concentric squares, 350ms.
     /// </summary>
     public void OnSelectionChanged(HashSet<int> currentSelectedIds)
@@ -73,10 +77,10 @@ public partial class EffectManager : Node2D
         {
             if (_prevSelectedIds.Contains(id)) continue;
 
-            // Newly selected — spawn effect
+            // Newly selected — spawn effect (only for local player's blocks)
             if (_gameState == null) continue;
             var block = _gameState.GetBlock(id);
-            if (block == null) continue;
+            if (block == null || block.PlayerId != _controllingPlayer) continue;
 
             var color = _config != null
                 ? _config.GetPalette(block.PlayerId).Base
@@ -89,6 +93,27 @@ public partial class EffectManager : Node2D
             _prevSelectedIds.Add(id);
     }
 
+    // ─── Private vs Global ───────────────────────────────────────────
+
+    /// <summary>
+    /// Returns true for effects that should only be shown to the player
+    /// who owns the affected units. Command-issued feedback (move trails,
+    /// root bursts, uproot converges) is private — you don't see the
+    /// enemy's input indicators.
+    /// All state-transition events (deaths, spawns, combat, abilities)
+    /// are global — everyone sees them.
+    /// </summary>
+    private static bool IsPrivateEvent(VisualEvent evt) => evt.Type switch
+    {
+        VisualEventType.CommandMoveIssued => true,
+        VisualEventType.CommandRootIssued => true,
+        VisualEventType.CommandUprootIssued => true,
+        VisualEventType.FormationFormed => true,
+        VisualEventType.WallConverted => true,
+        VisualEventType.FormationDissolved => true,
+        _ => false,
+    };
+
     // ─── Event → Effect Mapping ─────────────────────────────────────
     // Parameters from game bible §16.5 Grid Lightning Effects table.
 
@@ -98,6 +123,15 @@ public partial class EffectManager : Node2D
             ? _config.GetPalette(evt.PlayerId.Value).Base
             : Colors.White;
         var pos = evt.Position;
+
+        // ─── Private effects: local player only ─────────────────────
+        // Command-issued feedback is private — you don't see enemy input indicators.
+        if (IsPrivateEvent(evt))
+        {
+            // Only show if the event belongs to the local player
+            if (!evt.PlayerId.HasValue || evt.PlayerId.Value != _controllingPlayer)
+                return;
+        }
 
         switch (evt.Type)
         {
@@ -173,10 +207,8 @@ public partial class EffectManager : Node2D
 
             // Self-destruct: Large explosion + shockwave
             case VisualEventType.SelfDestructed:
-                AddEffect(EffectFactory.LightningBurst(this, pos, color,
-                    maxSegs: 56, duration: 1800f, trail: 0.28f));
-                AddEffect(EffectFactory.SquareShockwave(this, pos, color,
-                    maxRadius: 8, duration: 1000f));
+                AddEffect(EffectFactory.LightningBurst(this, pos, Color.Color8(200, 10, 10, 1),
+                    maxSegs: 16, duration: 1000f, trail: 0.18f));
                 break;
 
             // Stun ray hit: Impact burst at hit position

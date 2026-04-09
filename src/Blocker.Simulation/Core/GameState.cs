@@ -185,7 +185,7 @@ public class GameState
                 break;
 
             case CommandType.SelfDestruct:
-                StunSystem.SelfDestruct(this, block);
+                ExplosionSystem.SelfDestruct(this, block);
                 break;
 
             case CommandType.CreateTower:
@@ -254,7 +254,7 @@ public class GameState
                 return true;
 
             case CommandType.SelfDestruct:
-                return StunSystem.SelfDestruct(this, block);
+                return ExplosionSystem.SelfDestruct(this, block);
 
             case CommandType.CreateTower:
                 return TowerSystem.CreateTower(this, block);

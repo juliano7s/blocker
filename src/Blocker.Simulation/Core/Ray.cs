@@ -35,6 +35,9 @@ public class Ray
     /// <summary>Tick counter for advance timing.</summary>
     public int TickCounter { get; set; }
 
+    /// <summary>Whether this ray is part of a radial explosion (self-destruct).</summary>
+    public bool IsExplosion { get; init; }
+
     /// <summary>Whether the ray has hit something and is done.</summary>
     public bool IsExpired { get; set; }
 

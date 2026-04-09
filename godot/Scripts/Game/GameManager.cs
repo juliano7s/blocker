@@ -116,8 +116,9 @@ public partial class GameManager : Node2D
 
 	public override void _Process(double delta)
 	{
-		// Keep HUD in sync with controlling player and selection
+		// Keep HUD and effects in sync with controlling player
 		_hud.SetControllingPlayer(_selectionManager.ControllingPlayer);
+		_effectManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
 
 		// Pass selected IDs to renderer so selection border tracks visual position
 		_gridRenderer.SetSelectedIds(_selectionManager.SelectedBlocks);
