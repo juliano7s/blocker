@@ -129,7 +129,8 @@ public enum VisualEventType
     WallConverted, StunRayFired, StunRayHit, BlastRayFired,
     PushWaveFired, JumpExecuted, JumpLanded, MagnetPulled,
     SelfDestructed, FormationFormed, FormationDissolved,
-    NestSpawned, TowerFired
+    NestSpawned, TowerFired, PlayerEliminated, GameOver,
+    CommandMoveIssued, CommandRootIssued, CommandUprootIssued
 }
 ```
 

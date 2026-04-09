@@ -23,6 +23,8 @@ public partial class GameManager : Node2D
 	private HudOverlay _hud = null!;
 	private HudBar _hudBar = null!;
 	private PostProcessingManager _postProcessing = null!;
+	private EffectManager _effectManager = null!;
+	private readonly HashSet<int> _currentSelectedIds = new();
 
 	public override void _Ready()
 	{
@@ -96,6 +98,11 @@ public partial class GameManager : Node2D
 		_camera.SetHudInsets(38f, 150f);
 		_camera.CenterOnGrid();
 
+		// Set up effect manager
+		_effectManager = GetNode<EffectManager>("EffectManager");
+		_effectManager.SetGameState(gameState);
+		_effectManager.SetConfig(Config);
+
 		// Set up post-processing
 		_postProcessing = GetNode<PostProcessingManager>("PostProcessing");
 		_postProcessing.SetGameState(gameState);
@@ -114,6 +121,12 @@ public partial class GameManager : Node2D
 
 		// Pass selected IDs to renderer so selection border tracks visual position
 		_gridRenderer.SetSelectedIds(_selectionManager.SelectedBlocks);
+
+		// Notify effect manager of selection changes (fires one-shot SelectSquares)
+		_currentSelectedIds.Clear();
+		foreach (var b in _selectionManager.SelectedBlocks)
+			_currentSelectedIds.Add(b.Id);
+		_effectManager.OnSelectionChanged(_currentSelectedIds);
 
 		// Feed camera position and visible area to HudBar minimap
 		var viewSize = GetViewportRect().Size / _camera.Zoom;

@@ -8,6 +8,7 @@
 [ext_resource type="Script" uid="uid://cohivq00vl8s4" path="res://Scripts/Input/SelectionManager.cs" id="4_sel"]
 [ext_resource type="Script" uid="uid://c7n8ntfqyjgw5" path="res://Scripts/Game/TickRunner.cs" id="5_tick"]
 [ext_resource type="Script" uid="uid://cvo7thq0k25s" path="res://Scripts/Rendering/PostProcessingManager.cs" id="6_postproc"]
+[ext_resource type="Script" uid="uid://clamgc4odwpjx" path="res://Scripts/Rendering/EffectManager.cs" id="7_effect"]
 
 [sub_resource type="Resource" id="Resource_jw32o"]
 script = ExtResource("2_jw32o")
@@ -132,7 +133,7 @@ ProtoGroundColor = Color(0.5568628, 0.5372549, 0.18039216, 0.80784315)
 TerrainGroundColor = Color(0.18039216, 0.18039216, 0.2, 0)
 BreakableWallGroundColor = Color(0.21960784, 0.2, 0.18039216, 0)
 FragileWallGroundColor = Color(0.18039216, 0.16078432, 0.14117648, 0)
-BackgroundColor = Color(0.16710746, 0.08293713, 0.19616091, 1)
+BackgroundColor = Color(0, 0, 0, 1)
 SelectionBorderColor = Color(1, 1, 1, 0.88235295)
 PlayerPalettes = [SubResource("Resource_jw32o"), SubResource("Resource_50glp")]
 metadata/_custom_type_script = "uid://dvc4f2vsxi3lp"
@@ -158,6 +159,9 @@ environment = SubResource("SubResource_env")
 
 [node name="GridRenderer" type="Node2D" parent="." unique_id=700592717]
 script = ExtResource("2_grid")
+
+[node name="EffectManager" type="Node2D" parent="." unique_id=800592718]
+script = ExtResource("7_effect")
 
 [node name="SelectionManager" type="Node2D" parent="." unique_id=1234077948]
 script = ExtResource("4_sel")

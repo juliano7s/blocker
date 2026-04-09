@@ -14,7 +14,7 @@ public partial class GridRenderer : Node2D
 	public const float CellSize = 28f;
 	public const float GridLineWidth = 1f;
 	public const float BlockInset = 2.5f;
-	public const float GridPadding = CellSize * 1.5f;
+	public const float GridPadding = CellSize * 5f;
 
 	private GameConfig _config = GameConfig.CreateDefault();
 	private GameState? _gameState;
@@ -65,11 +65,6 @@ public partial class GridRenderer : Node2D
 			_selectedIds.Add(b.Id);
 	}
 
-	// Death effect tracking
-	private record struct DeathEffect(Vector2 Pos, Color Color, float StartTime, float Duration);
-	private record struct Fragment(Vector2 Pos, Vector2 Velocity, float Rotation, float RotSpeed, Color Color, float StartTime);
-	private readonly List<DeathEffect> _deathEffects = [];
-	private readonly List<Fragment> _fragments = [];
 
 	// Ground colors, grid line color, and player colors now come from _config
 
@@ -123,31 +118,7 @@ public partial class GridRenderer : Node2D
 					}
 				}
 			}
-			if (evt.Type == VisualEventType.BlockDied)
-				{
-					var worldPos = GridToWorld(evt.Position);
-					var color = evt.PlayerId.HasValue ? GetPlayerColor(evt.PlayerId.Value) : Colors.White;
-					float duration = Constants.DeathEffectTicks / 12f; // ~0.83s at 12 tps
-					_deathEffects.Add(new DeathEffect(worldPos, color, now, duration));
-
-					// Spawn fragments
-					int fragCount = _config.DeathFragmentCount;
-					for (int i = 0; i < fragCount; i++)
-					{
-						float angle = i * Mathf.Tau / fragCount + (i * 0.37f); // pseudo-random spread
-						float speed = 30f + (i % 7) * 15f;
-						_fragments.Add(new Fragment(
-							worldPos,
-							new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * speed,
-							0, 3f + (i % 5) * 1.4f,
-							color, now));
-					}
-				}
 			}
-
-			// Clean up expired effects
-			_deathEffects.RemoveAll(e => now - e.StartTime > e.Duration);
-			_fragments.RemoveAll(f => now - f.StartTime > _config.FragmentLifetime);
 
 			// Single pass: smooth visual positions + idle spin angles + build live ID set
 			float dt = (float)delta;
@@ -380,8 +351,6 @@ public partial class GridRenderer : Node2D
 		// Draw jumper ghost trails
 		DrawGhostTrails();
 
-		// Draw death effects (explosions, fragments)
-		DrawDeathEffects();
 
 		// Draw formation visuals (last so outlines/corners are on top of block sprites)
 		DrawFormations();

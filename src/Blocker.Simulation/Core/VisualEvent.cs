@@ -2,6 +2,7 @@ namespace Blocker.Simulation.Core;
 
 public enum VisualEventType
 {
+    // State transitions (simulation-driven)
     BlockMoved,
     BlockDied,
     BlockSpawned,
@@ -21,7 +22,12 @@ public enum VisualEventType
     NestSpawned,
     TowerFired,
     PlayerEliminated,
-    GameOver
+    GameOver,
+
+    // Command-issued (player clicks)
+    CommandMoveIssued,
+    CommandRootIssued,
+    CommandUprootIssued,
 }
 
 public readonly record struct VisualEvent(

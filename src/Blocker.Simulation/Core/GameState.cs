@@ -150,6 +150,7 @@ public class GameState
                 {
                     block.MoveTarget = cmd.TargetPos.Value;
                     block.IsAttackMoving = false;
+                    VisualEvents.Add(new VisualEvent(VisualEventType.CommandMoveIssued, block.Pos, block.PlayerId, Direction: DirectionFromDelta(block.Pos, cmd.TargetPos.Value), BlockId: block.Id));
                 }
                 break;
 
@@ -158,11 +159,13 @@ public class GameState
                 {
                     block.MoveTarget = cmd.TargetPos.Value;
                     block.IsAttackMoving = true;
+                    VisualEvents.Add(new VisualEvent(VisualEventType.CommandMoveIssued, block.Pos, block.PlayerId, Direction: DirectionFromDelta(block.Pos, cmd.TargetPos.Value), BlockId: block.Id));
                 }
                 break;
 
             case CommandType.Root:
                 RootingSystem.ToggleRoot(block);
+                EmitRootCommandEvent(block);
                 // Auto-chain: if W was queued during rooting, it stays in queue
                 break;
 
@@ -217,6 +220,7 @@ public class GameState
                 {
                     block.MoveTarget = cmd.TargetPos.Value;
                     block.IsAttackMoving = false;
+                    VisualEvents.Add(new VisualEvent(VisualEventType.CommandMoveIssued, block.Pos, block.PlayerId, Direction: DirectionFromDelta(block.Pos, cmd.TargetPos.Value), BlockId: block.Id));
                 }
                 return true;
 
@@ -226,11 +230,13 @@ public class GameState
                 {
                     block.MoveTarget = cmd.TargetPos.Value;
                     block.IsAttackMoving = true;
+                    VisualEvents.Add(new VisualEvent(VisualEventType.CommandMoveIssued, block.Pos, block.PlayerId, Direction: DirectionFromDelta(block.Pos, cmd.TargetPos.Value), BlockId: block.Id));
                 }
                 return true;
 
             case CommandType.Root:
                 RootingSystem.ToggleRoot(block);
+                EmitRootCommandEvent(block);
                 return true;
 
             case CommandType.ConvertToWall:
@@ -277,6 +283,35 @@ public class GameState
         if (block.State == BlockState.Rooting) return false;
         if (block.State == BlockState.Uprooting) return false;
         return true;
+    }
+
+    /// <summary>
+    /// Emit the appropriate root/uproot command event based on the block's current state.
+    /// Called after ToggleRoot which changes the state.
+    /// </summary>
+    private void EmitRootCommandEvent(Block block)
+    {
+        var evtType = block.State switch
+        {
+            BlockState.Rooting => VisualEventType.CommandRootIssued,
+            BlockState.Uprooting => VisualEventType.CommandUprootIssued,
+            _ => (VisualEventType?)null
+        };
+        if (evtType.HasValue)
+            VisualEvents.Add(new VisualEvent(evtType.Value, block.Pos, block.PlayerId, BlockId: block.Id));
+    }
+
+    /// <summary>
+    /// Compute the cardinal direction from one position toward another.
+    /// Returns the dominant axis direction.
+    /// </summary>
+    private static Direction DirectionFromDelta(GridPos from, GridPos to)
+    {
+        int dx = to.X - from.X;
+        int dy = to.Y - from.Y;
+        if (Math.Abs(dx) >= Math.Abs(dy))
+            return dx >= 0 ? Direction.Right : Direction.Left;
+        return dy >= 0 ? Direction.Down : Direction.Up;
     }
 
     /// <summary>
