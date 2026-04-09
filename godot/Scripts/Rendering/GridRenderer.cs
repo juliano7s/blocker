@@ -291,10 +291,10 @@ public partial class GridRenderer : Node2D
 		}
 
 		// Draw blocks — viewport cull using visible cell range with extra margin
-		float blockViewMinX = (minX - 1) * CellSize;
-		float blockViewMaxX = (maxX + 2) * CellSize;
-		float blockViewMinY = (minY - 1) * CellSize;
-		float blockViewMaxY = (maxY + 2) * CellSize;
+		float blockViewMinX = (minX - 1) * CellSize + GridPadding;
+		float blockViewMaxX = (maxX + 2) * CellSize + GridPadding;
+		float blockViewMinY = (minY - 1) * CellSize + GridPadding;
+		float blockViewMaxY = (maxY + 2) * CellSize + GridPadding;
 
 		foreach (var block in _gameState.Blocks)
 		{
