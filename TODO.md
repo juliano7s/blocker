@@ -2,6 +2,7 @@
 # Controls
  - queuing commands with shift not always work: if a block is rooting or uprooting, the next shift commands are not queued.
    - Also, if a block is rooting/uprooting any normal command on top of that should be queued, similar to the wall command.
+ - blueprints should be rotated with the nest center to the side of the opponent
 
 # Camera
 

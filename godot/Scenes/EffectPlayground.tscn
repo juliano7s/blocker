@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://Scripts/Showcase/EffectPlayground.cs" id="1_playground"]
+
+[node name="EffectPlayground" type="Node2D"]
+script = ExtResource("1_playground")
