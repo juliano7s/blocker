@@ -23,20 +23,28 @@ public static class StunSystem
         var dirOffset = direction.ToOffset();
 
         // 3 parallel rays: center, left perpendicular, right perpendicular
+        // Side rays travel one cell less to form a > arrow shape
         var perpOffsets = GetPerpendicularOffsets(direction);
 
-        var origins = new GridPos[]
+        var origins = new (GridPos pos, int range)[]
         {
-            stunner.Pos,
-            stunner.Pos + perpOffsets.left,
-            stunner.Pos + perpOffsets.right
+            (stunner.Pos, Constants.StunRange),
+            (stunner.Pos + perpOffsets.left, Constants.StunRange - 1),
+            (stunner.Pos + perpOffsets.right, Constants.StunRange - 1),
         };
 
-        foreach (var origin in origins)
+        for (int r = 0; r < origins.Length; r++)
         {
-            // Start one cell ahead of the stunner
-            var startPos = origin + dirOffset;
-            if (!state.Grid.InBounds(startPos)) continue;
+            var (origin, range) = origins[r];
+            bool isSideRay = r > 0;
+
+            // Center ray starts one cell ahead (stunner occupies origin).
+            // Side rays start AT the perpendicular cell beside the stunner so their
+            // head is one step behind the center, forming the > arrow shape.
+            var headPos = isSideRay ? origin : origin + dirOffset;
+            int startDist = isSideRay ? 0 : 1;
+
+            if (!state.Grid.InBounds(headPos)) continue;
 
             var ray = new Ray
             {
@@ -44,9 +52,9 @@ public static class StunSystem
                 PlayerId = stunner.PlayerId,
                 Origin = origin,
                 Direction = direction,
-                HeadPos = startPos,
-                Distance = 1,
-                Range = Constants.StunRange,
+                HeadPos = headPos,
+                Distance = startDist,
+                Range = range,
                 AdvanceInterval = Constants.StunUnitRayAdvanceInterval,
                 FadeTicks = Constants.StunRayFade
             };
@@ -142,19 +150,18 @@ public static class StunSystem
             case RayType.Stun:
                 if (block.Type == BlockType.Wall)
                 {
-                    // Walls are killed by stun rays
+                    // Walls block and are killed by stun rays
                     state.VisualEvents.Add(new VisualEvent(
                         VisualEventType.StunRayHit, ray.HeadPos, ray.PlayerId, BlockId: block.Id));
                     state.RemoveBlock(block);
+                    return true; // Ray stops at walls
                 }
-                else
-                {
-                    // Stun the target
-                    block.StunTimer = Constants.StunDuration;
-                    state.VisualEvents.Add(new VisualEvent(
-                        VisualEventType.StunRayHit, ray.HeadPos, ray.PlayerId, BlockId: block.Id));
-                }
-                return true; // Ray stops at first hit
+
+                // Stun the target but keep going
+                block.StunTimer = Constants.StunDuration;
+                state.VisualEvents.Add(new VisualEvent(
+                    VisualEventType.StunRayHit, ray.HeadPos, ray.PlayerId, BlockId: block.Id));
+                return false; // Penetrates non-wall blocks
 
             case RayType.Blast:
                 // Blast kills non-wall, non-formation enemies. Stops at walls.

@@ -227,9 +227,14 @@ public static class TowerSystem
         var dirOffset = dir.ToOffset();
         var perps = GetPerpendicularOffsets(dir);
 
-        var origins = new[] { center.Pos, center.Pos + perps.left, center.Pos + perps.right };
+        var origins = new (GridPos pos, int range)[]
+        {
+            (center.Pos, range),
+            (center.Pos + perps.left, range - 1),
+            (center.Pos + perps.right, range - 1),
+        };
 
-        foreach (var origin in origins)
+        foreach (var (origin, rayRange) in origins)
         {
             var startPos = origin + dirOffset;
             if (!state.Grid.InBounds(startPos)) continue;
@@ -242,7 +247,7 @@ public static class TowerSystem
                 Direction = dir,
                 HeadPos = startPos,
                 Distance = 1,
-                Range = range,
+                Range = rayRange,
                 AdvanceInterval = advanceInterval,
                 FadeTicks = Constants.StunRayFade
             };

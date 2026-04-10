@@ -93,7 +93,6 @@ public partial class GridRenderer : Node2D
 
     private void DrawDirectionalRay(Ray ray)
     {
-        // Blue tint for stun, orange for blast
         Color baseColor = ray.Type == RayType.Stun
             ? _config.StunRayColor
             : _config.BlastRayColor;
@@ -108,34 +107,68 @@ public partial class GridRenderer : Node2D
 
         var offset = ray.Direction.ToOffset();
 
-        // Traveling pulse wave (800ms cycle)
-        float pulse = ((float)Time.GetTicksMsec() % 800f) / 800f;
+        // Stun rays: one-shot expansion like explosion (no repeating pulse)
+        // Wavefront at ray.Distance, cells behind it fade to nothing
+        // Blast rays: repeating pulse wave
+        float pulse;
+        const float fadeLength = 2.5f;
 
-        // Draw whole-cell fills along ray path with wave pattern
-        for (int i = 0; i <= ray.Distance; i++)
-        {
-            var cellPos = new GridPos(ray.Origin.X + offset.X * i, ray.Origin.Y + offset.Y * i);
+        if (ray.Type == RayType.Stun)
+            {
+                // No repeating cycle — wavefront is exactly where the ray head is
+                // Skip origin only if a block sits there (center ray over the stunner)
+                // Side rays originate on empty cells beside the stunner, so include i=0
+                int start = _gameState!.GetBlockAt(ray.Origin) != null ? 1 : 0;
+                for (int i = start; i <= ray.Distance; i++)
+            {
+                var cellPos = new GridPos(ray.Origin.X + offset.X * i, ray.Origin.Y + offset.Y * i);
 
-            // Wave pattern: gaussian ring traveling outward
-            float distNorm = ray.Distance > 0 ? (float)i / ray.Distance : 0;
-            float ringStr = Mathf.Exp(-6f * Mathf.Pow(distNorm - pulse, 2));
-            // Trace behind the wave: cells already passed stay lit at base level
-            float traceStr = distNorm < pulse ? 0.2f : 0.05f;
-            float cellAlpha = alpha * (traceStr + 0.6f * ringStr);
+                // Age = how far behind the wavefront this cell is
+                float age = ray.Distance - i;
+                float brightness = Math.Max(0f, 1f - age / fadeLength);
 
-            // Fill whole cell
-            var cellRect = new Rect2(cellPos.X * CellSize + GridPadding, cellPos.Y * CellSize + GridPadding, CellSize, CellSize);
-            DrawRect(cellRect, baseColor with { A = cellAlpha });
+                // White-hot pilot cell at the wavefront
+                bool isPilot = i == ray.Distance && !ray.IsExpired;
+                float cellAlpha;
+                if (isPilot)
+                    cellAlpha = brightness * alpha * 1.2f;
+                else
+                    cellAlpha = brightness * alpha * 0.8f;
+
+                if (cellAlpha < 0.01f) continue;
+
+                Color cellColor = isPilot
+                    ? Colors.White with { A = cellAlpha }
+                    : baseColor with { A = cellAlpha };
+
+                var cellRect = new Rect2(cellPos.X * CellSize + GridPadding, cellPos.Y * CellSize + GridPadding, CellSize, CellSize);
+                DrawRect(cellRect, cellColor);
+            }
         }
-
-        // White-hot pilot cell for blast rays (the lethal head)
-        if (!ray.IsExpired)
+        else
         {
-            var headRect = new Rect2(ray.HeadPos.X * CellSize + GridPadding, ray.HeadPos.Y * CellSize + GridPadding, CellSize, CellSize);
-            Color headColor = ray.Type == RayType.Blast
-                ? Colors.White with { A = alpha * 0.9f }
-                : baseColor with { A = alpha * 0.5f };
-            DrawRect(headRect, headColor);
+            // Blast rays: repeating traveling pulse wave (800ms cycle)
+            pulse = ((float)Time.GetTicksMsec() % 800f) / 800f;
+
+            for (int i = 0; i <= ray.Distance; i++)
+            {
+                var cellPos = new GridPos(ray.Origin.X + offset.X * i, ray.Origin.Y + offset.Y * i);
+
+                float distNorm = ray.Distance > 0 ? (float)i / ray.Distance : 0;
+                float ringStr = Mathf.Exp(-6f * Mathf.Pow(distNorm - pulse, 2));
+                float traceStr = distNorm < pulse ? 0.2f : 0.05f;
+                float cellAlpha = alpha * (traceStr + 0.6f * ringStr);
+
+                var cellRect = new Rect2(cellPos.X * CellSize + GridPadding, cellPos.Y * CellSize + GridPadding, CellSize, CellSize);
+                DrawRect(cellRect, baseColor with { A = cellAlpha });
+            }
+
+            // White-hot pilot cell for blast rays (the lethal head)
+            if (!ray.IsExpired)
+            {
+                var headRect = new Rect2(ray.HeadPos.X * CellSize + GridPadding, ray.HeadPos.Y * CellSize + GridPadding, CellSize, CellSize);
+                DrawRect(headRect, Colors.White with { A = alpha * 0.9f });
+            }
         }
     }
 
@@ -199,9 +232,9 @@ public partial class GridRenderer : Node2D
                 float cellAlpha = brightness * expiredFade * 0.8f;
                 if (cellAlpha < 0.01f) continue;
 
-                // White-hot pilot cell at the wavefront for blast explosions
+                // White-hot pilot cell at the wavefront
                 bool isPilot = dist >= maxDist;
-                Color cellColor = isPilot && first.Type == RayType.Blast
+                Color cellColor = isPilot
                     ? Colors.White with { A = cellAlpha * 1.2f }
                     : baseColor with { A = cellAlpha };
 

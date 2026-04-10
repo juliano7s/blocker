@@ -295,6 +295,52 @@ public partial class GridRenderer : Node2D
         if (frame != 3) DrawLine(midLeft, midLeft + new Vector2(crackLen, 0), crackColor, 1f, true);
     }
 
+    /// <summary>
+    /// Draws thin progress bars floating below the block cell.
+    /// Stun bar (ice blue): remaining stun time, stacks above cooldown bar.
+    /// Cooldown bar (player color): remaining ability cooldown.
+    /// </summary>
+    private void DrawCooldownBars(Block block, Rect2 rect)
+    {
+        const float barHeight = 2.5f;
+        const float barWidthFraction = 0.85f;
+        const float gapBelowCell = 2f;
+        const float gapBetweenBars = 3f;
+
+        float barWidth = rect.Size.X * barWidthFraction;
+        float barX = rect.Position.X + (rect.Size.X - barWidth) * 0.5f;
+        float nextY = rect.End.Y + gapBelowCell;
+
+        // Stun bar: ice blue, full → empty as StunTimer counts down
+        if (block.IsStunned)
+        {
+            float progress = (float)block.StunTimer / Constants.StunDuration;
+            var bgRect = new Rect2(barX, nextY, barWidth, barHeight);
+            var fillRect = new Rect2(barX, nextY, barWidth * progress, barHeight);
+            DrawRect(bgRect, new Color(0.2f, 0.4f, 0.6f, 0.35f));
+            DrawRect(fillRect, _config.FrozenBorderColor with { A = 0.85f });
+            nextY += barHeight + gapBetweenBars;
+        }
+
+        // Ability cooldown bar: player color, full → empty as Cooldown counts down
+        if (block.IsOnCooldown)
+        {
+            int maxCooldown = block.Type switch
+            {
+                BlockType.Stunner => Constants.StunCooldown,
+                BlockType.Jumper  => Constants.JumperJumpCooldown,
+                BlockType.Warden  => Constants.WardenPullCooldown,
+                _                 => 1,
+            };
+            float progress = (float)block.Cooldown / maxCooldown;
+            var palette = _config.GetPalette(block.PlayerId);
+            var bgRect = new Rect2(barX, nextY, barWidth, barHeight);
+            var fillRect = new Rect2(barX, nextY, barWidth * progress, barHeight);
+            DrawRect(bgRect, palette.Base with { A = 0.2f });
+            DrawRect(fillRect, palette.Base with { A = 0.75f });
+        }
+    }
+
     private void DrawThreatIndicators(Block block, Rect2 rect)
     {
         // Count adjacent enemy soldiers

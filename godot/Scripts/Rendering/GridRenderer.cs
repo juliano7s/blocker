@@ -325,6 +325,10 @@ public partial class GridRenderer : Node2D
 			if (block.IsStunned)
 				DrawFrozenOverlay(block, rect);
 
+			// Cooldown bars (stun timer + ability cooldown), floating below cell
+			if (block.IsStunned || block.IsOnCooldown)
+				DrawCooldownBars(block, rect);
+
 			// Combat threat indicators (red corners for adjacent soldiers)
 			if (!block.IsStunned && block.Type != BlockType.Soldier)
 				DrawThreatIndicators(block, rect);

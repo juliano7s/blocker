@@ -211,10 +211,11 @@ public partial class EffectManager : Node2D
                     maxSegs: 16, duration: 1000f, trail: 0.18f));
                 break;
 
-            // Stun ray hit: Impact burst at hit position
+            // Stun ray hit: Dashed tendrils crackling into the target
             case VisualEventType.StunRayHit:
-                AddEffect(EffectFactory.CellPerimeter(this, pos,
-                    new Color(0.3f, 0.7f, 1f)));
+                AddEffect(EffectFactory.DashedTendrils(this, pos,
+                    new Color(0.3f, 0.7f, 1f), duration: 800f,
+                    tendrilCount: 6, minLen: 3, maxLen: 7));
                 break;
 
             // Blast ray: Impact burst at blast position
