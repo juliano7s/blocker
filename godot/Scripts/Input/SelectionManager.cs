@@ -13,13 +13,27 @@ namespace Blocker.Game.Input;
 /// </summary>
 public partial class SelectionManager : Node2D
 {
+	public interface ICommandSink { void Submit(Command cmd); }
+
 	[Export] public int ControllingPlayer = 0;
+
+	private ICommandSink? _commandSink;
+	public void SetCommandSink(ICommandSink? sink) => _commandSink = sink;
 
 	private GameState? _gameState;
 	private GameConfig? _config;
 	private GridPos? _hoveredCell;
 	private readonly List<Block> _selectedBlocks = [];
 	private readonly List<Command> _pendingCommands = [];
+
+	// Routes a command either to the configured sink (multiplayer: pushes
+	// straight to LockstepCoordinator.QueueLocalCommand) or to the local
+	// pending list that the single-player TickRunner pulls each tick.
+	private void EmitCommand(Command cmd)
+	{
+		if (_commandSink != null) _commandSink.Submit(cmd);
+		else _pendingCommands.Add(cmd);
+	}
 
 	// Drag select state
 	private bool _isDragging;
@@ -228,7 +242,7 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 						if (nonJumpers.Count > 0)
 						{
 							var ids = nonJumpers.Select(b => b.Id).ToList();
-							_pendingCommands.Add(new Command(ControllingPlayer, CommandType.Root, ids, Queue: shiftHeld));
+							EmitCommand(new Command(ControllingPlayer, CommandType.Root, ids, Queue: shiftHeld));
 						}
 						_jumpMode = true;
 						_blueprint.Deactivate();
@@ -404,7 +418,7 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 
 		if (blockIds.Count > 0)
 		{
-			_pendingCommands.Add(new Command(ControllingPlayer, CommandType.Move, blockIds, gridPos, Queue: queue));
+			EmitCommand(new Command(ControllingPlayer, CommandType.Move, blockIds, gridPos, Queue: queue));
 			GD.Print($"{(queue ? "Queued" : "Issued")} move for {blockIds.Count} blocks to {gridPos}");
 		}
 	}
@@ -578,18 +592,18 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
         // Issue commands for each assignment
         foreach (var (block, target, role) in assigned)
         {
-            _pendingCommands.Add(new Command(ControllingPlayer, CommandType.Move, [block.Id], target));
+            EmitCommand(new Command(ControllingPlayer, CommandType.Move, [block.Id], target));
 
             if (role == "wall")
             {
                 // move → root → convert to wall
-                _pendingCommands.Add(new Command(ControllingPlayer, CommandType.Root, [block.Id], Queue: true));
-                _pendingCommands.Add(new Command(ControllingPlayer, CommandType.ConvertToWall, [block.Id], Queue: true));
+                EmitCommand(new Command(ControllingPlayer, CommandType.Root, [block.Id], Queue: true));
+                EmitCommand(new Command(ControllingPlayer, CommandType.ConvertToWall, [block.Id], Queue: true));
             }
             else
             {
                 // move → root (for builders becoming part of nests, soldiers/stunners for nests/towers)
-                _pendingCommands.Add(new Command(ControllingPlayer, CommandType.Root, [block.Id], Queue: true));
+                EmitCommand(new Command(ControllingPlayer, CommandType.Root, [block.Id], Queue: true));
             }
         }
 
@@ -642,7 +656,7 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
             if (assignedBlocks.Contains(block.Id)) continue;
             if (assignedCells.Contains(target)) continue;
 
-            _pendingCommands.Add(new Command(
+            EmitCommand(new Command(
                 ControllingPlayer, CommandType.Move, [block.Id], target, Queue: queue));
             assignedBlocks.Add(block.Id);
             assignedCells.Add(target);
@@ -658,7 +672,7 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
             foreach (var block in mobileBlocks)
             {
                 if (assignedBlocks.Contains(block.Id)) continue;
-                _pendingCommands.Add(new Command(
+                EmitCommand(new Command(
                     ControllingPlayer, CommandType.Move, [block.Id], lastCell, Queue: queue));
             }
         }
@@ -686,7 +700,7 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 
         if (blockIds.Count > 0)
         {
-            _pendingCommands.Add(new Command(ControllingPlayer, CommandType.AttackMove, blockIds, gridPos, Queue: queue));
+            EmitCommand(new Command(ControllingPlayer, CommandType.AttackMove, blockIds, gridPos, Queue: queue));
             GD.Print($"Attack-move {blockIds.Count} blocks to {gridPos}");
         }
     }
@@ -725,7 +739,7 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
         if (relevant.Count == 0) return;
 
         var blockIds = relevant.Select(b => b.Id).ToList();
-        _pendingCommands.Add(new Command(ControllingPlayer, type, blockIds, Queue: queue));
+        EmitCommand(new Command(ControllingPlayer, type, blockIds, Queue: queue));
         GD.Print($"{(queue ? "Queued" : "Issued")} {type} for {blockIds.Count} blocks");
     }
 
@@ -756,7 +770,7 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
         }
 
         foreach (var (dir, blockIds) in byDirection)
-            _pendingCommands.Add(new Command(ControllingPlayer, type, blockIds,
+            EmitCommand(new Command(ControllingPlayer, type, blockIds,
                 TargetPos: GridRenderer.WorldToGrid(mouseWorld), Direction: dir, Queue: queue));
 
         GD.Print($"{(queue ? "Queued" : "Issued")} {type} for {relevant.Count} blocks ({byDirection.Count} directions)");
