@@ -14,7 +14,10 @@ public record RelayOptions(
     {
         string port = Environment.GetEnvironmentVariable("PORT") ?? "3002";
         return new RelayOptions(
-            ListenUrl: $"http://127.0.0.1:{port}/",
+            // Bind to all interfaces (+) so HttpListener accepts any Host header —
+            // nginx forwards Host: julianoschroeder.com, which doesn't match a 127.0.0.1
+            // prefix. The droplet's firewall restricts external access to the port.
+            ListenUrl: $"http://+:{port}/",
             RateLimitMsgPerSec: Int("BLOCKER_RELAY_RATE_LIMIT", 60),
             MaxMessageBytes: Int("BLOCKER_RELAY_MAX_MSG", 64 * 1024),
             MaxRoomsPerIp: Int("BLOCKER_RELAY_ROOMS_PER_IP", 3),
