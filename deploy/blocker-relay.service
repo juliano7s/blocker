@@ -1,0 +1,17 @@
+# deploy/blocker-relay.service — installed to /etc/systemd/system/blocker-relay.service
+[Unit]
+Description=Blocker Relay Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/blocker-relay
+Environment=PORT=3002
+ExecStart=/opt/blocker-relay/Blocker.Relay
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
