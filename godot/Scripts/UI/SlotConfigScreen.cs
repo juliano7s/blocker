@@ -22,6 +22,7 @@ public partial class SlotConfigScreen : Control
 	private Button? _hostStartBtn;
 	private string _hostRoomCode = "";
 	private int _hostLatestFilledSlots;
+	private string _hostPendingError = "";
 
 	// Join-only state.
 	private Label? _joinStatusLabel;
@@ -199,7 +200,12 @@ public partial class SlotConfigScreen : Control
 		var backBtn = new Button { Text = "< Back" };
 		backBtn.Pressed += () =>
 		{
+			// Tear down the connection entirely — re-entering MultiplayerMenu
+			// spins up a fresh RelayClient. Keeping the old one around leaks
+			// background ReceiveLoop/SendLoop tasks against a dead socket.
 			_relay?.SendLeaveRoom();
+			_relay?.Dispose();
+			MultiplayerLaunchData.Relay = null;
 			GetTree().ChangeSceneToFile("res://Scenes/MultiplayerMenu.tscn");
 		};
 		header.AddChild(backBtn);
@@ -235,6 +241,11 @@ public partial class SlotConfigScreen : Control
 			_pendingActiveIds = activeIds;
 			CallDeferred(nameof(OnHostGameStartedDeferred));
 		};
+		_relay.ServerError += (code) =>
+		{
+			_hostPendingError = code.ToString();
+			CallDeferred(nameof(OnHostErrorDeferred));
+		};
 
 		// Create the room. Map blob is opaque to the relay; joiners load by name for M1.
 		var mapBlob = System.Text.Encoding.UTF8.GetBytes(_mapData.Name);
@@ -251,6 +262,14 @@ public partial class SlotConfigScreen : Control
 			? $"Room code: {_hostRoomCode} — ready to start"
 			: $"Room code: {_hostRoomCode} — waiting for opponent…";
 		_hostStartBtn!.Disabled = _hostLatestFilledSlots < 2;
+	}
+
+	private void OnHostErrorDeferred()
+	{
+		if (_hostStatusLabel != null)
+			_hostStatusLabel.Text = $"Error: {_hostPendingError}";
+		if (_hostStartBtn != null)
+			_hostStartBtn.Disabled = true;
 	}
 
 	private void OnHostStartPressed() => _relay!.SendStartGame();
@@ -302,6 +321,8 @@ public partial class SlotConfigScreen : Control
 		backBtn.Pressed += () =>
 		{
 			_relay?.SendLeaveRoom();
+			_relay?.Dispose();
+			MultiplayerLaunchData.Relay = null;
 			GetTree().ChangeSceneToFile("res://Scenes/MultiplayerMenu.tscn");
 		};
 		header.AddChild(backBtn);

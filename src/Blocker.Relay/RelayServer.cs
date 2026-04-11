@@ -70,6 +70,9 @@ public sealed class RelayServer
             Ws = wsCtx.WebSocket,
             RemoteIp = ctx.Request.RemoteEndPoint?.Address.ToString() ?? "?"
         };
+        // Start with a full token bucket so the first Hello isn't rejected
+        // by the refill delta when it arrives within ~16ms of accept.
+        conn.RateTokens = _opts.RateLimitMsgPerSec;
 
         lock (_connectionsLock)
         {
@@ -288,6 +291,27 @@ public sealed class RelayServer
     {
         var room = conn.CurrentRoom;
         if (room == null) return;
+
+        // Host leaving a lobby tears the room down — mirrors the disconnect path
+        // in HandleDisconnectRoomCleanup. Without this, the per-IP room counter
+        // leaks and `/back → Host` eventually trips TooManyRooms.
+        if (room.Lifecycle == RoomLifecycle.Lobby && room.HostId == conn.Id)
+        {
+            foreach (var kv in room.Slots)
+            {
+                if (kv.Value.OwnerId is not Guid id || id == conn.Id) continue;
+                Connection? other;
+                lock (_connectionsLock) _connections.TryGetValue(id, out other);
+                if (other == null) continue;
+                try { await other.Ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "host-left", ct); } catch { }
+            }
+            _rooms.Remove(room, conn.RemoteIp);
+            conn.CurrentRoom = null;
+            conn.AssignedPlayerId = null;
+            Logger.Info($"conn={conn.Id} event=room-closed code={room.Code} reason=host-leave");
+            return;
+        }
+
         RemoveConnFromRoom(conn, room);
         conn.CurrentRoom = null;
         conn.AssignedPlayerId = null;
