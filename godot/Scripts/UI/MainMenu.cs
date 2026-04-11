@@ -36,6 +36,10 @@ public partial class MainMenu : Control
 		playVsAiBtn.Pressed += OnPlayVsAiPressed;
 		vbox.AddChild(playVsAiBtn);
 
+		var playMpBtn = new Button { Text = "Play Multiplayer", CustomMinimumSize = new Vector2(0, 50) };
+		playMpBtn.Pressed += OnPlayMultiplayerPressed;
+		vbox.AddChild(playMpBtn);
+
 		var editorBtn = new Button { Text = "Map Editor", CustomMinimumSize = new Vector2(0, 50) };
 		editorBtn.Pressed += OnMapEditorPressed;
 		vbox.AddChild(editorBtn);
@@ -53,6 +57,11 @@ public partial class MainMenu : Control
 	private void OnPlayVsAiPressed()
 	{
 		GetTree().ChangeSceneToFile("res://Scenes/MapSelect.tscn");
+	}
+
+	private void OnPlayMultiplayerPressed()
+	{
+		GetTree().ChangeSceneToFile("res://Scenes/MultiplayerMenu.tscn");
 	}
 
 	private void OnMapEditorPressed()

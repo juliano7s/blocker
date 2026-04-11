@@ -41,6 +41,8 @@ public sealed class RelayClient : IRelayClient, IDisposable
     private int _localPlayerId;
     public void SetLocalPlayerId(int id) => _localPlayerId = id;
 
+    private bool _closedNotified;
+
     public async Task<bool> ConnectAsync(string url, string clientName)
     {
         State = ConnState.Connecting;
@@ -156,6 +158,15 @@ public sealed class RelayClient : IRelayClient, IDisposable
     {
         while (_inbox.TryDequeue(out var msg))
             Dispatch(msg);
+
+        // ReceiveLoop sets State=Closed from a background thread; we surface
+        // the transition on the main thread (exactly once) so subscribers
+        // don't have to think about threading.
+        if (State == ConnState.Closed && !_closedNotified)
+        {
+            _closedNotified = true;
+            ConnectionClosed?.Invoke();
+        }
     }
 
     private void Dispatch(byte[] msg)
