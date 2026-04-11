@@ -1,9 +1,11 @@
 using Blocker.Game.Config;
 using Blocker.Game.Input;
+using Blocker.Game.Net;
 using Blocker.Game.Rendering;
 using Blocker.Game.UI;
 using Blocker.Simulation.Core;
 using Blocker.Simulation.Maps;
+using Blocker.Simulation.Net;
 using Godot;
 
 namespace Blocker.Game;
@@ -73,11 +75,32 @@ public partial class GameManager : Node2D
 		_selectionManager.SetGameState(gameState);
 		_selectionManager.SetConfig(Config);
 
-		// Set up tick runner
-		_tickRunner = GetNode<TickRunner>("TickRunner");
-		_tickRunner.SetGameState(gameState);
-		_tickRunner.SetSelectionManager(_selectionManager);
-		_gridRenderer.SetTickInterval((float)_tickRunner.TickInterval);
+		// Tick runner: multiplayer when a session was handed in, single-player otherwise.
+		if (GameLaunchData.MultiplayerSession is { } mp)
+		{
+			// Drop the SP TickRunner so it doesn't double-tick the simulation.
+			var spRunner = GetNodeOrNull<TickRunner>("TickRunner");
+			if (spRunner != null) spRunner.QueueFree();
+
+			var coord = new LockstepCoordinator(mp.LocalPlayerId, gameState, mp.Relay, mp.ActivePlayerIds);
+			var mpRunner = new MultiplayerTickRunner { Name = "MultiplayerTickRunner", TickRate = 12 };
+			AddChild(mpRunner);
+			mpRunner.Initialize(coord, mp.Relay, gameState);
+			_gridRenderer.SetTickInterval((float)mpRunner.TickInterval);
+			_selectionManager.ControllingPlayer = mp.LocalPlayerId;
+			_selectionManager.SetCommandSink(mpRunner);
+			coord.StartGame();
+
+			coord.GameEnded += (winner) => GD.Print($"Game over. Winner: team {winner}");
+			coord.DesyncDetected += () => GD.PrintErr("DESYNC DETECTED");
+		}
+		else
+		{
+			_tickRunner = GetNode<TickRunner>("TickRunner");
+			_tickRunner.SetGameState(gameState);
+			_tickRunner.SetSelectionManager(_selectionManager);
+			_gridRenderer.SetTickInterval((float)_tickRunner.TickInterval);
+		}
 
 		// Set up HUD
 		_hud = new HudOverlay();
@@ -110,6 +133,9 @@ public partial class GameManager : Node2D
 
 		// Set background color
 		RenderingServer.SetDefaultClearColor(Config.BackgroundColor);
+
+		// Clear after consuming so a return-to-menu round trip starts fresh.
+		GameLaunchData.MultiplayerSession = null;
 
 		// Exit button handled by HudOverlay
 	}
