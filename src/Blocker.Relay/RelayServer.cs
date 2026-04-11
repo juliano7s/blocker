@@ -98,6 +98,8 @@ public sealed class RelayServer
                 case Protocol.JoinRoom:   await HandleJoinRoom(conn, buf, len, ct); break;
                 case Protocol.LeaveRoom:  await HandleLeaveRoom(conn, ct); break;
                 case Protocol.StartGame:  await HandleStartGame(conn, ct); break;
+                case Protocol.Commands:   await FanOutCommands(conn, buf, len, ct); break;
+                case Protocol.Hash:       await FanOutHash(conn, buf, len, ct); break;
                 default:
                     await SendError(conn, ErrorCode.UnknownMessageType, ct);
                     return;
@@ -226,6 +228,58 @@ public sealed class RelayServer
         {
             if (kv.Value.OwnerId == conn.Id)
                 room.Slots[kv.Key] = new SlotInfo(null, "", kv.Value.ColorIndex, IsOpen: true, IsClosed: false);
+        }
+    }
+
+    private async Task FanOutCommands(Connection conn, byte[] payload, int len, CancellationToken ct)
+    {
+        if (conn.CurrentRoom is not { Lifecycle: RoomLifecycle.Playing } room) return;
+        if (conn.AssignedPlayerId is not byte assigned) return;
+
+        // Peek tick + playerId from message body (skip 0x10 type byte).
+        try
+        {
+            var body = new ReadOnlySpan<byte>(payload, 1, len - 1);
+            var (tick, playerId) = Blocker.Simulation.Net.CommandSerializer.PeekTickAndPlayer(body);
+            if ((byte)playerId != assigned)
+            {
+                Logger.Warn($"conn={conn.Id} event=auth-fail claimed={playerId} owned={assigned}");
+                return;
+            }
+            if (tick > room.HighestSeenTick) room.HighestSeenTick = tick;
+        }
+        catch { return; }
+        room.LastActivity = DateTime.UtcNow;
+
+        await FanOutToRoom(room, conn, payload, len, ct);
+    }
+
+    private async Task FanOutHash(Connection conn, byte[] payload, int len, CancellationToken ct)
+    {
+        if (conn.CurrentRoom is not { Lifecycle: RoomLifecycle.Playing } room) return;
+        // Hash layout: [0x11][tick:varint][playerId:byte][hash:uint32 LE]
+        try
+        {
+            var body = new ReadOnlySpan<byte>(payload, 1, len - 1);
+            var (_, consumed) = Varint.Read(body, 0);
+            byte claimed = body[consumed];
+            if (conn.AssignedPlayerId is not byte assigned || claimed != assigned) return;
+        }
+        catch { return; }
+        await FanOutToRoom(room, conn, payload, len, ct);
+    }
+
+    private async Task FanOutToRoom(Room room, Connection sender, byte[] payload, int len, CancellationToken ct)
+    {
+        var segment = new ArraySegment<byte>(payload, 0, len);
+        foreach (var kv in room.Slots)
+        {
+            if (kv.Value.OwnerId is not Guid id) continue;
+            if (id == sender.Id) continue;
+            Connection? other;
+            lock (_connectionsLock) _connections.TryGetValue(id, out other);
+            if (other == null) continue;
+            try { await other.Ws.SendAsync(segment, WebSocketMessageType.Binary, true, ct); } catch { }
         }
     }
 
