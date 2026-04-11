@@ -19,6 +19,7 @@ public static class Program
 
         var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+        _server.StartReaper(cts.Token);
 
         try
         {

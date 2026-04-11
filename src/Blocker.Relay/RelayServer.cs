@@ -14,6 +14,47 @@ public sealed class RelayServer
 
     public RelayServer(RelayOptions opts) { _opts = opts; }
 
+    private bool RateAllows(Connection conn)
+    {
+        var now = DateTime.UtcNow;
+        double elapsed = (now - conn.RateLastRefill).TotalSeconds;
+        conn.RateTokens = Math.Min(_opts.RateLimitMsgPerSec,
+                                   conn.RateTokens + elapsed * _opts.RateLimitMsgPerSec);
+        conn.RateLastRefill = now;
+        if (conn.RateTokens < 1) return false;
+        conn.RateTokens -= 1;
+        return true;
+    }
+
+    public void StartReaper(CancellationToken ct)
+    {
+        _ = Task.Run(async () =>
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                try { await Task.Delay(TimeSpan.FromMinutes(1), ct); } catch { return; }
+                var now = DateTime.UtcNow;
+                foreach (var room in _rooms.All().ToList())
+                {
+                    var limit = room.Lifecycle == RoomLifecycle.Lobby ? _opts.LobbyTimeout : _opts.GameTimeout;
+                    if (now - room.LastActivity <= limit) continue;
+                    Logger.Info($"reaper closing idle room {room.Code} lifecycle={room.Lifecycle}");
+                    foreach (var kv in room.Slots)
+                    {
+                        if (kv.Value.OwnerId is not Guid id) continue;
+                        Connection? c;
+                        lock (_connectionsLock) _connections.TryGetValue(id, out c);
+                        if (c == null) continue;
+                        try { await c.Ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "idle", ct); } catch { }
+                    }
+                    // Per-IP accounting is best-effort here; passing "" skips the decrement
+                    // rather than risking a wrong one.
+                    _rooms.Remove(room, "");
+                }
+            }
+        }, ct);
+    }
+
     public async Task HandleWebSocket(HttpListenerContext ctx, CancellationToken ct)
     {
         HttpListenerWebSocketContext wsCtx;
@@ -129,6 +170,11 @@ public sealed class RelayServer
             conn.LastMessageAt = DateTime.UtcNow;
 
             if (len == 0) continue;
+            if (!RateAllows(conn))
+            {
+                await SendError(conn, ErrorCode.RateLimit, ct);
+                return;
+            }
             byte type = buf[0];
 
             if (!helloSeen)
