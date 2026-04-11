@@ -4,9 +4,12 @@ namespace Blocker.Relay;
 
 public static class Program
 {
+    private static RelayServer? _server;
+
     public static async Task Main(string[] args)
     {
         var options = RelayOptions.FromEnvironment();
+        _server = new RelayServer(options);
         Logger.Info($"Blocker.Relay starting on {options.ListenUrl}");
 
         var listener = new HttpListener();
@@ -47,9 +50,7 @@ public static class Program
             }
             if (ctx.Request.Url?.AbsolutePath == "/blocker/ws-relay" && ctx.Request.IsWebSocketRequest)
             {
-                // Task 13 implements the WebSocket upgrade + session loop.
-                ctx.Response.StatusCode = 501;
-                ctx.Response.Close();
+                await _server!.HandleWebSocket(ctx, ct);
                 return;
             }
             ctx.Response.StatusCode = 404;
