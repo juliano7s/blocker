@@ -219,6 +219,32 @@ public class LockstepCoordinator
 
     private void CheckMajorityVote(int tick)
     {
-        // Task 9 implements this fully.
+        if (!_hashBuffer.TryGetValue(tick, out var map)) return;
+        if (map.Count < _activePlayers.Count) return; // wait for everyone
+
+        var groups = map.GroupBy(kv => kv.Value)
+                        .OrderByDescending(g => g.Count())
+                        .ToList();
+        if (groups.Count == 1) return; // unanimous — no desync
+
+        var majority = groups[0];
+        bool localInMajority = majority.Any(kv => kv.Key == LocalPlayerId);
+        bool majorityIsClear = majority.Count() > _activePlayers.Count / 2;
+
+        if (majorityIsClear && !localInMajority)
+        {
+            // We're outvoted by a clear majority — we are the desynced one.
+            _relay.SendDesyncReport(tick, _state.Snapshot());
+            Fsm = CoordinatorFsm.Desynced;
+            DesyncDetected?.Invoke();
+        }
+        else if (!majorityIsClear)
+        {
+            // No clear majority (e.g. 2-player disagreement, 3-way split, even-vote tie).
+            // Everyone declares desync since no one can be trusted.
+            _relay.SendDesyncReport(tick, _state.Snapshot());
+            Fsm = CoordinatorFsm.Desynced;
+            DesyncDetected?.Invoke();
+        }
     }
 }

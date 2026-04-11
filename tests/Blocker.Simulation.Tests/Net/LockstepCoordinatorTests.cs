@@ -53,6 +53,54 @@ public class LockstepCoordinatorTests
         Assert.True(state0.TickNumber >= 100, $"expected at least 100 ticks advanced, got {state0.TickNumber}");
     }
 
+    private class CheatingRelay : IRelayClient
+    {
+        private readonly FakeRelayClient _inner;
+        public CheatingRelay(FakeRelayClient inner) { _inner = inner; }
+
+        public void SendCommands(int tick, IReadOnlyList<Command> c) => _inner.SendCommands(tick, c);
+        public void SendHash(int tick, uint hash) => _inner.SendHash(tick, hash ^ 0xDEADBEEFu); // corrupt outgoing
+        public void SendDesyncReport(int tick, GameStateSnapshot snap) => _inner.SendDesyncReport(tick, snap);
+        public void SendSurrender() => _inner.SendSurrender();
+        public event Action<int, int, IReadOnlyList<Command>>? CommandsReceived
+        { add => _inner.CommandsReceived += value; remove => _inner.CommandsReceived -= value; }
+        public event Action<int, int, uint>? HashReceived
+        { add => _inner.HashReceived += value; remove => _inner.HashReceived -= value; }
+        public event Action<int, int, LeaveReason>? PlayerLeft
+        { add => _inner.PlayerLeft += value; remove => _inner.PlayerLeft -= value; }
+        public event Action<int>? SurrenderReceived
+        { add => _inner.SurrenderReceived += value; remove => _inner.SurrenderReceived -= value; }
+    }
+
+    [Fact]
+    public void Mismatched_Hashes_Trigger_Desync_In_Two_Player_Game()
+    {
+        var state0 = MakeTwoPlayerState();
+        var state1 = MakeTwoPlayerState();
+        var relay0 = new FakeRelayClient(0);
+        var relay1 = new FakeRelayClient(1);
+        FakeRelayClient.Connect(relay0, relay1);
+
+        // Wrap relay0 in a cheater that corrupts outgoing hashes.
+        var cheat0 = new CheatingRelay(relay0);
+
+        var coord0 = new LockstepCoordinator(0, state0, cheat0, new HashSet<int> { 0, 1 });
+        var coord1 = new LockstepCoordinator(1, state1, relay1, new HashSet<int> { 0, 1 });
+        coord0.StartGame(); coord1.StartGame();
+
+        bool desyncedFired = false;
+        coord1.DesyncDetected += () => desyncedFired = true;
+
+        for (int i = 0; i < 20; i++)
+        {
+            coord0.PollAdvance();
+            coord1.PollAdvance();
+            if (desyncedFired) break;
+        }
+        Assert.True(desyncedFired);
+        Assert.Equal(CoordinatorFsm.Desynced, coord1.Fsm);
+    }
+
     [Fact]
     public void Disconnect_Unblocks_Remaining_Player()
     {
