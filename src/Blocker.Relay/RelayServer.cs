@@ -48,7 +48,63 @@ public sealed class RelayServer
         {
             lock (_connectionsLock) _connections.Remove(conn.Id);
             Logger.Info($"conn={conn.Id} event=disconnect");
-            // Task 16 adds room cleanup here.
+            var lostRoom = conn.CurrentRoom;
+            if (lostRoom != null)
+            {
+                _ = HandleDisconnectRoomCleanup(conn, lostRoom, ct);
+            }
+        }
+    }
+
+    private async Task HandleDisconnectRoomCleanup(Connection conn, Room room, CancellationToken ct)
+    {
+        if (room.Lifecycle == RoomLifecycle.Playing && conn.AssignedPlayerId is byte pid)
+        {
+            int effectiveTick = room.HighestSeenTick + 2;
+            // PlayerLeft layout: [0x12][playerId:byte][effectiveTick:varint][reason:byte]
+            var varBuf = new byte[5];
+            int vl = Varint.Write(varBuf, 0, (uint)effectiveTick);
+            var msg = new byte[3 + vl];
+            msg[0] = Protocol.PlayerLeft;
+            msg[1] = pid;
+            Array.Copy(varBuf, 0, msg, 2, vl);
+            msg[2 + vl] = (byte)LeaveReason.Disconnected;
+
+            foreach (var kv in room.Slots)
+            {
+                if (kv.Value.OwnerId is not Guid id || id == conn.Id) continue;
+                Connection? other;
+                lock (_connectionsLock) _connections.TryGetValue(id, out other);
+                if (other == null) continue;
+                try { await other.Ws.SendAsync(msg, WebSocketMessageType.Binary, true, ct); } catch { }
+            }
+            RemoveConnFromRoom(conn, room);
+            Logger.Info($"conn={conn.Id} event=left-game code={room.Code} slot={pid} effectiveTick={effectiveTick}");
+
+            // If no players remain, drop the room.
+            int remaining = room.Slots.Values.Count(s => s.OwnerId != null);
+            if (remaining < 1) _rooms.Remove(room, conn.RemoteIp);
+        }
+        else if (room.Lifecycle == RoomLifecycle.Lobby)
+        {
+            if (room.HostId == conn.Id)
+            {
+                // Host left the lobby — close the room and notify everyone.
+                foreach (var kv in room.Slots)
+                {
+                    if (kv.Value.OwnerId is not Guid id || id == conn.Id) continue;
+                    Connection? other;
+                    lock (_connectionsLock) _connections.TryGetValue(id, out other);
+                    if (other == null) continue;
+                    try { await other.Ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "host-left", ct); } catch { }
+                }
+                _rooms.Remove(room, conn.RemoteIp);
+            }
+            else
+            {
+                RemoveConnFromRoom(conn, room);
+                await BroadcastRoomState(room, ct);
+            }
         }
     }
 
