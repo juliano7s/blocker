@@ -42,6 +42,12 @@ public class LockstepCoordinator
     private int _currentTick = 0;
     private int _highestSubmittedLocalTick = -1;
 
+    // Pending disconnect bookkeeping (Task 8). Each entry says: when _currentTick
+    // reaches `atTick`, mark the player IsEliminated; once we've passed `afterTick`,
+    // remove them from the active set so PollAdvance no longer waits for their input.
+    private readonly List<(int playerId, int atTick)> _disconnectEliminations = new();
+    private readonly List<(int playerId, int afterTick)> _pendingRemovals = new();
+
     public event Action<int /*winnerTeamId*/>? GameEnded;
     public event Action? DesyncDetected;
 
@@ -113,6 +119,33 @@ public class LockstepCoordinator
         Fsm = CoordinatorFsm.Running;
         StallMs = 0;
 
+        // 3.5. Apply deterministic disconnect eliminations at their effective tick.
+        // Setting IsEliminated directly (bypassing EliminationSystem's 3-builder rule) is
+        // intentional: a disconnected player is eliminated regardless of their unit count.
+        // Every peer runs this on the same _currentTick, so state hashes stay identical.
+        // Must run BEFORE hashing so the hash reflects the post-elimination state.
+        for (int i = _disconnectEliminations.Count - 1; i >= 0; i--)
+        {
+            var (pid, atTick) = _disconnectEliminations[i];
+            if (_currentTick == atTick)
+            {
+                var player = _state.Players.FirstOrDefault(p => p.Id == pid);
+                if (player != null) player.IsEliminated = true;
+                _disconnectEliminations.RemoveAt(i);
+            }
+        }
+        // Remove disconnected players from the active set once we've reached their
+        // effective tick. After this, PollAdvance won't wait for their buffers.
+        for (int i = _pendingRemovals.Count - 1; i >= 0; i--)
+        {
+            var (pid, afterTick) = _pendingRemovals[i];
+            if (_currentTick >= afterTick)
+            {
+                _activePlayers.Remove(pid);
+                _pendingRemovals.RemoveAt(i);
+            }
+        }
+
         // 4. Hash + broadcast
         uint h = StateHasher.Hash(_state);
         _relay.SendHash(_currentTick, h);
@@ -164,7 +197,24 @@ public class LockstepCoordinator
 
     private void OnPlayerLeft(int playerId, int effectiveTick, LeaveReason reason)
     {
-        // Task 8 implements this fully.
+        if (!_activePlayers.Contains(playerId)) return;
+
+        // Fill the disconnected player's buffer from _currentTick+1 up to effectiveTick
+        // with empty commands. This unblocks PollAdvance so the remaining players don't
+        // stall waiting for input that will never arrive.
+        if (!_buffers.TryGetValue(playerId, out var buf))
+            _buffers[playerId] = buf = new SortedDictionary<int, IReadOnlyList<Command>>();
+        for (int t = _currentTick + 1; t <= effectiveTick; t++)
+            buf[t] = Array.Empty<Command>();
+
+        // Schedule deterministic elimination at effectiveTick: every peer applies this
+        // at the exact same tick, so hashes stay identical across clients.
+        _disconnectEliminations.Add((playerId, effectiveTick));
+
+        // Schedule removal from the active set once we've passed effectiveTick. We can't
+        // remove immediately because we still need the filled buffers to participate in
+        // tick merging for the [_currentTick+1, effectiveTick] window.
+        _pendingRemovals.Add((playerId, effectiveTick));
     }
 
     private void CheckMajorityVote(int tick)

@@ -54,6 +54,45 @@ public class LockstepCoordinatorTests
     }
 
     [Fact]
+    public void Disconnect_Unblocks_Remaining_Player()
+    {
+        var state0 = MakeTwoPlayerState();
+        var state1 = MakeTwoPlayerState();
+        var relay0 = new FakeRelayClient(0);
+        var relay1 = new FakeRelayClient(1);
+        FakeRelayClient.Connect(relay0, relay1);
+
+        var coord0 = new LockstepCoordinator(0, state0, relay0, new HashSet<int> { 0, 1 });
+        var coord1 = new LockstepCoordinator(1, state1, relay1, new HashSet<int> { 0, 1 });
+        coord0.StartGame(); coord1.StartGame();
+
+        // Run 20 ticks normally.
+        for (int i = 0; i < 20; i++) { coord0.PollAdvance(); coord1.PollAdvance(); }
+        Assert.True(coord0.CurrentTick >= 10);
+
+        int preDisconnectTick = coord0.CurrentTick;
+        int effectiveTick = preDisconnectTick + 2;
+
+        int? endedWithTeam = null;
+        coord0.GameEnded += t => endedWithTeam = t;
+
+        // Player 1 "disconnects" at effectiveTick. This fires PlayerLeft on coord0.
+        relay1.SimulateDisconnect(effectiveTick);
+
+        // Coord0 should unblock and advance through the filled window up to effectiveTick.
+        for (int i = 0; i < 50; i++) coord0.PollAdvance();
+
+        // Pipeline flowed past the stall point (the disconnect was absorbed, not blocked).
+        Assert.True(coord0.CurrentTick >= effectiveTick,
+            $"expected coord0 to reach effectiveTick {effectiveTick}, got {coord0.CurrentTick}");
+
+        // Setting IsEliminated on p1 at effectiveTick causes EliminationSystem.GetWinningTeam
+        // to return team 0 on that same tick, so the game ends with team 0 winning.
+        Assert.Equal(CoordinatorFsm.Ended, coord0.Fsm);
+        Assert.Equal(0, endedWithTeam);
+    }
+
+    [Fact]
     public void Commands_Scheduled_With_Input_Delay_Apply_To_Correct_Tick()
     {
         var state0 = MakeTwoPlayerState();
