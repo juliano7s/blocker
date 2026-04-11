@@ -17,6 +17,13 @@ public partial class SelectionManager : Node2D
 
 	[Export] public int ControllingPlayer = 0;
 
+	// Hot-seat Tab toggle is a single-player development convenience. In a
+	// networked game it's catastrophic: cycling ControllingPlayer locally makes
+	// us emit Commands tagged with the wrong PlayerId, which the relay still
+	// broadcasts under our real connection ID — the peers immediately desync.
+	// GameManager flips this off when launching a multiplayer session.
+	public bool AllowHotSeatSwitch = true;
+
 	private ICommandSink? _commandSink;
 	public void SetCommandSink(ICommandSink? sink) => _commandSink = sink;
 
@@ -317,7 +324,8 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 					GD.Print($"Quick-selected {_selectedBlocks.Count} mobile combat units");
 					break;
 				case Key.Tab:
-					// Hot-seat: switch player
+					// Hot-seat: switch player. Disabled in multiplayer (would desync).
+					if (!AllowHotSeatSwitch) break;
 					ControllingPlayer = (ControllingPlayer + 1) % _gameState.Players.Count;
 					_selectedBlocks.Clear();
 					GD.Print($"Switched to Player {ControllingPlayer}");

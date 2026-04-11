@@ -88,6 +88,8 @@ public partial class GameManager : Node2D
 			mpRunner.Initialize(coord, mp.Relay, gameState);
 			_gridRenderer.SetTickInterval((float)mpRunner.TickInterval);
 			_selectionManager.ControllingPlayer = mp.LocalPlayerId;
+			// Tab hot-seat is for single-player only — in MP it desyncs the sim.
+			_selectionManager.AllowHotSeatSwitch = false;
 			_selectionManager.SetCommandSink(mpRunner);
 			coord.StartGame();
 

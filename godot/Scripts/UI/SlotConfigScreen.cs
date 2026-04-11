@@ -248,8 +248,11 @@ public partial class SlotConfigScreen : Control
 		};
 
 		// Create the room. Map blob is opaque to the relay; joiners load by name for M1.
-		var mapBlob = System.Text.Encoding.UTF8.GetBytes(_mapData.Name);
-		_relay.SendCreateRoom((byte)2, _mapData.Name, mapBlob);
+		// We send the *file name* (e.g. "Lanes.json"), not the display name from the JSON
+		// metadata — the joiner needs to look the file up on disk by that exact name.
+		var mapFileName = MapSelection.SelectedMapFileName ?? (_mapData.Name + ".json");
+		var mapBlob = System.Text.Encoding.UTF8.GetBytes(mapFileName);
+		_relay.SendCreateRoom((byte)2, mapFileName, mapBlob);
 
 		var drain = new Godot.Timer { WaitTime = 0.016, Autostart = true };
 		drain.Timeout += () => _relay.DrainInbound();
