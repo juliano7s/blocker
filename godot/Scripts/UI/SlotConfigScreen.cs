@@ -24,7 +24,6 @@ public partial class SlotConfigScreen : Control
 	// Host-only state.
 	private Label? _hostStatusLabel;
 	private Button? _hostStartBtn;
-	private Button? _hostCreateBtn;
 	private OptionButton? _hostGameModeOption;
 	private OptionButton? _hostMapOption;
 	private VBoxContainer? _hostLobbyContainer;
@@ -279,16 +278,8 @@ public partial class SlotConfigScreen : Control
 		modeRow.AddChild(_hostGameModeOption);
 		vbox.AddChild(modeRow);
 
-		if (!rematchReattach)
-		{
-			_hostCreateBtn = new Button { Text = "Create Room", CustomMinimumSize = new Vector2(0, 40) };
-			_hostCreateBtn.Pressed += OnHostCreateRoomPressed;
-			vbox.AddChild(_hostCreateBtn);
-		}
-		else
-		{
-			_hostRoomCreated = true;
-		}
+		// Auto-create the room immediately on entry.
+		_hostRoomCreated = true;
 
 		vbox.AddChild(new HSeparator());
 
@@ -296,7 +287,7 @@ public partial class SlotConfigScreen : Control
 		{
 			Text = rematchReattach
 				? "Rematch lobby — waiting for player slots…"
-				: "Select a map and click Create Room."
+				: "Creating room…"
 		};
 		vbox.AddChild(_hostStatusLabel);
 
@@ -334,6 +325,17 @@ public partial class SlotConfigScreen : Control
 		var drain = new Godot.Timer { WaitTime = 0.016, Autostart = true };
 		drain.Timeout += () => _relay.DrainInbound();
 		AddChild(drain);
+
+		// Auto-create room if not a rematch reattach (rematch already has a room).
+		if (!rematchReattach)
+		{
+			if (_mapData != null)
+			{
+				var mapFileName = MapSelection.SelectedMapFileName ?? (_mapData.Name + ".json");
+				var mapBlob = System.Text.Encoding.UTF8.GetBytes(mapFileName);
+				_relay.SendCreateRoom((byte)_mapData.SlotCount, _hostSelectedMode, mapFileName, mapBlob);
+			}
+		}
 
 		if (MultiplayerLaunchData.PendingRoomState is { } pending)
 		{
@@ -405,19 +407,6 @@ public partial class SlotConfigScreen : Control
 		var mapFileName = MapSelection.SelectedMapFileName ?? (_mapData.Name + ".json");
 		var mapBlob = System.Text.Encoding.UTF8.GetBytes(mapFileName);
 		_relay.SendUpdateRoom((byte)_mapData.SlotCount, _hostSelectedMode, mapFileName, mapBlob);
-	}
-
-	private void OnHostCreateRoomPressed()
-	{
-		if (_relay == null || _mapData == null || _hostRoomCreated) return;
-
-		_hostRoomCreated = true;
-		_hostCreateBtn!.Disabled = true;
-		_hostStatusLabel!.Text = "Creating room…";
-
-		var mapFileName = MapSelection.SelectedMapFileName ?? (_mapData.Name + ".json");
-		var mapBlob = System.Text.Encoding.UTF8.GetBytes(mapFileName);
-		_relay.SendCreateRoom((byte)_mapData.SlotCount, _hostSelectedMode, mapFileName, mapBlob);
 	}
 
 	private void OnHostRoomStateDeferred()
