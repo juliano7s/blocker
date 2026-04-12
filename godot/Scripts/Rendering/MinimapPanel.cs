@@ -25,11 +25,8 @@ public partial class MinimapPanel : Control
     // How much extra space (as fraction of grid size) to show around the grid
     private const float MarginFraction = 0.15f;
 
-    private static readonly Color BorderColor = new(0.4f, 0.4f, 0.5f, 0.8f);
-    private static readonly Color BgColor = new(0.05f, 0.05f, 0.08f, 0.9f);
     private static readonly Color ViewportRectColor = new(1f, 1f, 1f, 0.7f);
     private static readonly Color TerrainColor = new(0.3f, 0.3f, 0.35f);
-    private static readonly Color GridAreaColor = new(0.08f, 0.08f, 0.11f);
 
     private int _frameCounter;
     private const int RedrawEveryNFrames = 3;
@@ -66,23 +63,22 @@ public partial class MinimapPanel : Control
         var grid = _gameState!.Grid;
         var panelSize = Size;
 
-        // Total area in grid-cell units: grid + margin on each side
+        const float labelHeight = 20f;
+        float availH = panelSize.Y - labelHeight - 8f; // 8px bottom padding
+
         float marginCellsX = grid.Width * MarginFraction;
         float marginCellsY = grid.Height * MarginFraction;
         float totalW = grid.Width + marginCellsX * 2;
         float totalH = grid.Height + marginCellsY * 2;
 
-        // Fit total area into panel with 2px pixel margin
-        const float panelMargin = 2f;
+        const float panelMargin = 4f;
         float availW = panelSize.X - panelMargin * 2;
-        float availH = panelSize.Y - panelMargin * 2;
         float scale = Mathf.Min(availW / totalW, availH / totalH);
 
-        // Center the total area in the panel
         float drawnW = totalW * scale;
         float drawnH = totalH * scale;
         float areaOffX = panelMargin + (availW - drawnW) * 0.5f;
-        float areaOffY = panelMargin + (availH - drawnH) * 0.5f;
+        float areaOffY = labelHeight + (availH - drawnH) * 0.5f;
 
         // Grid (0,0) starts after the margin cells
         float gridOffX = areaOffX + marginCellsX * scale;
@@ -97,15 +93,21 @@ public partial class MinimapPanel : Control
 
         var grid = _gameState.Grid;
         var panelSize = Size;
+        var font = ThemeDB.FallbackFont;
+
+        // Panel background with border
+        HudStyles.DrawInnerPanel(this, new Rect2(Vector2.Zero, panelSize));
+
+        // Label
+        DrawString(font, new Vector2(10, 14), "MINIMAP",
+            HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall, HudStyles.TextDim);
+
         var (scale, gridOffX, gridOffY) = ComputeLayout();
 
-        // Background (entire panel — includes margin area)
-        DrawRect(new Rect2(Vector2.Zero, panelSize), BgColor);
-
-        // Grid area background (slightly lighter than margin to distinguish)
+        // Grid area background
         float gridW = grid.Width * scale;
         float gridH = grid.Height * scale;
-        DrawRect(new Rect2(gridOffX, gridOffY, gridW, gridH), GridAreaColor);
+        DrawRect(new Rect2(gridOffX, gridOffY, gridW, gridH), HudStyles.PanelBgTop);
 
         // Draw ground and terrain
         for (int y = 0; y < grid.Height; y++)
@@ -155,9 +157,6 @@ public partial class MinimapPanel : Control
             camH * scale);
 
         DrawRect(vpRect, ViewportRectColor, false, 1.0f);
-
-        // Border
-        DrawRect(new Rect2(Vector2.Zero, panelSize), BorderColor, false, 1.0f);
     }
 
     public override void _GuiInput(InputEvent @event)
