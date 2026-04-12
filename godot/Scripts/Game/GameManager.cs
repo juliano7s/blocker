@@ -25,6 +25,7 @@ public partial class GameManager : Node2D
 	private TickRunner _tickRunner = null!;
 	private HudOverlay _hud = null!;
 	private HudBar _hudBar = null!;
+	private SpawnToggles _spawnToggles = null!;
 	private PostProcessingManager _postProcessing = null!;
 	private EffectManager _effectManager = null!;
 	private AudioManager _audioManager = null!;
@@ -128,6 +129,19 @@ public partial class GameManager : Node2D
 		_hudBar.SetConfig(Config);
 		_hudBar.MinimapCameraJump += pos => _camera.JumpTo(pos);
 
+		// Set up floating spawn toggles (top-right of game area)
+		_spawnToggles = new SpawnToggles();
+		var togglesLayer = new CanvasLayer { Layer = 10 };
+		AddChild(togglesLayer);
+		var togglesAnchor = new Control();
+		togglesAnchor.SetAnchorsPreset(Control.LayoutPreset.TopRight);
+		togglesAnchor.OffsetLeft = -70;
+		togglesAnchor.OffsetTop = HudStyles.TopBarHeight + 20;
+		togglesAnchor.OffsetRight = -20;
+		togglesAnchor.OffsetBottom = HudStyles.TopBarHeight + 130;
+		togglesLayer.AddChild(togglesAnchor);
+		togglesAnchor.AddChild(_spawnToggles);
+
 		// Tell camera about HUD coverage so it offsets the visible area
 		// Top bar: 32px bar + 6px ratio bar = 38px. Bottom bar: 150px.
 		_camera.SetHudInsets(38f, 150f);
@@ -179,6 +193,9 @@ public partial class GameManager : Node2D
 		// Feed camera position and visible area to HudBar minimap
 		var viewSize = GetViewportRect().Size / _camera.Zoom;
 		_hudBar.SetCameraView(_camera.Position, viewSize);
+
+		// Update HUD with selection state
+		_hudBar.SetSelection(_selectionManager.SelectedBlocks);
 
 		// SP game-over polling. MP path uses _coord.GameEnded directly. We poll
 		// here for the SP path because TickRunner doesn't expose a hook — and
