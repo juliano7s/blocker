@@ -4,6 +4,7 @@ obj/
 *.user
 *.suo
 *.cache
+publish/
 
 # Godot
 godot/.godot/

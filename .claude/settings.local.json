@@ -9,7 +9,14 @@
       "Bash(dotnet sln:*)",
       "Bash(dotnet build:*)",
       "Bash(dotnet test:*)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "PowerShell([Environment]::SetEnvironmentVariable\\(\"GODOT_SDK_PATH\", \"C:\\\\Program Files\\\\Godot\\\\GodotSharp\\\\Tools\\\\nupkgs\", \"User\"\\))",
+      "Bash(GODOT_SDK_PATH=\"C:/Program Files/Godot/GodotSharp/Tools/nupkgs\" dotnet test tests/Blocker.Simulation.Tests/ --filter \"FullyQualifiedName~StateHasher\")",
+      "Bash(GODOT_SDK_PATH=\"C:/Program Files/Godot/GodotSharp/Tools/nupkgs\" dotnet test tests/Blocker.Simulation.Tests/ --filter \"FullyQualifiedName~LockstepCoordinator\")",
+      "Bash(GODOT_SDK_PATH=\"C:/Program Files/Godot/GodotSharp/Tools/nupkgs\" dotnet test tests/Blocker.Simulation.Tests/)",
+      "PowerShell(dotnet test:*)",
+      "PowerShell(dotnet build:*)",
+      "PowerShell(dotnet run:*)"
     ]
   },
   "hooks": {
