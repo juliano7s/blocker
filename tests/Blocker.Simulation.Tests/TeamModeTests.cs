@@ -83,11 +83,10 @@ public class TeamModeTests
     }
 
     [Fact]
-    public void Jumper_StoppedByTeammate_NotKilled()
+    public void Jumper_KillsTeammateInPath()
     {
         // Jumper from player 0 jumps right; player 1 ally sits in the path.
-        // Expectation: jump stops at the ally cell, ally is alive, no kill registered
-        // (kills+combo path requires the obstacle to be an enemy).
+        // Teammates are killed just like enemies — jumper kills through them.
         var state = TwoVsOneState();
         var jumper = state.AddBlock(BlockType.Jumper, 0, new GridPos(5, 5));
         jumper.Hp = Constants.JumperMaxHp;
@@ -95,10 +94,9 @@ public class TeamModeTests
 
         JumperSystem.Jump(state, jumper, Direction.Right);
 
-        Assert.Contains(ally, state.Blocks);
-        Assert.Equal(new GridPos(6, 5), jumper.Pos); // Landed in cell before the ally
-        // Miss path applies cooldown — confirms it didn't combo through the ally.
-        Assert.True(jumper.IsOnCooldown);
+        // Ally is killed, jumper gets combo
+        Assert.DoesNotContain(ally, state.Blocks);
+        Assert.True(jumper.HasCombo); // Kill grants combo
     }
 
     [Fact]

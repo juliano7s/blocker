@@ -112,7 +112,7 @@ public class JumperTests
     }
 
     [Fact]
-    public void Jump_StopsAtFriendly()
+    public void Jump_KillsFriendlyBlocksInPath()
     {
         var state = CreateState();
         var friendly = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 7));
@@ -121,9 +121,9 @@ public class JumperTests
 
         JumperSystem.Jump(state, jumper, Direction.Right);
 
-        // Should stop before the friendly block, friendly not killed
-        Assert.Equal(new GridPos(4, 7), jumper.Pos);
-        Assert.Contains(friendly, state.Blocks);
+        // Should kill the friendly block and continue through
+        Assert.DoesNotContain(friendly, state.Blocks);
+        Assert.True(jumper.HasCombo); // Kill grants combo
     }
 
     [Fact]

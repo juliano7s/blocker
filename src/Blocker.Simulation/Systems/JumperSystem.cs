@@ -66,12 +66,10 @@ public static class JumperSystem
                     break;
                 }
 
-                if (state.AreAllies(blockAtPos, jumper))
-                {
-                    break; // Can't pass through friendlies / teammates
-                }
+                // Kill all non-structural blocks in path (friendlies too)
+                // Walls, formations, and immobile blocks are structural obstacles
 
-                // Kill enemies in path
+                // Kill block in path
                 state.RemoveBlock(blockAtPos);
                 kills++;
                 state.VisualEvents.Add(new VisualEvent(
@@ -94,8 +92,11 @@ public static class JumperSystem
             state.Grid[landingPos].BlockId = jumper.Id;
 
             state.VisualEvents.Add(new VisualEvent(
-                VisualEventType.JumpExecuted, landingPos, jumper.PlayerId,
+                VisualEventType.JumpExecuted, jumper.PrevPos, jumper.PlayerId,
                 Direction: direction, Range: (landingPos - jumper.PrevPos).ManhattanDistance(new GridPos(0, 0)),
+                BlockId: jumper.Id));
+            state.VisualEvents.Add(new VisualEvent(
+                VisualEventType.JumpLanded, landingPos, jumper.PlayerId,
                 BlockId: jumper.Id));
         }
 

@@ -1,3 +1,4 @@
+using Blocker.Game.Audio;
 using Blocker.Game.Config;
 using Blocker.Game.Input;
 using Blocker.Game.Net;
@@ -26,6 +27,7 @@ public partial class GameManager : Node2D
 	private HudBar _hudBar = null!;
 	private PostProcessingManager _postProcessing = null!;
 	private EffectManager _effectManager = null!;
+	private AudioManager _audioManager = null!;
 	private readonly HashSet<int> _currentSelectedIds = new();
 
 	// Game-state we hold so rematch can rebuild GameLaunchData on its own.
@@ -136,6 +138,10 @@ public partial class GameManager : Node2D
 		_effectManager.SetGameState(gameState);
 		_effectManager.SetConfig(Config);
 
+		// Set up audio manager
+		_audioManager = GetNode<AudioManager>("AudioManager");
+		_audioManager.SetGameState(gameState);
+
 		// Set up post-processing
 		_postProcessing = GetNode<PostProcessingManager>("PostProcessing");
 		_postProcessing.SetGameState(gameState);
@@ -155,18 +161,20 @@ public partial class GameManager : Node2D
 
 	public override void _Process(double delta)
 	{
-		// Keep HUD and effects in sync with controlling player
+		// Keep HUD, effects, and audio in sync with controlling player
 		_hud.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_effectManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
+		_audioManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
 
 		// Pass selected IDs to renderer so selection border tracks visual position
 		_gridRenderer.SetSelectedIds(_selectionManager.SelectedBlocks);
 
-		// Notify effect manager of selection changes (fires one-shot SelectSquares)
+		// Notify effect manager and audio manager of selection changes
 		_currentSelectedIds.Clear();
 		foreach (var b in _selectionManager.SelectedBlocks)
 			_currentSelectedIds.Add(b.Id);
 		_effectManager.OnSelectionChanged(_currentSelectedIds);
+		_audioManager.OnSelectionChanged(_currentSelectedIds);
 
 		// Feed camera position and visible area to HudBar minimap
 		var viewSize = GetViewportRect().Size / _camera.Zoom;
@@ -190,6 +198,11 @@ public partial class GameManager : Node2D
 
 		var overlay = new GameOverOverlay();
 		int localPid = _selectionManager?.ControllingPlayer ?? 0;
+
+		// Play win/loss fanfare
+		var localPlayer = _gameState.Players.Find(p => p.Id == localPid);
+		bool localWon = localPlayer != null && localPlayer.TeamId == winningTeam;
+		_audioManager.PlayGameEndFanfare(localWon);
 		var (title, subtitle, accent) = GameOverOverlay.BuildWinnerLabels(
 			winningTeam, localPid, _gameState, Config);
 

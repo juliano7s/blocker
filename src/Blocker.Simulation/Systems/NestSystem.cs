@@ -172,8 +172,15 @@ public static class NestSystem
                 block.FormationId = null;
         }
         toRemove.Add(nest.Id);
+        var dissolvedEvent = nest.Type switch
+        {
+            NestType.Builder => VisualEventType.BuilderNestDissolved,
+            NestType.Soldier => VisualEventType.SoldierNestDissolved,
+            NestType.Stunner => VisualEventType.StunnerNestDissolved,
+            _ => VisualEventType.BuilderNestDissolved
+        };
         state.VisualEvents.Add(new VisualEvent(
-            VisualEventType.FormationDissolved, nest.Center, nest.PlayerId));
+            dissolvedEvent, nest.Center, nest.PlayerId));
     }
 
     private static void ScanForNewNests(GameState state)
@@ -287,8 +294,11 @@ public static class NestSystem
                 member.FormationId = nest.Id;
 
             state.Nests.Add(nest);
+            var formedEvent = nestType == NestType.Soldier
+                ? VisualEventType.SoldierNestFormed
+                : VisualEventType.StunnerNestFormed;
             state.VisualEvents.Add(new VisualEvent(
-                VisualEventType.FormationFormed, center, playerId));
+                formedEvent, center, playerId));
             return true;
         }
 
@@ -323,7 +333,7 @@ public static class NestSystem
 
             state.Nests.Add(nest);
             state.VisualEvents.Add(new VisualEvent(
-                VisualEventType.FormationFormed, center, playerId));
+                VisualEventType.BuilderNestFormed, center, playerId));
             return;
         }
     }
@@ -364,7 +374,7 @@ public static class NestSystem
                 nest.MemberIds.Add(w1.Id);
                 nest.MemberIds.Add(w2.Id);
                 state.VisualEvents.Add(new VisualEvent(
-                    VisualEventType.FormationFormed, nest.Center, nest.PlayerId));
+                    VisualEventType.SoldierNestFormed, nest.Center, nest.PlayerId));
                 break;
             }
         }

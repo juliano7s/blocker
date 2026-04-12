@@ -108,9 +108,20 @@ public partial class EffectManager : Node2D
         VisualEventType.CommandMoveIssued => true,
         VisualEventType.CommandRootIssued => true,
         VisualEventType.CommandUprootIssued => true,
-        VisualEventType.FormationFormed => true,
         VisualEventType.WallConverted => true,
-        VisualEventType.FormationDissolved => true,
+        // Formation events are private - you see your own formations form
+        VisualEventType.BuilderNestFormed => true,
+        VisualEventType.SoldierNestFormed => true,
+        VisualEventType.StunnerNestFormed => true,
+        VisualEventType.SupplyFormed => true,
+        VisualEventType.StunTowerFormed => true,
+        VisualEventType.SoldierTowerFormed => true,
+        VisualEventType.BuilderNestDissolved => true,
+        VisualEventType.SoldierNestDissolved => true,
+        VisualEventType.StunnerNestDissolved => true,
+        VisualEventType.SupplyDissolved => true,
+        VisualEventType.StunTowerDissolved => true,
+        VisualEventType.SoldierTowerDissolved => true,
         _ => false,
     };
 
@@ -188,16 +199,32 @@ public partial class EffectManager : Node2D
                     contProb: 0.66f, branchProb: 0.34f));
                 break;
 
-            // Formation complete: Clockwise spiral, ~40 segs, 1800ms
-            case VisualEventType.FormationFormed:
+            // Formation formed: Clockwise spiral, ~40 segs, 1800ms
+            case VisualEventType.BuilderNestFormed:
+            case VisualEventType.SoldierNestFormed:
+            case VisualEventType.StunnerNestFormed:
+            case VisualEventType.SupplyFormed:
+            case VisualEventType.StunTowerFormed:
+            case VisualEventType.SoldierTowerFormed:
                 AddEffect(EffectFactory.SpiralTrace(this, pos, color,
                     duration: 1800f, maxSegs: 40));
                 break;
 
             // Formation dissolved: Small cross contracting inward, 600ms
-            case VisualEventType.FormationDissolved:
+            case VisualEventType.BuilderNestDissolved:
+            case VisualEventType.SoldierNestDissolved:
+            case VisualEventType.StunnerNestDissolved:
+            case VisualEventType.SupplyDissolved:
+            case VisualEventType.StunTowerDissolved:
+            case VisualEventType.SoldierTowerDissolved:
                 AddEffect(EffectFactory.CrossContract(this, pos, Colors.White,
                     duration: 600f));
+                break;
+
+            // Jump landed: Impact flash
+            case VisualEventType.JumpLanded:
+                AddEffect(EffectFactory.LightningBurst(this, pos, color,
+                    maxSegs: 14, duration: 300f, trail: 0.15f));
                 break;
 
             // Jump: Core streak origin→landing (bible §16.9)
@@ -266,26 +293,18 @@ public partial class EffectManager : Node2D
 
     private void SpawnJumpTrail(VisualEvent evt, Color color)
     {
-        if (!evt.BlockId.HasValue || _gameState == null) return;
-
-        var jumper = _gameState.GetBlock(evt.BlockId.Value);
-        if (jumper == null) return;
-
         var dir = evt.Direction;
         var range = evt.Range ?? 1;
         if (!dir.HasValue) return;
 
         var offset = dir.Value.ToOffset();
-        // Reconstruct origin from landing position (PrevPos is already overwritten)
-        var fromPos = jumper.Pos - new GridPos(offset.X * range, offset.Y * range);
+        // Event position is origin, compute landing from direction + range
+        var fromPos = evt.Position;
+        var toPos = fromPos + new GridPos(offset.X * range, offset.Y * range);
 
         // Core streak: line from origin to landing
-        AddEffect(EffectFactory.LineTrail(this, fromPos, jumper.Pos, color,
+        AddEffect(EffectFactory.LineTrail(this, fromPos, toPos, color,
             duration: 500f));
-
-        // Impact flash at landing: small burst
-        AddEffect(EffectFactory.LightningBurst(this, jumper.Pos, color,
-            maxSegs: 14, duration: 300f, trail: 0.15f));
     }
 
     // ─── Block Spawn ─────────────────────────────────────────────────

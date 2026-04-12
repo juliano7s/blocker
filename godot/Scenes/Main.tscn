@@ -9,6 +9,19 @@
 [ext_resource type="Script" uid="uid://c7n8ntfqyjgw5" path="res://Scripts/Game/TickRunner.cs" id="5_tick"]
 [ext_resource type="Script" uid="uid://cvo7thq0k25s" path="res://Scripts/Rendering/PostProcessingManager.cs" id="6_postproc"]
 [ext_resource type="Script" uid="uid://clamgc4odwpjx" path="res://Scripts/Rendering/EffectManager.cs" id="7_effect"]
+[ext_resource type="AudioStream" uid="uid://coa2hd08lhnip" path="res://Assets/Sounds/kill_uprooted.ogg" id="7_hwpts"]
+[ext_resource type="Script" uid="uid://b3bphyyw6m81c" path="res://Scripts/Audio/AudioManager.cs" id="8_audio"]
+[ext_resource type="AudioStream" uid="uid://bt8oam6t6x07" path="res://Assets/Sounds/command-move.ogg" id="8_jyqft"]
+[ext_resource type="AudioStream" uid="uid://bf8t5jurnri8s" path="res://Assets/Sounds/root_finished.ogg" id="9_3tgeq"]
+[ext_resource type="Script" uid="uid://cbo06ubgj3cnd" path="res://Scripts/Audio/AudioConfig.cs" id="9_audioconfig"]
+[ext_resource type="AudioStream" uid="uid://bxtnv7ggs83er" path="res://Assets/Sounds/command-root.ogg" id="10_c4ay3"]
+[ext_resource type="AudioStream" uid="uid://d0u85jdwux1c6" path="res://Assets/Sounds/builder-spawn.ogg" id="11_aht7i"]
+[ext_resource type="AudioStream" uid="uid://d1u1scdohux8k" path="res://Assets/Sounds/soldier-spawn.ogg" id="12_5jffn"]
+[ext_resource type="AudioStream" uid="uid://pbk4kc8aiowu" path="res://Assets/Sounds/spawn-warden.ogg" id="13_kpo4j"]
+[ext_resource type="AudioStream" uid="uid://bhkowjs1c0x3f" path="res://Assets/Sounds/supply-completed.ogg" id="14_4n42c"]
+[ext_resource type="AudioStream" uid="uid://boeqv2xdsiklk" path="res://Assets/Sounds/uproot_finished.ogg" id="15_c5snn"]
+[ext_resource type="AudioStream" uid="uid://jlhbabsnbopg" path="res://Assets/Sounds/command-uproot.ogg" id="16_xvtyr"]
+[ext_resource type="AudioStream" uid="uid://b5duajm7pvdda" path="res://Assets/Sounds/command-wall.ogg" id="17_u7mjy"]
 
 [sub_resource type="Resource" id="Resource_jw32o"]
 script = ExtResource("2_jw32o")
@@ -150,6 +163,20 @@ glow_bloom = 0.35
 glow_blend_mode = 0
 glow_hdr_threshold = 0.63
 
+[sub_resource type="Resource" id="Resource_audio"]
+script = ExtResource("9_audioconfig")
+MoveCommand = ExtResource("8_jyqft")
+RootStart = ExtResource("10_c4ay3")
+UprootStart = ExtResource("16_xvtyr")
+RootComplete = ExtResource("9_3tgeq")
+UprootComplete = ExtResource("15_c5snn")
+WallConvert = ExtResource("17_u7mjy")
+Death = ExtResource("7_hwpts")
+SpawnBuilder = ExtResource("11_aht7i")
+SpawnSoldier = ExtResource("12_5jffn")
+SpawnWarden = ExtResource("13_kpo4j")
+SupplyFormed = ExtResource("14_4n42c")
+
 [node name="Main" type="Node2D" unique_id=1453460776]
 script = ExtResource("1_game")
 Config = SubResource("Resource_4kpch")
@@ -162,6 +189,10 @@ script = ExtResource("2_grid")
 
 [node name="EffectManager" type="Node2D" parent="." unique_id=800592718]
 script = ExtResource("7_effect")
+
+[node name="AudioManager" type="Node" parent="." unique_id=900592719]
+script = ExtResource("8_audio")
+Config = SubResource("Resource_audio")
 
 [node name="SelectionManager" type="Node2D" parent="." unique_id=1234077948]
 script = ExtResource("4_sel")

@@ -134,7 +134,7 @@ public static class FormationSystem
 
                 state.Formations.Add(formation);
                 state.VisualEvents.Add(new VisualEvent(
-                    VisualEventType.FormationFormed, wall.Pos, wall.PlayerId));
+                    VisualEventType.SupplyFormed, wall.Pos, wall.PlayerId));
                 break; // This wall is now in a formation
             }
         }

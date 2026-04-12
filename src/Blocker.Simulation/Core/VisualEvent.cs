@@ -17,12 +17,26 @@ public enum VisualEventType
     JumpLanded,
     MagnetPulled,
     SelfDestructed,
-    FormationFormed,
-    FormationDissolved,
-    NestSpawned,
     TowerFired,
     PlayerEliminated,
     GameOver,
+    PopCapWarning,
+
+    // Formation formed (per-type for distinct audio)
+    BuilderNestFormed,
+    SoldierNestFormed,
+    StunnerNestFormed,
+    SupplyFormed,
+    StunTowerFormed,
+    SoldierTowerFormed,
+
+    // Formation dissolved (per-type for distinct audio)
+    BuilderNestDissolved,
+    SoldierNestDissolved,
+    StunnerNestDissolved,
+    SupplyDissolved,
+    StunTowerDissolved,
+    SoldierTowerDissolved,
 
     // Command-issued (player clicks)
     CommandMoveIssued,

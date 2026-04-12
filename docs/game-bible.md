@@ -137,7 +137,7 @@ Spawned from Soldier Nests on overload ground instead of normal Soldiers.
 | Combat defense | 1 Soldier kills Jumper (fragile) |
 
 **Abilities:**
-- **Jump** (F key → aim → left-click): Leaps up to 5 cells in a cardinal direction, killing all enemy blocks in the path. Stops at terrain, formations, map edges, and neutral walls (breakable → fragile on first hit; fragile → destroyed on second).
+- **Jump** (F key → aim → left-click): Leaps up to 5 cells in a cardinal direction, killing all blocks in the path (friendlies and enemies alike). Stops at terrain, formations, map edges, and neutral walls (breakable → fragile on first hit; fragile → destroyed on second).
 - **Combo**: If the jump kills at least one enemy and doesn't hit an obstacle, the Jumper enters **combo-ready** state — can jump again immediately without moving. Issuing a move command consumes the combo and starts a **mobile cooldown** (can move but can't jump).
 - **Cooldown**: 120 ticks. If no combo: immobile during cooldown. If combo consumed by moving: mobile but can't jump.
 - **HP loss**: Missed jumps (non-combo, triggering immobile cooldown) cost 1 HP. The visual icon shrinks with HP loss (100% → 60% → 20%).
@@ -729,12 +729,14 @@ The signature visual system. Procedural lightning patterns travel along grid lin
 ### 17.1 Sound Events
 
 Sound effects are triggered by game events:
+- All player issued commands: move, root, wall, uproot, explode, stun, etc.
 - Block selection click
-- Movement command confirmation
-- Root start / root complete
-- Wall conversion
-- Stun ray fire + hit
-- Push wave fire
+- Root complete
+- Uproot complete
+- Wall converted
+- Nests/Supply formed
+- Stun ray hit
+- Push wave hit
 - Combat kills
 - Nest spawn
 - Self-destruct explosion

@@ -58,8 +58,11 @@ public static class TowerSystem
         firstArm.FormationId = tower.Id;
 
         state.Towers.Add(tower);
+        var towerFormedEvent = tower.Type == TowerType.Stun
+            ? VisualEventType.StunTowerFormed
+            : VisualEventType.SoldierTowerFormed;
         state.VisualEvents.Add(new VisualEvent(
-            VisualEventType.FormationFormed, center.Pos, center.PlayerId));
+            towerFormedEvent, center.Pos, center.PlayerId));
 
         return true;
     }
@@ -304,8 +307,11 @@ public static class TowerSystem
         toRemove.Add(tower.Id);
 
         var pos = center?.Pos ?? new GridPos(0, 0);
+        var towerDissolvedEvent = tower.Type == TowerType.Stun
+            ? VisualEventType.StunTowerDissolved
+            : VisualEventType.SoldierTowerDissolved;
         state.VisualEvents.Add(new VisualEvent(
-            VisualEventType.FormationDissolved, pos, tower.PlayerId));
+            towerDissolvedEvent, pos, tower.PlayerId));
     }
 
     private static (GridPos left, GridPos right) GetPerpendicularOffsets(Direction dir) => dir switch
