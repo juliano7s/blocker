@@ -23,6 +23,8 @@ public static class Protocol
     public const byte StartGame    = 0x07;
     public const byte GameStarted  = 0x08;
     public const byte Rematch      = 0x09;
+    public const byte UpdateRoom   = 0x0A;
+    public const byte KickPlayer   = 0x0B;
 
     // Tick traffic — 0x10–0x1F
     public const byte Commands     = 0x10;
@@ -66,12 +68,7 @@ public static class GameModeExtensions
     };
 
     /// <summary>True if this mode is valid for the given slot count.</summary>
-    public static bool IsValidFor(this GameMode mode, int slotCount) => mode switch
-    {
-        // Teams requires even slot count: every slot must have a partner.
-        GameMode.Teams => slotCount >= 2 && slotCount % 2 == 0,
-        _              => slotCount >= 2,
-    };
+    public static bool IsValidFor(this GameMode mode, int slotCount) => slotCount >= 2;
 }
 
 public enum ErrorCode : byte
@@ -87,4 +84,6 @@ public enum ErrorCode : byte
     UnknownMessageType  = 8,
     NotInRoom           = 9,
     NotHost             = 10,
+    HostLeft            = 11,
+    Kicked              = 12,
 }

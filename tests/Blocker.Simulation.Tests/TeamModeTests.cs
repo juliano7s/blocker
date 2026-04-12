@@ -145,10 +145,11 @@ public class TeamModeTests
         Assert.False(GameMode.Ffa.IsValidFor(1));
 
         Assert.True(GameMode.Teams.IsValidFor(2));
+        Assert.True(GameMode.Teams.IsValidFor(3));
         Assert.True(GameMode.Teams.IsValidFor(4));
+        Assert.True(GameMode.Teams.IsValidFor(5));
         Assert.True(GameMode.Teams.IsValidFor(6));
-        Assert.False(GameMode.Teams.IsValidFor(3));
-        Assert.False(GameMode.Teams.IsValidFor(5));
+        Assert.False(GameMode.Teams.IsValidFor(1));
     }
 
     [Fact]

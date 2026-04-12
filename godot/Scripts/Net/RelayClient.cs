@@ -150,6 +150,28 @@ public sealed class RelayClient : IRelayClient, IDisposable
     public void SendLeaveRoom() =>
         _outbox.Writer.TryWrite(new byte[] { Protocol.LeaveRoom });
 
+    public void SendUpdateRoom(byte slotCount, GameMode gameMode, string mapName, byte[] mapBlob)
+    {
+        var nameBytes = System.Text.Encoding.UTF8.GetBytes(mapName);
+        var varBuf = new byte[5];
+        int vn = Varint.Write(varBuf, 0, (uint)nameBytes.Length);
+        var varBuf2 = new byte[5];
+        int vb = Varint.Write(varBuf2, 0, (uint)mapBlob.Length);
+        var msg = new byte[3 + vn + nameBytes.Length + vb + mapBlob.Length];
+        int o = 0;
+        msg[o++] = Protocol.UpdateRoom;
+        msg[o++] = slotCount;
+        msg[o++] = (byte)gameMode;
+        Array.Copy(varBuf, 0, msg, o, vn); o += vn;
+        Array.Copy(nameBytes, 0, msg, o, nameBytes.Length); o += nameBytes.Length;
+        Array.Copy(varBuf2, 0, msg, o, vb); o += vb;
+        Array.Copy(mapBlob, 0, msg, o, mapBlob.Length);
+        _outbox.Writer.TryWrite(msg);
+    }
+
+    public void SendKickPlayer(byte slotId) =>
+        _outbox.Writer.TryWrite(new byte[] { Protocol.KickPlayer, slotId });
+
     /// <summary>Must be called on main thread every frame by MultiplayerTickRunner.</summary>
     public void DrainInbound()
     {

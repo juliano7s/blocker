@@ -119,7 +119,7 @@ public partial class MultiplayerMenu : Control
     {
         MultiplayerLaunchData.Intent = MultiplayerIntent.Host;
         MultiplayerLaunchData.Relay = _relay;
-        GetTree().ChangeSceneToFile("res://Scenes/MapSelect.tscn");
+        GetTree().ChangeSceneToFile("res://Scenes/SlotConfig.tscn");
     }
 
     private void OnJoinPressed()

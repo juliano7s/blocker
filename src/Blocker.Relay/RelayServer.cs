@@ -133,14 +133,19 @@ public sealed class RelayServer
         {
             if (room.HostId == conn.Id)
             {
-                // Host left the lobby — close the room and notify everyone.
+                // Host left the lobby — notify joiners with HostLeft error, then close.
                 foreach (var kv in room.Slots)
                 {
                     if (kv.Value.OwnerId is not Guid id || id == conn.Id) continue;
                     Connection? other;
                     lock (_connectionsLock) _connections.TryGetValue(id, out other);
                     if (other == null) continue;
-                    try { await other.Ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "host-left", ct); } catch { }
+                    try
+                    {
+                        await SendError(other, ErrorCode.HostLeft, ct);
+                        await other.Ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "host-left", ct);
+                    }
+                    catch { }
                 }
                 _rooms.Remove(room, conn.RemoteIp);
             }
@@ -199,13 +204,15 @@ public sealed class RelayServer
 
             switch (type)
             {
-                case Protocol.CreateRoom: HandleCreateRoom(conn, new ReadOnlySpan<byte>(buf, 0, len), ct); break;
-                case Protocol.JoinRoom:   await HandleJoinRoom(conn, buf, len, ct); break;
-                case Protocol.LeaveRoom:  await HandleLeaveRoom(conn, ct); break;
-                case Protocol.StartGame:  await HandleStartGame(conn, ct); break;
-                case Protocol.Rematch:    await HandleRematch(conn, ct); break;
-                case Protocol.Commands:   await FanOutCommands(conn, buf, len, ct); break;
-                case Protocol.Hash:       await FanOutHash(conn, buf, len, ct); break;
+                case Protocol.CreateRoom:  HandleCreateRoom(conn, new ReadOnlySpan<byte>(buf, 0, len), ct); break;
+                case Protocol.JoinRoom:    await HandleJoinRoom(conn, buf, len, ct); break;
+                case Protocol.LeaveRoom:   await HandleLeaveRoom(conn, ct); break;
+                case Protocol.StartGame:   await HandleStartGame(conn, ct); break;
+                case Protocol.Rematch:     await HandleRematch(conn, ct); break;
+                case Protocol.UpdateRoom:  await HandleUpdateRoom(conn, buf, len, ct); break;
+                case Protocol.KickPlayer:  await HandleKickPlayer(conn, buf, len, ct); break;
+                case Protocol.Commands:    await FanOutCommands(conn, buf, len, ct); break;
+                case Protocol.Hash:        await FanOutHash(conn, buf, len, ct); break;
                 default:
                     await SendError(conn, ErrorCode.UnknownMessageType, ct);
                     return;
@@ -317,7 +324,12 @@ public sealed class RelayServer
                 Connection? other;
                 lock (_connectionsLock) _connections.TryGetValue(id, out other);
                 if (other == null) continue;
-                try { await other.Ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "host-left", ct); } catch { }
+                try
+                {
+                    await SendError(other, ErrorCode.HostLeft, ct);
+                    await other.Ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "host-left", ct);
+                }
+                catch { }
             }
             _rooms.Remove(room, conn.RemoteIp);
             conn.CurrentRoom = null;
@@ -379,6 +391,126 @@ public sealed class RelayServer
         room.HighestSeenTick = 0;
         room.LastActivity = DateTime.UtcNow;
         Logger.Info($"conn={conn.Id} event=rematch code={room.Code}");
+        await BroadcastRoomState(room, ct);
+    }
+
+    /// <summary>
+    /// Host updates room settings (map, mode, slot count) while in the lobby.
+    /// Slot count must be >= the number of currently filled slots. Excess open
+    /// slots are trimmed; new open slots are added if count increases.
+    /// </summary>
+    private async Task HandleUpdateRoom(Connection conn, byte[] buf, int len, CancellationToken ct)
+    {
+        var room = conn.CurrentRoom;
+        if (room == null) { await SendError(conn, ErrorCode.NotInRoom, ct); return; }
+        if (room.HostId != conn.Id) { await SendError(conn, ErrorCode.NotHost, ct); return; }
+        if (room.Lifecycle != RoomLifecycle.Lobby) return;
+
+        // Parse — same layout as CreateRoom: [0x0A][slotCount][gameMode][mapNameLen:varint][mapName][blobLen:varint][blob]
+        ReadOnlySpan<byte> payload;
+        byte newSlotCount;
+        byte newGameMode;
+        string newMapName;
+        byte[] newMapBlob;
+        {
+            payload = new ReadOnlySpan<byte>(buf, 0, len);
+            if (payload.Length < 4) { await SendError(conn, ErrorCode.ProtocolMismatch, ct); return; }
+            newSlotCount = payload[1];
+            newGameMode = payload[2];
+            var (nameLen, c1) = Varint.Read(payload, 3);
+            int pos = 3 + c1;
+            if (pos + (int)nameLen > payload.Length) { await SendError(conn, ErrorCode.ProtocolMismatch, ct); return; }
+            newMapName = System.Text.Encoding.UTF8.GetString(payload.Slice(pos, (int)nameLen));
+            pos += (int)nameLen;
+            var (blobLen, c2) = Varint.Read(payload, pos); pos += c2;
+            if (pos + (int)blobLen > payload.Length) { await SendError(conn, ErrorCode.ProtocolMismatch, ct); return; }
+            newMapBlob = payload.Slice(pos, (int)blobLen).ToArray();
+        }
+
+        // Validate: new slot count must accommodate all currently filled slots.
+        int filledCount = room.Slots.Values.Count(s => s.OwnerId != null);
+        if (newSlotCount < filledCount || newSlotCount < 2)
+        {
+            await SendError(conn, ErrorCode.ProtocolMismatch, ct);
+            return;
+        }
+
+        // Rebuild slot layout. Preserve filled slots (re-derive TeamIds), trim/add open slots.
+        var filledSlots = room.Slots
+            .Where(kv => kv.Value.OwnerId != null)
+            .OrderBy(kv => kv.Key)
+            .ToList();
+        room.Slots.Clear();
+
+        // Re-seat filled slots into lowest available slot indices.
+        byte nextSlot = 0;
+        foreach (var kv in filledSlots)
+        {
+            byte newTeam = TeamForSlot(nextSlot, newGameMode);
+            room.Slots[nextSlot] = new SlotInfo(kv.Value.OwnerId, kv.Value.DisplayName,
+                nextSlot, newTeam, IsOpen: false, IsClosed: false);
+            // Update the connection's assigned player ID to the new slot index.
+            if (kv.Value.OwnerId is Guid oid)
+            {
+                Connection? c;
+                lock (_connectionsLock) _connections.TryGetValue(oid, out c);
+                if (c != null) c.AssignedPlayerId = nextSlot;
+            }
+            nextSlot++;
+        }
+        // Fill remaining with open slots.
+        for (byte i = nextSlot; i < newSlotCount; i++)
+            room.Slots[i] = new SlotInfo(null, "", i, TeamForSlot(i, newGameMode), IsOpen: true, IsClosed: false);
+
+        room.SlotCount = newSlotCount;
+        room.GameMode = newGameMode;
+        room.MapName = newMapName;
+        room.MapBlob = newMapBlob;
+        room.LastActivity = DateTime.UtcNow;
+
+        Logger.Info($"conn={conn.Id} event=room-updated code={room.Code} map={newMapName} slots={newSlotCount} mode={newGameMode}");
+        await BroadcastRoomState(room, ct);
+    }
+
+    /// <summary>
+    /// Host kicks a player from a lobby slot. The kicked player receives a
+    /// Kicked error before their socket is closed.
+    /// </summary>
+    private async Task HandleKickPlayer(Connection conn, byte[] buf, int len, CancellationToken ct)
+    {
+        var room = conn.CurrentRoom;
+        if (room == null) { await SendError(conn, ErrorCode.NotInRoom, ct); return; }
+        if (room.HostId != conn.Id) { await SendError(conn, ErrorCode.NotHost, ct); return; }
+        if (room.Lifecycle != RoomLifecycle.Lobby) return;
+        if (len < 2) { await SendError(conn, ErrorCode.ProtocolMismatch, ct); return; }
+
+        byte targetSlot = buf[1];
+        if (!room.Slots.TryGetValue(targetSlot, out var slotInfo) || slotInfo.OwnerId == null)
+            return; // nothing to kick
+        if (slotInfo.OwnerId == conn.Id)
+            return; // can't kick yourself
+
+        var targetId = slotInfo.OwnerId.Value;
+        Connection? target;
+        lock (_connectionsLock) _connections.TryGetValue(targetId, out target);
+
+        // Open the slot before notifying — the broadcast will show it as open.
+        room.Slots[targetSlot] = new SlotInfo(null, "", slotInfo.ColorIndex, slotInfo.TeamId, IsOpen: true, IsClosed: false);
+
+        if (target != null)
+        {
+            target.CurrentRoom = null;
+            target.AssignedPlayerId = null;
+            try
+            {
+                await SendError(target, ErrorCode.Kicked, ct);
+                await target.Ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "kicked", ct);
+            }
+            catch { }
+        }
+
+        room.LastActivity = DateTime.UtcNow;
+        Logger.Info($"conn={conn.Id} event=player-kicked code={room.Code} slot={targetSlot}");
         await BroadcastRoomState(room, ct);
     }
 

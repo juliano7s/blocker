@@ -26,18 +26,24 @@ public partial class SlotConfigScreen : Control
 	private Button? _hostStartBtn;
 	private Button? _hostCreateBtn;
 	private OptionButton? _hostGameModeOption;
+	private OptionButton? _hostMapOption;
 	private VBoxContainer? _hostLobbyContainer;
 	private string _hostRoomCode = "";
 	private int _hostLatestFilledSlots;
 	private string _hostPendingError = "";
 	private GameMode _hostSelectedMode = GameMode.Ffa;
 	private bool _hostRoomCreated;
+	private bool _hostSuppressMapSignal;
+	// Map catalog: filename → loaded MapData, populated once at setup.
+	private readonly List<(string FileName, MapData Data)> _mapCatalog = new();
 
 	// Join-only state.
 	private Label? _joinStatusLabel;
 	private VBoxContainer? _joinLobbyContainer;
 	private string _joinMapName = "";
 	private string _pendingError = "";
+	private Action? _relayClosedHandler;
+	private bool _joinNavigatingAway;
 
 	// Relay event handlers — assigned to fields so _ExitTree can unsubscribe
 	// when the scene is freed. Anonymous lambdas can't be detached, which
@@ -58,6 +64,14 @@ public partial class SlotConfigScreen : Control
 			return;
 		}
 
+		// Host mode: map selection is built into the lobby screen.
+		if (intent == MultiplayerIntent.Host)
+		{
+			SetupHostMode();
+			return;
+		}
+
+		// Single-player: still uses MapSelectScreen → SlotConfigScreen flow.
 		if (MapSelection.SelectedMapFileName == null)
 		{
 			GetTree().ChangeSceneToFile("res://Scenes/MapSelect.tscn");
@@ -69,12 +83,6 @@ public partial class SlotConfigScreen : Control
 		{
 			GD.PrintErr("Failed to load selected map");
 			GetTree().ChangeSceneToFile("res://Scenes/MapSelect.tscn");
-			return;
-		}
-
-		if (intent == MultiplayerIntent.Host)
-		{
-			SetupHostMode();
 			return;
 		}
 
@@ -200,10 +208,18 @@ public partial class SlotConfigScreen : Control
 	private void SetupHostMode()
 	{
 		_relay = MultiplayerLaunchData.Relay;
-		if (_relay == null || _mapData == null)
+		if (_relay == null)
 		{
 			GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
 			return;
+		}
+
+		// Build the map catalog once — load every available map so we can show
+		// names + slot counts in the dropdown and filter dynamically.
+		foreach (var fileName in MapFileManager.ListMaps())
+		{
+			var data = MapFileManager.Load(fileName);
+			if (data != null) _mapCatalog.Add((fileName, data));
 		}
 
 		var vbox = new VBoxContainer
@@ -219,9 +235,6 @@ public partial class SlotConfigScreen : Control
 		var backBtn = new Button { Text = "< Back" };
 		backBtn.Pressed += () =>
 		{
-			// Tear down the connection entirely — re-entering MultiplayerMenu
-			// spins up a fresh RelayClient. Keeping the old one around leaks
-			// background ReceiveLoop/SendLoop tasks against a dead socket.
 			_relay?.SendLeaveRoom();
 			_relay?.Dispose();
 			MultiplayerLaunchData.Relay = null;
@@ -230,60 +243,60 @@ public partial class SlotConfigScreen : Control
 		header.AddChild(backBtn);
 		var title = new Label
 		{
-			Text = $"Host: {_mapData.Name} ({_mapData.SlotCount} slots)",
+			Text = "Host Lobby",
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 			HorizontalAlignment = HorizontalAlignment.Center
 		};
 		title.AddThemeFontSizeOverride("font_size", 28);
 		header.AddChild(title);
 
-		// Rematch reattach: the relay already has a Lobby room from the previous
-		// game, so the Create Room step would double-create. Skip the picker and
-		// land directly on the lobby panel — the next RoomState fan-out from the
-		// rematch will populate it.
 		bool rematchReattach = MultiplayerLaunchData.RematchReattach;
 		MultiplayerLaunchData.RematchReattach = false;
 
+		// Map picker row.
+		var mapRow = new HBoxContainer();
+		mapRow.AddChild(new Label { Text = "Map:", CustomMinimumSize = new Vector2(60, 0) });
+		_hostMapOption = new OptionButton { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		PopulateMapDropdown(0); // no filter yet — 0 filled slots
+		if (_mapCatalog.Count > 0)
+		{
+			_hostMapOption.Selected = 0;
+			_mapData = _mapCatalog[0].Data;
+			MapSelection.SelectedMapFileName = _mapCatalog[0].FileName;
+		}
+		_hostMapOption.ItemSelected += OnHostMapSelected;
+		mapRow.AddChild(_hostMapOption);
+		vbox.AddChild(mapRow);
+
+		// Mode picker row.
+		var modeRow = new HBoxContainer();
+		modeRow.AddChild(new Label { Text = "Mode:", CustomMinimumSize = new Vector2(60, 0) });
+		_hostGameModeOption = new OptionButton();
+		_hostGameModeOption.AddItem("Free-for-all", (int)GameMode.Ffa);
+		_hostGameModeOption.AddItem("Teams", (int)GameMode.Teams);
+		_hostGameModeOption.Selected = 0;
+		_hostGameModeOption.ItemSelected += OnHostModeSelected;
+		modeRow.AddChild(_hostGameModeOption);
+		vbox.AddChild(modeRow);
+
 		if (!rematchReattach)
 		{
-			// Pre-creation panel: GameMode picker + Create button.
-			// Locked once the room is created (creating bakes mode/slot count into
-			// the room's TeamId assignments and the relay would have to tear it down
-			// to change them).
-			var modeRow = new HBoxContainer();
-			modeRow.AddChild(new Label { Text = "Game mode:" });
-			_hostGameModeOption = new OptionButton();
-			_hostGameModeOption.AddItem("Free-for-all", (int)GameMode.Ffa);
-			// Teams requires an even slot count: 2 → 1v1, 4 → 2v2, 6 → 3v3.
-			// Leave the option present but disabled for odd-slot maps so the host
-			// can see *why* it's not allowed instead of silently missing it.
-			_hostGameModeOption.AddItem("Teams", (int)GameMode.Teams);
-			if (_mapData.SlotCount % 2 != 0)
-				_hostGameModeOption.SetItemDisabled(1, true);
-			_hostGameModeOption.Selected = 0;
-			_hostGameModeOption.ItemSelected += (idx) =>
-				_hostSelectedMode = (GameMode)_hostGameModeOption.GetItemId((int)idx);
-			modeRow.AddChild(_hostGameModeOption);
-			vbox.AddChild(modeRow);
-
 			_hostCreateBtn = new Button { Text = "Create Room", CustomMinimumSize = new Vector2(0, 40) };
 			_hostCreateBtn.Pressed += OnHostCreateRoomPressed;
 			vbox.AddChild(_hostCreateBtn);
-
-			vbox.AddChild(new HSeparator());
 		}
 		else
 		{
-			// Already room-bound from the previous game; lock state accordingly.
 			_hostRoomCreated = true;
 		}
 
-		// Lobby panel — populated after RoomState arrives.
+		vbox.AddChild(new HSeparator());
+
 		_hostStatusLabel = new Label
 		{
 			Text = rematchReattach
 				? "Rematch lobby — waiting for player slots…"
-				: "Pick a game mode and click Create Room."
+				: "Select a map and click Create Room."
 		};
 		vbox.AddChild(_hostStatusLabel);
 
@@ -296,9 +309,6 @@ public partial class SlotConfigScreen : Control
 		_hostStartBtn.Pressed += OnHostStartPressed;
 		vbox.AddChild(_hostStartBtn);
 
-		// Relay events fire from the receive loop on a background thread. Capture
-		// the payload into fields and bounce to the main thread via CallDeferred
-		// with a 0-arg handler — Variant can't wrap arbitrary records.
 		_relayRoomStateHandler = (rs) =>
 		{
 			_latestRoomState = rs;
@@ -325,33 +335,86 @@ public partial class SlotConfigScreen : Control
 		drain.Timeout += () => _relay.DrainInbound();
 		AddChild(drain);
 
-		// If we're reattaching after a rematch, seed the lobby panel from the
-		// stashed RoomState so the host doesn't see an empty list.
 		if (MultiplayerLaunchData.PendingRoomState is { } pending)
 		{
 			_latestRoomState = pending;
 			_hostRoomCode = pending.Code;
 			_hostLatestFilledSlots = pending.Slots.Count(s => !s.IsOpen && !s.IsClosed);
 			MultiplayerLaunchData.PendingRoomState = null;
+
+			// Sync map/mode dropdowns from the existing room state on rematch.
+			_hostSelectedMode = pending.GameMode;
+			if (_hostGameModeOption != null)
+			{
+				for (int i = 0; i < _hostGameModeOption.ItemCount; i++)
+				{
+					if (_hostGameModeOption.GetItemId(i) == (int)pending.GameMode)
+					{ _hostGameModeOption.Selected = i; break; }
+				}
+			}
+			// Find the map by name in the catalog.
+			var mapEntry = _mapCatalog.Find(e => e.FileName == pending.MapName
+				|| e.FileName == pending.MapName + ".json");
+			if (mapEntry.Data != null)
+			{
+				_mapData = mapEntry.Data;
+				MapSelection.SelectedMapFileName = mapEntry.FileName;
+			}
+
 			OnHostRoomStateDeferred();
 		}
+	}
+
+	/// <summary>Populate the map dropdown with maps that have at least <paramref name="minSlots"/> slots.</summary>
+	private void PopulateMapDropdown(int minSlots)
+	{
+		if (_hostMapOption == null) return;
+		_hostMapOption.Clear();
+		foreach (var (fileName, data) in _mapCatalog)
+		{
+			if (data.SlotCount < minSlots) continue;
+			_hostMapOption.AddItem($"{data.Name} ({data.SlotCount} slots)");
+			// Metadata index stored as item ID so we can look up the catalog entry.
+			_hostMapOption.SetItemId(_hostMapOption.ItemCount - 1, _mapCatalog.IndexOf((fileName, data)));
+		}
+	}
+
+	private void OnHostMapSelected(long idx)
+	{
+		if (_hostSuppressMapSignal) return;
+		int catIdx = _hostMapOption!.GetItemId((int)idx);
+		if (catIdx < 0 || catIdx >= _mapCatalog.Count) return;
+		var (fileName, data) = _mapCatalog[catIdx];
+		_mapData = data;
+		MapSelection.SelectedMapFileName = fileName;
+
+		if (_hostRoomCreated)
+			SendUpdateRoom();
+	}
+
+	private void OnHostModeSelected(long idx)
+	{
+		_hostSelectedMode = (GameMode)_hostGameModeOption!.GetItemId((int)idx);
+		if (_hostRoomCreated)
+			SendUpdateRoom();
+	}
+
+	private void SendUpdateRoom()
+	{
+		if (_relay == null || _mapData == null) return;
+		var mapFileName = MapSelection.SelectedMapFileName ?? (_mapData.Name + ".json");
+		var mapBlob = System.Text.Encoding.UTF8.GetBytes(mapFileName);
+		_relay.SendUpdateRoom((byte)_mapData.SlotCount, _hostSelectedMode, mapFileName, mapBlob);
 	}
 
 	private void OnHostCreateRoomPressed()
 	{
 		if (_relay == null || _mapData == null || _hostRoomCreated) return;
 
-		// Lock the picker — every peer derives team from (slot, mode), so changing
-		// mode after slots have been claimed would silently rewrite teams under
-		// joiners. Easier to lock than to broadcast a re-team event.
 		_hostRoomCreated = true;
-		_hostGameModeOption!.Disabled = true;
 		_hostCreateBtn!.Disabled = true;
 		_hostStatusLabel!.Text = "Creating room…";
 
-		// Map blob is opaque to the relay; joiners load by name for M1/M2.
-		// We send the *file name* (e.g. "Lanes.json"), not the display name from the
-		// JSON metadata — joiners look the file up on disk by that exact name.
 		var mapFileName = MapSelection.SelectedMapFileName ?? (_mapData.Name + ".json");
 		var mapBlob = System.Text.Encoding.UTF8.GetBytes(mapFileName);
 		_relay.SendCreateRoom((byte)_mapData.SlotCount, _hostSelectedMode, mapFileName, mapBlob);
@@ -359,14 +422,83 @@ public partial class SlotConfigScreen : Control
 
 	private void OnHostRoomStateDeferred()
 	{
-		if (_mapData == null || _latestRoomState == null) return;
-		int total = _mapData.SlotCount;
-		bool ready = _hostLatestFilledSlots == total;
+		if (_latestRoomState == null) return;
+		int total = _latestRoomState.Slots.Length;
+		bool ready = _hostLatestFilledSlots >= 2;
 		_hostStatusLabel!.Text = ready
-			? $"Room code: {_hostRoomCode} — all {total} slots filled, ready to start"
-			: $"Room code: {_hostRoomCode} — waiting ({_hostLatestFilledSlots}/{total})…";
+			? $"Room code: {_hostRoomCode} — {_hostLatestFilledSlots}/{total} players, ready to start"
+			: $"Room code: {_hostRoomCode} — waiting for players ({_hostLatestFilledSlots}/{total})…";
 		_hostStartBtn!.Disabled = !ready;
-		RebuildLobbyList(_hostLobbyContainer!, _latestRoomState);
+
+		// Re-filter the map dropdown: can't pick maps with fewer slots than filled players.
+		// Suppress ItemSelected signal to avoid feedback loop (RoomState → repopulate → signal → UpdateRoom → RoomState).
+		if (_hostMapOption != null)
+		{
+			_hostSuppressMapSignal = true;
+			PopulateMapDropdown(_hostLatestFilledSlots);
+			if (_mapData != null)
+			{
+				for (int i = 0; i < _hostMapOption.ItemCount; i++)
+				{
+					int catIdx = _hostMapOption.GetItemId(i);
+					if (catIdx >= 0 && catIdx < _mapCatalog.Count && _mapCatalog[catIdx].Data == _mapData)
+					{ _hostMapOption.Selected = i; break; }
+				}
+			}
+			_hostSuppressMapSignal = false;
+		}
+
+		RebuildHostLobbyList();
+	}
+
+	/// <summary>Render the lobby list with kick buttons for non-host occupied slots.</summary>
+	private void RebuildHostLobbyList()
+	{
+		if (_hostLobbyContainer == null || _latestRoomState == null) return;
+		foreach (var child in _hostLobbyContainer.GetChildren())
+			child.QueueFree();
+
+		var rs = _latestRoomState;
+		string modeLabel = rs.GameMode == GameMode.Teams ? "Teams" : "FFA";
+		var header = new Label { Text = $"Mode: {modeLabel}  |  Slots: {rs.Slots.Length}" };
+		header.AddThemeFontSizeOverride("font_size", 16);
+		_hostLobbyContainer.AddChild(header);
+
+		for (int i = 0; i < rs.Slots.Length; i++)
+		{
+			var slot = rs.Slots[i];
+			string who;
+			if (slot.IsClosed) who = "(closed)";
+			else if (slot.IsOpen || string.IsNullOrEmpty(slot.DisplayName)) who = "(open)";
+			else who = slot.DisplayName;
+
+			string teamTag = rs.GameMode == GameMode.Teams
+				? $"Team {slot.TeamId + 1}"
+				: $"Player {slot.TeamId + 1}";
+
+			var row = new HBoxContainer();
+			row.AddChild(new Label { Text = $"Slot {i + 1}", CustomMinimumSize = new Vector2(70, 0) });
+			row.AddChild(new Label { Text = who, SizeFlagsHorizontal = SizeFlags.ExpandFill });
+			row.AddChild(new Label { Text = teamTag });
+
+			// Kick button for occupied non-host slots.
+			bool isOccupied = !slot.IsOpen && !slot.IsClosed && !string.IsNullOrEmpty(slot.DisplayName);
+			bool isHost = (i == 0 && !_hostRoomCreated) || (_latestRoomState != null && slot.DisplayName == rs.Slots[0].DisplayName && i == 0);
+			// Simpler: slot 0 is always the host after room creation (relay assigns host to slot 0).
+			// But after UpdateRoom the host may be re-seated. Check via the slot index in activeIds.
+			// Actually the host's connection is slot 0 on CreateRoom and re-seated to the lowest slot
+			// on UpdateRoom. The reliable check: the host is whoever is in the first filled slot.
+			// For now, just don't show kick on slot 0 (host is always re-seated there by the relay).
+			if (isOccupied && i != 0)
+			{
+				byte kickSlot = (byte)i;
+				var kickBtn = new Button { Text = "Kick", CustomMinimumSize = new Vector2(60, 0) };
+				kickBtn.Pressed += () => _relay?.SendKickPlayer(kickSlot);
+				row.AddChild(kickBtn);
+			}
+
+			_hostLobbyContainer.AddChild(row);
+		}
 	}
 
 	private void OnHostErrorDeferred()
@@ -443,12 +575,34 @@ public partial class SlotConfigScreen : Control
 		};
 		_relayErrorHandler = (code) =>
 		{
-			_pendingError = code.ToString();
-			CallDeferred(nameof(OnJoinErrorDeferred));
+			if (code == ErrorCode.HostLeft)
+			{
+				_pendingError = "Host left the lobby.";
+				CallDeferred(nameof(OnJoinDisconnectedDeferred));
+			}
+			else if (code == ErrorCode.Kicked)
+			{
+				_pendingError = "You were kicked from the lobby.";
+				CallDeferred(nameof(OnJoinDisconnectedDeferred));
+			}
+			else
+			{
+				_pendingError = code.ToString();
+				CallDeferred(nameof(OnJoinErrorDeferred));
+			}
+		};
+		_relayClosedHandler = () =>
+		{
+			// Fallback: if the connection closes without a HostLeft/Kicked error
+			// (e.g. network failure), still navigate back with a generic message.
+			if (string.IsNullOrEmpty(_pendingError))
+				_pendingError = "Connection lost.";
+			CallDeferred(nameof(OnJoinDisconnectedDeferred));
 		};
 		_relay.RoomStateReceived += _relayRoomStateHandler;
 		_relay.GameStarted += _relayGameStartedHandler;
 		_relay.ServerError += _relayErrorHandler;
+		_relay.ConnectionClosed += _relayClosedHandler;
 
 		var drain = new Godot.Timer { WaitTime = 0.016, Autostart = true };
 		drain.Timeout += () => _relay.DrainInbound();
@@ -477,6 +631,19 @@ public partial class SlotConfigScreen : Control
 
 	private void OnJoinErrorDeferred() => _joinStatusLabel!.Text = $"Error: {_pendingError}";
 
+	private void OnJoinDisconnectedDeferred()
+	{
+		if (_joinNavigatingAway) return;
+		_joinNavigatingAway = true;
+		// Clean up relay — it's dead or about to die.
+		_relay?.Dispose();
+		MultiplayerLaunchData.Relay = null;
+		// Show the reason briefly, then navigate back.
+		_joinStatusLabel!.Text = _pendingError;
+		var timer = GetTree().CreateTimer(1.5);
+		timer.Timeout += () => GetTree().ChangeSceneToFile("res://Scenes/MultiplayerMenu.tscn");
+	}
+
 	private void OnJoinGameStartedDeferred()
 	{
 		// M1/M2: the joiner loads the same map by name from local disk. Host and
@@ -497,15 +664,12 @@ public partial class SlotConfigScreen : Control
 
 	public override void _ExitTree()
 	{
-		// Detach from the long-lived RelayClient before this scene is freed.
-		// Without this, lambdas captured in SetupHostMode/SetupJoinMode keep
-		// firing on the next RoomState/GameStarted broadcast and try to call
-		// CallDeferred on a freed node — exposed by the rematch flow.
 		if (_relay != null)
 		{
 			if (_relayRoomStateHandler != null) _relay.RoomStateReceived -= _relayRoomStateHandler;
 			if (_relayGameStartedHandler != null) _relay.GameStarted -= _relayGameStartedHandler;
 			if (_relayErrorHandler != null) _relay.ServerError -= _relayErrorHandler;
+			if (_relayClosedHandler != null) _relay.ConnectionClosed -= _relayClosedHandler;
 		}
 	}
 
