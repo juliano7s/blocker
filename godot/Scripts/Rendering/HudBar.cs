@@ -1,4 +1,5 @@
 using Blocker.Game.Config;
+using Blocker.Simulation.Blocks;
 using Blocker.Simulation.Core;
 using Godot;
 
@@ -6,19 +7,18 @@ namespace Blocker.Game.Rendering;
 
 /// <summary>
 /// Bottom-of-screen HUD bar with three panels:
-/// Left = minimap, Center = unit info (placeholder), Right = command card (placeholder).
-/// Sits on a CanvasLayer above the game world.
+/// Left = minimap, Center = selection info, Right = command card.
 /// </summary>
 public partial class HudBar : CanvasLayer
 {
     private MinimapPanel _minimap = null!;
-    private PanelContainer _unitInfoPanel = null!;
-    private PanelContainer _commandPanel = null!;
-
-    private const float BarHeight = 150f;
-    private const float MinimapWidth = 200f;
+    private SelectionPanel _selectionPanel = null!;
+    private CommandCard _commandCard = null!;
 
     [Signal] public delegate void MinimapCameraJumpEventHandler(Vector2 worldPos);
+    [Signal] public delegate void ControlGroupClickedEventHandler(int groupIndex, bool ctrlHeld);
+    [Signal] public delegate void UnitClickedEventHandler(int blockId, bool shiftHeld);
+    [Signal] public delegate void CommandClickedEventHandler(string commandKey);
 
     public override void _Ready()
     {
@@ -27,54 +27,62 @@ public partial class HudBar : CanvasLayer
         // Anchor bar to bottom of screen
         var anchor = new Control();
         anchor.SetAnchorsPreset(Control.LayoutPreset.BottomWide);
-        anchor.OffsetTop = -BarHeight;
+        anchor.OffsetTop = -HudStyles.BottomBarHeight;
         anchor.OffsetBottom = 0;
         anchor.MouseFilter = Control.MouseFilterEnum.Ignore;
         AddChild(anchor);
 
         // Background panel
-        var bg = new ColorRect
-        {
-            Color = new Color(0.05f, 0.05f, 0.08f, 0.85f),
-            MouseFilter = Control.MouseFilterEnum.Ignore
-        };
+        var bg = new HudBarBackground();
         bg.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         anchor.AddChild(bg);
 
+        // Margin container for padding
+        var margin = new MarginContainer();
+        margin.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        margin.AddThemeConstantOverride("margin_left", 8);
+        margin.AddThemeConstantOverride("margin_right", 8);
+        margin.AddThemeConstantOverride("margin_top", 8);
+        margin.AddThemeConstantOverride("margin_bottom", 8);
+        anchor.AddChild(margin);
+
         // HBox for three panels
         var hbox = new HBoxContainer();
-        hbox.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        hbox.AddThemeConstantOverride("separation", 4);
+        hbox.AddThemeConstantOverride("separation", (int)HudStyles.PanelGap);
         hbox.MouseFilter = Control.MouseFilterEnum.Ignore;
-        anchor.AddChild(hbox);
+        margin.AddChild(hbox);
 
-        // Left: Minimap
+        // Left: Minimap (fixed width)
         _minimap = new MinimapPanel
         {
-            CustomMinimumSize = new Vector2(MinimapWidth, BarHeight),
+            CustomMinimumSize = new Vector2(HudStyles.FixedPanelWidth, 0),
             MouseFilter = Control.MouseFilterEnum.Stop
         };
         _minimap.SizeFlagsHorizontal = Control.SizeFlags.Fill;
+        _minimap.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         _minimap.CameraJumpRequested += pos => EmitSignal(SignalName.MinimapCameraJump, pos);
         hbox.AddChild(_minimap);
 
-        // Center: Unit info placeholder
-        _unitInfoPanel = new PanelContainer
+        // Center: Selection panel (flexible)
+        _selectionPanel = new SelectionPanel
         {
-            CustomMinimumSize = new Vector2(0, BarHeight),
-            MouseFilter = Control.MouseFilterEnum.Ignore
+            CustomMinimumSize = new Vector2(0, 0),
         };
-        _unitInfoPanel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        hbox.AddChild(_unitInfoPanel);
+        _selectionPanel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        _selectionPanel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+        _selectionPanel.ControlGroupClicked += (idx, ctrl) => EmitSignal(SignalName.ControlGroupClicked, idx, ctrl);
+        _selectionPanel.UnitClicked += (id, shift) => EmitSignal(SignalName.UnitClicked, id, shift);
+        hbox.AddChild(_selectionPanel);
 
-        // Right: Command card placeholder
-        _commandPanel = new PanelContainer
+        // Right: Command card (fixed width)
+        _commandCard = new CommandCard
         {
-            CustomMinimumSize = new Vector2(MinimapWidth, BarHeight),
-            MouseFilter = Control.MouseFilterEnum.Ignore
+            CustomMinimumSize = new Vector2(HudStyles.FixedPanelWidth, 0),
         };
-        _commandPanel.SizeFlagsHorizontal = Control.SizeFlags.Fill;
-        hbox.AddChild(_commandPanel);
+        _commandCard.SizeFlagsHorizontal = Control.SizeFlags.Fill;
+        _commandCard.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+        _commandCard.CommandClicked += key => EmitSignal(SignalName.CommandClicked, key);
+        hbox.AddChild(_commandCard);
     }
 
     public void SetGameState(GameState state) => _minimap.SetGameState(state);
@@ -83,5 +91,36 @@ public partial class HudBar : CanvasLayer
     public void SetCameraView(Vector2 worldPos, Vector2 viewSize)
     {
         _minimap.SetCameraView(worldPos, viewSize);
+    }
+
+    public void SetSelection(IReadOnlyList<Block>? blocks)
+    {
+        _selectionPanel.SetSelection(blocks);
+        _commandCard.SetSelection(blocks);
+    }
+
+    public void SetControlGroups(IReadOnlyDictionary<int, IReadOnlyList<int>>? groups)
+    {
+        _selectionPanel.SetControlGroups(groups);
+    }
+
+    /// <summary>Inner control for drawing the bar background.</summary>
+    private partial class HudBarBackground : Control
+    {
+        public override void _Draw()
+        {
+            var rect = new Rect2(Vector2.Zero, Size);
+            // Draw gradient background
+            var topRect = new Rect2(rect.Position, new Vector2(rect.Size.X, rect.Size.Y * 0.5f));
+            var bottomRect = new Rect2(
+                new Vector2(rect.Position.X, rect.Position.Y + rect.Size.Y * 0.5f),
+                new Vector2(rect.Size.X, rect.Size.Y * 0.5f));
+
+            DrawRect(topRect, HudStyles.PanelBgTop);
+            DrawRect(bottomRect, HudStyles.PanelBgBottom);
+
+            // Top border
+            DrawLine(new Vector2(0, 0), new Vector2(Size.X, 0), HudStyles.PanelBorder, HudStyles.PanelBorderWidth);
+        }
     }
 }
