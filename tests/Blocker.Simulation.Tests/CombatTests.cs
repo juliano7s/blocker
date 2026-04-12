@@ -207,4 +207,18 @@ public class CombatTests
         Assert.Contains(s0, state.Blocks);
         Assert.Contains(s1, state.Blocks);
     }
+
+    [Fact]
+    public void Block_PopCosts_MatchConstants()
+    {
+        var builder = new Block { Type = BlockType.Builder };
+        var wall = new Block { Type = BlockType.Wall };
+        var soldier = new Block { Type = BlockType.Soldier };
+        var stunner = new Block { Type = BlockType.Stunner };
+
+        Assert.Equal(1, builder.PopCost);
+        Assert.Equal(0, wall.PopCost);
+        Assert.Equal(1, soldier.PopCost);
+        Assert.Equal(3, stunner.PopCost);
+    }
 }

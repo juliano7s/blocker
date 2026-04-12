@@ -1,0 +1,321 @@
+{
+  "meta": {
+    "name": "default",
+    "version": 1,
+    "width": 41,
+    "height": 25,
+    "slots": 2
+  },
+  "ground": [
+    {
+      "x": 5,
+      "y": 2,
+      "type": "proto"
+    },
+    {
+      "x": 35,
+      "y": 2,
+      "type": "proto"
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "type": "boot"
+    },
+    {
+      "x": 36,
+      "y": 3,
+      "type": "boot"
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "type": "proto"
+    },
+    {
+      "x": 37,
+      "y": 4,
+      "type": "proto"
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "type": "proto"
+    },
+    {
+      "x": 13,
+      "y": 12,
+      "type": "overload"
+    },
+    {
+      "x": 27,
+      "y": 12,
+      "type": "overload"
+    },
+    {
+      "x": 39,
+      "y": 12,
+      "type": "proto"
+    },
+    {
+      "x": 3,
+      "y": 20,
+      "type": "proto"
+    },
+    {
+      "x": 37,
+      "y": 20,
+      "type": "proto"
+    },
+    {
+      "x": 4,
+      "y": 21,
+      "type": "boot"
+    },
+    {
+      "x": 36,
+      "y": 21,
+      "type": "boot"
+    },
+    {
+      "x": 5,
+      "y": 22,
+      "type": "proto"
+    },
+    {
+      "x": 35,
+      "y": 22,
+      "type": "proto"
+    }
+  ],
+  "terrain": [
+    {
+      "x": 20,
+      "y": 0,
+      "type": "terrain"
+    },
+    {
+      "x": 20,
+      "y": 1,
+      "type": "terrain"
+    },
+    {
+      "x": 20,
+      "y": 2,
+      "type": "terrain"
+    },
+    {
+      "x": 20,
+      "y": 3,
+      "type": "terrain"
+    },
+    {
+      "x": 20,
+      "y": 4,
+      "type": "terrain"
+    },
+    {
+      "x": 20,
+      "y": 5,
+      "type": "terrain"
+    },
+    {
+      "x": 20,
+      "y": 6,
+      "type": "terrain"
+    },
+    {
+      "x": 20,
+      "y": 18,
+      "type": "terrain"
+    },
+    {
+      "x": 20,
+      "y": 19,
+      "type": "terrain"
+    },
+    {
+      "x": 20,
+      "y": 20,
+      "type": "terrain"
+    },
+    {
+      "x": 20,
+      "y": 21,
+      "type": "terrain"
+    },
+    {
+      "x": 20,
+      "y": 22,
+      "type": "terrain"
+    },
+    {
+      "x": 20,
+      "y": 23,
+      "type": "terrain"
+    },
+    {
+      "x": 20,
+      "y": 24,
+      "type": "terrain"
+    }
+  ],
+  "units": [
+    {
+      "x": 1,
+      "y": 9,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 38,
+      "y": 9,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 39,
+      "y": 9,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 4,
+      "y": 10,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 36,
+      "y": 10,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 39,
+      "y": 10,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 5,
+      "y": 11,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 35,
+      "y": 11,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 3,
+      "y": 12,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 6,
+      "y": 12,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 7,
+      "y": 12,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 33,
+      "y": 12,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 34,
+      "y": 12,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 37,
+      "y": 12,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 5,
+      "y": 13,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 35,
+      "y": 13,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 4,
+      "y": 14,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 36,
+      "y": 14,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 39,
+      "y": 14,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 1,
+      "y": 15,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 2,
+      "y": 15,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 38,
+      "y": 15,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 39,
+      "y": 15,
+      "type": "wall",
+      "slot": 1
+    }
+  ]
+}

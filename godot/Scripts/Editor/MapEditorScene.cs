@@ -343,271 +343,276 @@ public partial class MapEditorScene : Node2D
 						if (existingBlock != null)
 							_editorState.RemoveBlock(existingBlock);
 						// Can't place on terrain
-						if (cell.Terrain != TerrainType.None) break;
-						EnsurePlayerExists(mirrorSlot);
-						_editorState.AddBlock(_currentBlock, mirrorSlot, new GridPos(mx, my));
-						break;
+                        if (cell.Terrain != TerrainType.None) break;
+                        EnsurePlayerExists(mirrorSlot);
+                        _editorState.AddBlock(_currentBlock, mirrorSlot, new GridPos(mx, my));
+                        break;
 
-					case EditorTool.Eraser:
-						cell.Ground = GroundType.Normal;
-						cell.Terrain = TerrainType.None;
-						if (existingBlock != null)
-							_editorState.RemoveBlock(existingBlock);
-						break;
-				}
-			}
+                    case EditorTool.Eraser:
+                        cell.Ground = GroundType.Normal;
+                        cell.Terrain = TerrainType.None;
+                        if (existingBlock != null)
+                            _editorState.RemoveBlock(existingBlock);
+                        break;
+                }
+            }
 
-			// Record after state
-			var newBlock = _editorState.GetBlockAt(new GridPos(mx, my));
-			var after = new CellSnapshot(mx, my, cell.Ground, cell.Terrain,
-				newBlock?.Type, newBlock != null ? (int?)newBlock.PlayerId : null);
+            // Record after state
+            var newBlock = _editorState.GetBlockAt(new GridPos(mx, my));
+            var after = new CellSnapshot(mx, my, cell.Ground, cell.Terrain,
+                newBlock?.Type, newBlock != null ? (int?)newBlock.PlayerId : null);
 
-			// Only record if something changed
-			if (before != after)
-			{
-				_dragAction?.Before.Add(before);
-				_dragAction?.After.Add(after);
-			}
-		}
+            // Only record if something changed
+            if (before != after)
+            {
+                _dragAction?.Before.Add(before);
+                _dragAction?.After.Add(after);
+            }
+        }
 
-		RefreshRenderer();
-	}
+        RefreshRenderer();
+    }
 
-	private void EnsurePlayerExists(int slotId)
-	{
-		if (_editorState.Players.Any(p => p.Id == slotId)) return;
-		_editorState.Players.Add(new Player { Id = slotId, TeamId = slotId });
-	}
+    private void EnsurePlayerExists(int slotId)
+    {
+        if (_editorState.Players.Any(p => p.Id == slotId)) return;
+        _editorState.Players.Add(new Player { Id = slotId, TeamId = slotId });
+    }
 
-	private void Undo()
-	{
-		var action = _actionStack.Undo();
-		if (action == null) return;
-		ApplySnapshots(action.Before);
-		RefreshRenderer();
-	}
+    private void Undo()
+    {
+        var action = _actionStack.Undo();
+        if (action == null) return;
+        ApplySnapshots(action.Before);
+        RefreshRenderer();
+    }
 
-	private void Redo()
-	{
-		var action = _actionStack.Redo();
-		if (action == null) return;
-		ApplySnapshots(action.After);
-		RefreshRenderer();
-	}
+    private void Redo()
+    {
+        var action = _actionStack.Redo();
+        if (action == null) return;
+        ApplySnapshots(action.After);
+        RefreshRenderer();
+    }
 
-	private void ApplySnapshots(List<CellSnapshot> snapshots)
-	{
-		foreach (var snap in snapshots)
-		{
-			var cell = _editorState.Grid[snap.X, snap.Y];
-			var existing = _editorState.GetBlockAt(new GridPos(snap.X, snap.Y));
-			if (existing != null)
-				_editorState.RemoveBlock(existing);
+    private void ApplySnapshots(List<CellSnapshot> snapshots)
+    {
+        foreach (var snap in snapshots)
+        {
+            var cell = _editorState.Grid[snap.X, snap.Y];
+            var existing = _editorState.GetBlockAt(new GridPos(snap.X, snap.Y));
+            if (existing != null)
+                _editorState.RemoveBlock(existing);
 
-			cell.Ground = snap.Ground;
-			cell.Terrain = snap.Terrain;
+            cell.Ground = snap.Ground;
+            cell.Terrain = snap.Terrain;
 
-			if (snap.UnitType.HasValue && snap.UnitSlot.HasValue)
-			{
-				EnsurePlayerExists(snap.UnitSlot.Value);
-				_editorState.AddBlock(snap.UnitType.Value, snap.UnitSlot.Value, new GridPos(snap.X, snap.Y));
-			}
-		}
-	}
+            if (snap.UnitType.HasValue && snap.UnitSlot.HasValue)
+            {
+                EnsurePlayerExists(snap.UnitSlot.Value);
+                _editorState.AddBlock(snap.UnitType.Value, snap.UnitSlot.Value, new GridPos(snap.X, snap.Y));
+            }
+        }
+    }
 
-	private void RefreshRenderer()
-	{
-		_gridRenderer.SetGameState(_editorState);
-		_minimap.SetGameState(_editorState);
-	}
+    private void RefreshRenderer()
+    {
+        _gridRenderer.SetGameState(_editorState);
+        _minimap.SetGameState(_editorState);
+    }
 
-	private void OnMinimapJump(Vector2 worldPos)
-	{
-		_camera.Position = worldPos;
-		ClampCamera();
-	}
+    private void OnMinimapJump(Vector2 worldPos)
+    {
+        _camera.Position = worldPos;
+        ClampCamera();
+    }
 
-	private void CenterCamera()
-	{
-		var gridPixelW = _mapWidth * GridRenderer.CellSize;
-		var gridPixelH = _mapHeight * GridRenderer.CellSize;
-		_camera.Position = new Vector2(gridPixelW * 0.5f + GridRenderer.GridPadding, gridPixelH * 0.5f + GridRenderer.GridPadding);
-	}
+    private void CenterCamera()
+    {
+        var gridPixelW = _mapWidth * GridRenderer.CellSize;
+        var gridPixelH = _mapHeight * GridRenderer.CellSize;
+        _camera.Position = new Vector2(gridPixelW * 0.5f + GridRenderer.GridPadding, gridPixelH * 0.5f + GridRenderer.GridPadding);
+    }
 
-	private void ClampCamera()
-	{
-		var gridPixelW = _mapWidth * GridRenderer.CellSize;
-		var gridPixelH = _mapHeight * GridRenderer.CellSize;
-		var effectiveViewW = GetViewportRect().Size.X / _camera.Zoom.X;
-		var effectiveViewH = GetViewportRect().Size.Y / _camera.Zoom.Y;
+    private void ClampCamera()
+    {
+        var gridPixelW = _mapWidth * GridRenderer.CellSize;
+        var gridPixelH = _mapHeight * GridRenderer.CellSize;
+        var effectiveViewW = GetViewportRect().Size.X / _camera.Zoom.X;
+        var effectiveViewH = GetViewportRect().Size.Y / _camera.Zoom.Y;
 
-		float marginX = effectiveViewW * 0.25f;
-		float marginY = effectiveViewH * 0.25f;
+        float marginX = effectiveViewW * 0.25f;
+        float marginY = effectiveViewH * 0.25f;
 
-		float minX = effectiveViewW >= gridPixelW ? gridPixelW * 0.5f : effectiveViewW * 0.5f - marginX + GridRenderer.GridPadding;
-		float maxX = effectiveViewW >= gridPixelW ? gridPixelW * 0.5f : gridPixelW - effectiveViewW * 0.5f + marginX + GridRenderer.GridPadding;
-		float minY = effectiveViewH >= gridPixelH ? gridPixelH * 0.5f : effectiveViewH * 0.5f - marginY + GridRenderer.GridPadding;
-		float maxY = effectiveViewH >= gridPixelH ? gridPixelH * 0.5f : gridPixelH - effectiveViewH * 0.5f + marginY + GridRenderer.GridPadding;
+        float minX = effectiveViewW >= gridPixelW ? gridPixelW * 0.5f : effectiveViewW * 0.5f - marginX + GridRenderer.GridPadding;
+        float maxX = effectiveViewW >= gridPixelW ? gridPixelW * 0.5f : gridPixelW - effectiveViewW * 0.5f + marginX + GridRenderer.GridPadding;
+        float minY = effectiveViewH >= gridPixelH ? gridPixelH * 0.5f : effectiveViewH * 0.5f - marginY + GridRenderer.GridPadding;
+        float maxY = effectiveViewH >= gridPixelH ? gridPixelH * 0.5f : gridPixelH - effectiveViewH * 0.5f + marginY + GridRenderer.GridPadding;
 
-		_camera.Position = new Vector2(
-			Mathf.Clamp(_camera.Position.X, minX, maxX),
-			Mathf.Clamp(_camera.Position.Y, minY, maxY)
-		);
-	}
+        _camera.Position = new Vector2(
+            Mathf.Clamp(_camera.Position.X, minX, maxX),
+            Mathf.Clamp(_camera.Position.Y, minY, maxY)
+        );
+    }
 
-	// --- Map operations ---
+    // --- Map operations ---
 
-	private void CreateNewMap(int width, int height, int slots)
-	{
-		_mapWidth = width;
-		_mapHeight = height;
-		_slotCount = slots;
-		_editorState = new GameState(new Grid(width, height));
-		_actionStack.Clear();
+    private void CreateNewMap(int width, int height, int slots)
+    {
+        _mapWidth = width;
+        _mapHeight = height;
+        _slotCount = slots;
+        _editorState = new GameState(new Grid(width, height));
+        _actionStack.Clear();
 
-		// Add default players for slot rendering
-		for (int i = 0; i < slots; i++)
-			EnsurePlayerExists(i);
-	}
+        // Add default players for slot rendering
+        for (int i = 0; i < slots; i++)
+            EnsurePlayerExists(i);
+    }
 
-	private MapData BuildMapData()
-	{
-		var ground = new List<GroundEntry>();
-		var terrain = new List<TerrainEntry>();
-		var units = new List<UnitEntry>();
-		var grid = _editorState.Grid;
+    private MapData BuildMapData()
+    {
+        var ground = new List<GroundEntry>();
+        var terrain = new List<TerrainEntry>();
+        var units = new List<UnitEntry>();
+        var grid = _editorState.Grid;
 
-		for (int y = 0; y < grid.Height; y++)
-		{
-			for (int x = 0; x < grid.Width; x++)
-			{
-				var cell = grid[x, y];
-				if (cell.Ground != GroundType.Normal)
-					ground.Add(new GroundEntry(x, y, cell.Ground));
-				if (cell.Terrain != TerrainType.None)
-					terrain.Add(new TerrainEntry(x, y, cell.Terrain));
-			}
-		}
+        for (int y = 0; y < grid.Height; y++)
+        {
+            for (int x = 0; x < grid.Width; x++)
+            {
+                var cell = grid[x, y];
+                if (cell.Ground != GroundType.Normal)
+                    ground.Add(new GroundEntry(x, y, cell.Ground));
+                if (cell.Terrain != TerrainType.None)
+                    terrain.Add(new TerrainEntry(x, y, cell.Terrain));
+            }
+        }
 
-		foreach (var block in _editorState.Blocks)
-			units.Add(new UnitEntry(block.Pos.X, block.Pos.Y, block.Type, block.PlayerId));
+        foreach (var block in _editorState.Blocks)
+            units.Add(new UnitEntry(block.Pos.X, block.Pos.Y, block.Type, block.PlayerId, block.IsFullyRooted && block.Type != BlockType.Wall));
 
-		return new MapData(_mapName, _mapWidth, _mapHeight, _slotCount, ground, terrain, units);
-	}
+        return new MapData(_mapName, _mapWidth, _mapHeight, _slotCount, ground, terrain, units);
+    }
 
-	private void LoadMapIntoEditor(MapData data)
-	{
-		_mapName = data.Name;
-		_mapWidth = data.Width;
-		_mapHeight = data.Height;
-		_slotCount = data.SlotCount;
+    private void LoadMapIntoEditor(MapData data)
+    {
+        _mapName = data.Name;
+        _mapWidth = data.Width;
+        _mapHeight = data.Height;
+        _slotCount = data.SlotCount;
 
-		_editorState = new GameState(new Grid(data.Width, data.Height));
-		_actionStack.Clear();
+        _editorState = new GameState(new Grid(data.Width, data.Height));
+        _actionStack.Clear();
 
-		// Apply ground
-		foreach (var g in data.Ground)
-			_editorState.Grid[g.X, g.Y].Ground = g.Type;
+        // Apply ground
+        foreach (var g in data.Ground)
+            _editorState.Grid[g.X, g.Y].Ground = g.Type;
 
-		// Apply terrain
-		foreach (var t in data.Terrain)
-			_editorState.Grid[t.X, t.Y].Terrain = t.Type;
+        // Apply terrain
+        foreach (var t in data.Terrain)
+            _editorState.Grid[t.X, t.Y].Terrain = t.Type;
 
-		// Place units
-		foreach (var u in data.Units)
-		{
-			EnsurePlayerExists(u.SlotId);
-			_editorState.AddBlock(u.Type, u.SlotId, new GridPos(u.X, u.Y));
-		}
+        // Place units
+        foreach (var u in data.Units)
+        {
+            EnsurePlayerExists(u.SlotId);
+            var block = _editorState.AddBlock(u.Type, u.SlotId, new GridPos(u.X, u.Y));
+            if (u.Rooted && u.Type != BlockType.Wall)
+            {
+                block.State = BlockState.Rooted;
+                block.RootProgress = Constants.RootTicks;
+            }
+        }
 
-		// Update toolbar
-		_toolbar.SetMapName(_mapName);
-		_toolbar.SetSlotCount(_slotCount);
+        // Update toolbar
+        _toolbar.SetMapName(_mapName);
+        _toolbar.SetSlotCount(_slotCount);
 
-		CenterCamera();
-		RefreshRenderer();
-		RefreshGuides();
-	}
+        CenterCamera();
+        RefreshRenderer();
+        RefreshGuides();
+    }
 
-	// --- Toolbar event handlers ---
+    // --- Toolbar event handlers ---
 
-	private void OnToolSelected(EditorTool tool) => _currentTool = tool;
-	private void OnGroundSelected(GroundType ground)
-	{
-		_currentGround = ground;
-		_currentTool = EditorTool.GroundPaint;
-	}
-	private void OnTerrainSelected(TerrainType terrain)
-	{
-		_currentTerrain = terrain;
-		_currentTool = EditorTool.TerrainPaint;
-	}
-	private void OnBlockSelected(BlockType block)
-	{
-		_currentBlock = block;
-		_currentTool = EditorTool.UnitPlace;
-	}
-	private void OnSlotSelected(int slot) => _currentSlot = slot;
-	private void OnSymmetryChanged(SymmetryMode mode) => _symmetry.Mode = mode;
+    private void OnToolSelected(EditorTool tool) => _currentTool = tool;
+    private void OnGroundSelected(GroundType ground)
+    {
+        _currentGround = ground;
+        _currentTool = EditorTool.GroundPaint;
+    }
+    private void OnTerrainSelected(TerrainType terrain)
+    {
+        _currentTerrain = terrain;
+        _currentTool = EditorTool.TerrainPaint;
+    }
+    private void OnBlockSelected(BlockType block)
+    {
+        _currentBlock = block;
+        _currentTool = EditorTool.UnitPlace;
+    }
+    private void OnSlotSelected(int slot) => _currentSlot = slot;
+    private void OnSymmetryChanged(SymmetryMode mode) => _symmetry.Mode = mode;
 
-	private void OnNewMapRequested(int width, int height, int slots)
-	{
-		CreateNewMap(width, height, slots);
-		_mapName = "Untitled";
-		_toolbar.SetMapName(_mapName);
-		_toolbar.SetSlotCount(slots);
-		CenterCamera();
-		RefreshRenderer();
-		RefreshGuides();
-	}
+    private void OnNewMapRequested(int width, int height, int slots)
+    {
+        CreateNewMap(width, height, slots);
+        _mapName = "Untitled";
+        _toolbar.SetMapName(_mapName);
+        _toolbar.SetSlotCount(slots);
+        CenterCamera();
+        RefreshRenderer();
+        RefreshGuides();
+    }
 
-	private void OnSaveRequested()
-	{
-		var data = BuildMapData();
-		var fileName = SanitizeFileName(_mapName) + ".json";
-		MapFileManager.Save(data, fileName);
-	}
+    private void OnSaveRequested()
+    {
+        var data = BuildMapData();
+        var fileName = SanitizeFileName(_mapName) + ".json";
+        MapFileManager.Save(data, fileName);
+    }
 
-	private void OnLoadRequested(string fileName)
-	{
-		var data = MapFileManager.Load(fileName);
-		if (data != null)
-			LoadMapIntoEditor(data);
-	}
+    private void OnLoadRequested(string fileName)
+    {
+        var data = MapFileManager.Load(fileName);
+        if (data != null)
+            LoadMapIntoEditor(data);
+    }
 
-	private void OnBackRequested()
-	{
-		GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
-	}
+    private void OnBackRequested()
+    {
+        GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
+    }
 
-	private void OnGuidesToggled(bool show)
-	{
-		_showGuides = show;
-		if (_guideOverlay is GuideOverlay overlay)
-		{
-			overlay.ShowGuides = show;
-			overlay.MapWidth = _mapWidth;
-			overlay.MapHeight = _mapHeight;
-			overlay.QueueRedraw();
-		}
-	}
+    private void OnGuidesToggled(bool show)
+    {
+        _showGuides = show;
+        if (_guideOverlay is GuideOverlay overlay)
+        {
+            overlay.ShowGuides = show;
+            overlay.MapWidth = _mapWidth;
+            overlay.MapHeight = _mapHeight;
+            overlay.QueueRedraw();
+        }
+    }
 
-	private static string SanitizeFileName(string name)
-	{
-		var invalid = System.IO.Path.GetInvalidFileNameChars();
-		var sanitized = string.Join("_", name.Split(invalid, System.StringSplitOptions.RemoveEmptyEntries));
-		return string.IsNullOrWhiteSpace(sanitized) ? "Untitled" : sanitized.Trim();
-	}
+    private static string SanitizeFileName(string name)
+    {
+        var invalid = System.IO.Path.GetInvalidFileNameChars();
+        var sanitized = string.Join("_", name.Split(invalid, System.StringSplitOptions.RemoveEmptyEntries));
+        return string.IsNullOrWhiteSpace(sanitized) ? "Untitled" : sanitized.Trim();
+    }
 
-	private void RefreshGuides()
-	{
-		if (_guideOverlay is GuideOverlay overlay)
-		{
-			overlay.MapWidth = _mapWidth;
-			overlay.MapHeight = _mapHeight;
-			overlay.QueueRedraw();
-		}
-	}
+    private void RefreshGuides()
+    {
+        if (_guideOverlay is GuideOverlay overlay)
+        {
+            overlay.MapWidth = _mapWidth;
+            overlay.MapHeight = _mapHeight;
+            overlay.QueueRedraw();
+        }
+    }
 }
 
 /// <summary>
@@ -615,24 +620,24 @@ public partial class MapEditorScene : Node2D
 /// </summary>
 public partial class GuideOverlay : Node2D
 {
-	public bool ShowGuides { get; set; }
-	public int MapWidth { get; set; }
-	public int MapHeight { get; set; }
+    public bool ShowGuides { get; set; }
+    public int MapWidth { get; set; }
+    public int MapHeight { get; set; }
 
-	private static readonly Color GuideColor = new(1f, 1f, 0f, 0.5f);
+    private static readonly Color GuideColor = new(1f, 1f, 0f, 0.5f);
 
-	public override void _Draw()
-	{
-		if (!ShowGuides || MapWidth == 0 || MapHeight == 0) return;
+    public override void _Draw()
+    {
+        if (!ShowGuides || MapWidth == 0 || MapHeight == 0) return;
 
-		float gridW = MapWidth * GridRenderer.CellSize;
-		float gridH = MapHeight * GridRenderer.CellSize;
-		float centerX = gridW * 0.5f + GridRenderer.GridPadding;
-		float centerY = gridH * 0.5f + GridRenderer.GridPadding;
+        float gridW = MapWidth * GridRenderer.CellSize;
+        float gridH = MapHeight * GridRenderer.CellSize;
+        float centerX = gridW * 0.5f + GridRenderer.GridPadding;
+        float centerY = gridH * 0.5f + GridRenderer.GridPadding;
 
-		// Vertical center line
-		DrawLine(new Vector2(centerX, GridRenderer.GridPadding), new Vector2(centerX, gridH + GridRenderer.GridPadding), GuideColor, 2f);
-		// Horizontal center line
-		DrawLine(new Vector2(GridRenderer.GridPadding, centerY), new Vector2(gridW + GridRenderer.GridPadding, centerY), GuideColor, 2f);
-	}
+        // Vertical center line
+        DrawLine(new Vector2(centerX, GridRenderer.GridPadding), new Vector2(centerX, gridH + GridRenderer.GridPadding), GuideColor, 2f);
+        // Horizontal center line
+        DrawLine(new Vector2(GridRenderer.GridPadding, centerY), new Vector2(gridW + GridRenderer.GridPadding, centerY), GuideColor, 2f);
+    }
 }

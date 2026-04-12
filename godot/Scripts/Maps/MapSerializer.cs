@@ -29,7 +29,7 @@ public static class MapSerializer
             },
             Ground = data.Ground.Select(g => new JsonGroundEntry { X = g.X, Y = g.Y, Type = g.Type }).ToList(),
             Terrain = data.Terrain.Select(t => new JsonTerrainEntry { X = t.X, Y = t.Y, Type = t.Type }).ToList(),
-            Units = data.Units.Select(u => new JsonUnitEntry { X = u.X, Y = u.Y, Type = u.Type, Slot = u.SlotId }).ToList()
+            Units = data.Units.Select(u => new JsonUnitEntry { X = u.X, Y = u.Y, Type = u.Type, Slot = u.SlotId, Rooted = u.Rooted }).ToList()
         };
         return JsonSerializer.Serialize(json, Options);
     }
@@ -46,7 +46,7 @@ public static class MapSerializer
             SlotCount: file.Meta.Slots,
             Ground: file.Ground.Select(g => new GroundEntry(g.X, g.Y, g.Type)).ToList(),
             Terrain: file.Terrain.Select(t => new TerrainEntry(t.X, t.Y, t.Type)).ToList(),
-            Units: file.Units.Select(u => new UnitEntry(u.X, u.Y, u.Type, u.Slot)).ToList()
+            Units: file.Units.Select(u => new UnitEntry(u.X, u.Y, u.Type, u.Slot, u.Rooted)).ToList()
         );
     }
 
@@ -88,5 +88,6 @@ public static class MapSerializer
         public int Y { get; set; }
         public BlockType Type { get; set; }
         public int Slot { get; set; }
+        public bool Rooted { get; set; }
     }
 }

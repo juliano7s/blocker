@@ -16,7 +16,6 @@ namespace Blocker.Game;
 /// </summary>
 public partial class GameManager : Node2D
 {
-	[Export] public string MapPath = "res://../maps/test-small.txt";
 	[Export] public GameConfig Config { get; set; } = null!;
 
 	private GridRenderer _gridRenderer = null!;
@@ -47,33 +46,19 @@ public partial class GameManager : Node2D
 		Config ??= GameConfig.CreateDefault();
 		Constants.Initialize(Config.ToSimulationConfig());
 
-		// Load map — either from GameLaunchData (Play vs AI flow) or legacy file
-		GameState gameState;
-		if (GameLaunchData.MapData != null && GameLaunchData.Assignments != null)
-		{
-			gameState = MapLoader.Load(GameLaunchData.MapData, GameLaunchData.Assignments);
-			GD.Print($"Map loaded from launcher: {GameLaunchData.MapData.Name} " +
-					 $"{gameState.Grid.Width}x{gameState.Grid.Height}, {gameState.Blocks.Count} blocks");
-			// Stash for rematch — _Ready clears the static slots so a fresh launch
-			// after returning to MainMenu doesn't accidentally inherit stale data.
-			_launchMap = GameLaunchData.MapData;
-			_launchAssignments = GameLaunchData.Assignments;
-			GameLaunchData.MapData = null;
-			GameLaunchData.Assignments = null;
-		}
-		else
-		{
-			var absolutePath = ProjectSettings.GlobalizePath(MapPath);
-			if (!Godot.FileAccess.FileExists(MapPath) && !System.IO.File.Exists(absolutePath))
-			{
-				absolutePath = System.IO.Path.Combine(
-					System.IO.Path.GetDirectoryName(ProjectSettings.GlobalizePath("res://"))!,
-					"..", "maps", "test-small.txt"
-				);
-			}
-			GD.Print($"Loading map from: {absolutePath}");
-			gameState = MapLoader.LoadFromFile(absolutePath);
-		}
+		// Load map from GameLaunchData (set by SlotConfigScreen for both SP and MP)
+		if (GameLaunchData.MapData == null || GameLaunchData.Assignments == null)
+			throw new System.Exception("GameLaunchData.MapData and Assignments must be set before launching the game.");
+
+		GameState gameState = MapLoader.Load(GameLaunchData.MapData, GameLaunchData.Assignments);
+		GD.Print($"Map loaded from launcher: {GameLaunchData.MapData.Name} " +
+				 $"{gameState.Grid.Width}x{gameState.Grid.Height}, {gameState.Blocks.Count} blocks");
+		// Stash for rematch — _Ready clears the static slots so a fresh launch
+		// after returning to MainMenu doesn't accidentally inherit stale data.
+		_launchMap = GameLaunchData.MapData;
+		_launchAssignments = GameLaunchData.Assignments;
+		GameLaunchData.MapData = null;
+		GameLaunchData.Assignments = null;
 		GD.Print($"Map loaded: {gameState.Grid.Width}x{gameState.Grid.Height}, {gameState.Blocks.Count} blocks, {gameState.Players.Count} players");
 		foreach (var block in gameState.Blocks)
 			GD.Print($"  Block id={block.Id} {block.Type} P{block.PlayerId} at {block.Pos}");

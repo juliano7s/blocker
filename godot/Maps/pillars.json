@@ -1,0 +1,401 @@
+{
+  "meta": {
+    "name": "pillars",
+    "version": 1,
+    "width": 41,
+    "height": 25,
+    "slots": 2
+  },
+  "ground": [
+    {
+      "x": 5,
+      "y": 2,
+      "type": "proto"
+    },
+    {
+      "x": 35,
+      "y": 2,
+      "type": "proto"
+    },
+    {
+      "x": 18,
+      "y": 6,
+      "type": "boot"
+    },
+    {
+      "x": 22,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "type": "proto"
+    },
+    {
+      "x": 9,
+      "y": 12,
+      "type": "boot"
+    },
+    {
+      "x": 15,
+      "y": 12,
+      "type": "overload"
+    },
+    {
+      "x": 25,
+      "y": 12,
+      "type": "overload"
+    },
+    {
+      "x": 31,
+      "y": 12,
+      "type": "boot"
+    },
+    {
+      "x": 39,
+      "y": 12,
+      "type": "proto"
+    },
+    {
+      "x": 18,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 22,
+      "y": 18,
+      "type": "boot"
+    },
+    {
+      "x": 5,
+      "y": 22,
+      "type": "proto"
+    },
+    {
+      "x": 35,
+      "y": 22,
+      "type": "proto"
+    }
+  ],
+  "terrain": [
+    {
+      "x": 9,
+      "y": 4,
+      "type": "terrain"
+    },
+    {
+      "x": 10,
+      "y": 4,
+      "type": "terrain"
+    },
+    {
+      "x": 30,
+      "y": 4,
+      "type": "terrain"
+    },
+    {
+      "x": 31,
+      "y": 4,
+      "type": "terrain"
+    },
+    {
+      "x": 9,
+      "y": 5,
+      "type": "terrain"
+    },
+    {
+      "x": 10,
+      "y": 5,
+      "type": "terrain"
+    },
+    {
+      "x": 30,
+      "y": 5,
+      "type": "terrain"
+    },
+    {
+      "x": 31,
+      "y": 5,
+      "type": "terrain"
+    },
+    {
+      "x": 14,
+      "y": 8,
+      "type": "terrain"
+    },
+    {
+      "x": 15,
+      "y": 8,
+      "type": "terrain"
+    },
+    {
+      "x": 25,
+      "y": 8,
+      "type": "terrain"
+    },
+    {
+      "x": 26,
+      "y": 8,
+      "type": "terrain"
+    },
+    {
+      "x": 14,
+      "y": 9,
+      "type": "terrain"
+    },
+    {
+      "x": 15,
+      "y": 9,
+      "type": "terrain"
+    },
+    {
+      "x": 25,
+      "y": 9,
+      "type": "terrain"
+    },
+    {
+      "x": 26,
+      "y": 9,
+      "type": "terrain"
+    },
+    {
+      "x": 14,
+      "y": 15,
+      "type": "terrain"
+    },
+    {
+      "x": 15,
+      "y": 15,
+      "type": "terrain"
+    },
+    {
+      "x": 25,
+      "y": 15,
+      "type": "terrain"
+    },
+    {
+      "x": 26,
+      "y": 15,
+      "type": "terrain"
+    },
+    {
+      "x": 14,
+      "y": 16,
+      "type": "terrain"
+    },
+    {
+      "x": 15,
+      "y": 16,
+      "type": "terrain"
+    },
+    {
+      "x": 25,
+      "y": 16,
+      "type": "terrain"
+    },
+    {
+      "x": 26,
+      "y": 16,
+      "type": "terrain"
+    },
+    {
+      "x": 9,
+      "y": 19,
+      "type": "terrain"
+    },
+    {
+      "x": 10,
+      "y": 19,
+      "type": "terrain"
+    },
+    {
+      "x": 30,
+      "y": 19,
+      "type": "terrain"
+    },
+    {
+      "x": 31,
+      "y": 19,
+      "type": "terrain"
+    },
+    {
+      "x": 9,
+      "y": 20,
+      "type": "terrain"
+    },
+    {
+      "x": 10,
+      "y": 20,
+      "type": "terrain"
+    },
+    {
+      "x": 30,
+      "y": 20,
+      "type": "terrain"
+    },
+    {
+      "x": 31,
+      "y": 20,
+      "type": "terrain"
+    }
+  ],
+  "units": [
+    {
+      "x": 1,
+      "y": 9,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 38,
+      "y": 9,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 39,
+      "y": 9,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 39,
+      "y": 10,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 4,
+      "y": 11,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 36,
+      "y": 11,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 37,
+      "y": 11,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 3,
+      "y": 12,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 4,
+      "y": 12,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 5,
+      "y": 12,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 35,
+      "y": 12,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 36,
+      "y": 12,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 37,
+      "y": 12,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 3,
+      "y": 13,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 4,
+      "y": 13,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 36,
+      "y": 13,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 37,
+      "y": 13,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 39,
+      "y": 14,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 1,
+      "y": 15,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 2,
+      "y": 15,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 38,
+      "y": 15,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 39,
+      "y": 15,
+      "type": "wall",
+      "slot": 1
+    }
+  ]
+}

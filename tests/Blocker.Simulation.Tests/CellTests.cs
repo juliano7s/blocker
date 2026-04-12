@@ -47,4 +47,20 @@ public class CellTests
         Assert.Equal(GroundType.Overload, cell.Ground);
         Assert.True(cell.IsNestZone);
     }
+
+    [Fact]
+    public void GridPos_ChebyshevDistance()
+    {
+        var a = new GridPos(0, 0);
+        var b = new GridPos(3, 4);
+        Assert.Equal(4, a.ChebyshevDistance(b));
+    }
+
+    [Fact]
+    public void GridPos_ManhattanDistance()
+    {
+        var a = new GridPos(0, 0);
+        var b = new GridPos(3, 4);
+        Assert.Equal(7, a.ManhattanDistance(b));
+    }
 }

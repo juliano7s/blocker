@@ -1,0 +1,229 @@
+{
+  "meta": {
+    "name": "4v4 box",
+    "version": 1,
+    "width": 41,
+    "height": 41,
+    "slots": 4
+  },
+  "ground": [],
+  "terrain": [],
+  "units": [
+    {
+      "x": 2,
+      "y": 2,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 38,
+      "y": 2,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 37,
+      "y": 2,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 36,
+      "y": 2,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 36,
+      "y": 3,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 37,
+      "y": 3,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 38,
+      "y": 3,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 38,
+      "y": 4,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 37,
+      "y": 4,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 36,
+      "y": 4,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 2,
+      "y": 38,
+      "type": "builder",
+      "slot": 2
+    },
+    {
+      "x": 3,
+      "y": 38,
+      "type": "builder",
+      "slot": 2
+    },
+    {
+      "x": 4,
+      "y": 38,
+      "type": "builder",
+      "slot": 2
+    },
+    {
+      "x": 4,
+      "y": 37,
+      "type": "builder",
+      "slot": 2
+    },
+    {
+      "x": 3,
+      "y": 37,
+      "type": "builder",
+      "slot": 2
+    },
+    {
+      "x": 2,
+      "y": 37,
+      "type": "builder",
+      "slot": 2
+    },
+    {
+      "x": 2,
+      "y": 36,
+      "type": "builder",
+      "slot": 2
+    },
+    {
+      "x": 3,
+      "y": 36,
+      "type": "builder",
+      "slot": 2
+    },
+    {
+      "x": 4,
+      "y": 36,
+      "type": "builder",
+      "slot": 2
+    },
+    {
+      "x": 38,
+      "y": 38,
+      "type": "builder",
+      "slot": 3
+    },
+    {
+      "x": 38,
+      "y": 37,
+      "type": "builder",
+      "slot": 3
+    },
+    {
+      "x": 38,
+      "y": 36,
+      "type": "builder",
+      "slot": 3
+    },
+    {
+      "x": 37,
+      "y": 36,
+      "type": "builder",
+      "slot": 3
+    },
+    {
+      "x": 36,
+      "y": 36,
+      "type": "builder",
+      "slot": 3
+    },
+    {
+      "x": 36,
+      "y": 37,
+      "type": "builder",
+      "slot": 3
+    },
+    {
+      "x": 36,
+      "y": 38,
+      "type": "builder",
+      "slot": 3
+    },
+    {
+      "x": 37,
+      "y": 38,
+      "type": "builder",
+      "slot": 3
+    },
+    {
+      "x": 37,
+      "y": 37,
+      "type": "builder",
+      "slot": 3
+    }
+  ]
+}

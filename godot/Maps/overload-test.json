@@ -1,0 +1,1035 @@
+{
+  "meta": {
+    "name": "overload-test",
+    "version": 1,
+    "width": 41,
+    "height": 25,
+    "slots": 2
+  },
+  "ground": [
+    {
+      "x": 2,
+      "y": 1,
+      "type": "boot"
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "type": "boot"
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "type": "boot"
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "type": "boot"
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "type": "boot"
+    },
+    {
+      "x": 35,
+      "y": 1,
+      "type": "boot"
+    },
+    {
+      "x": 37,
+      "y": 1,
+      "type": "boot"
+    },
+    {
+      "x": 38,
+      "y": 1,
+      "type": "boot"
+    },
+    {
+      "x": 39,
+      "y": 1,
+      "type": "boot"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "type": "boot"
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "type": "boot"
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "type": "boot"
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "type": "boot"
+    },
+    {
+      "x": 35,
+      "y": 3,
+      "type": "boot"
+    },
+    {
+      "x": 36,
+      "y": 3,
+      "type": "boot"
+    },
+    {
+      "x": 37,
+      "y": 3,
+      "type": "boot"
+    },
+    {
+      "x": 39,
+      "y": 3,
+      "type": "boot"
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 5,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 7,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 9,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 11,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 13,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 15,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 17,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 19,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 21,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 23,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 25,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 27,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 29,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 31,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 33,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 35,
+      "y": 6,
+      "type": "proto"
+    },
+    {
+      "x": 11,
+      "y": 12,
+      "type": "overload"
+    },
+    {
+      "x": 19,
+      "y": 12,
+      "type": "overload"
+    },
+    {
+      "x": 28,
+      "y": 12,
+      "type": "overload"
+    },
+    {
+      "x": 3,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 5,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 7,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 9,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 11,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 13,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 15,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 17,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 19,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 21,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 23,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 25,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 27,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 29,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 31,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 33,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 35,
+      "y": 18,
+      "type": "proto"
+    },
+    {
+      "x": 2,
+      "y": 21,
+      "type": "boot"
+    },
+    {
+      "x": 3,
+      "y": 21,
+      "type": "boot"
+    },
+    {
+      "x": 4,
+      "y": 21,
+      "type": "boot"
+    },
+    {
+      "x": 5,
+      "y": 21,
+      "type": "boot"
+    },
+    {
+      "x": 6,
+      "y": 21,
+      "type": "boot"
+    },
+    {
+      "x": 35,
+      "y": 21,
+      "type": "boot"
+    },
+    {
+      "x": 37,
+      "y": 21,
+      "type": "boot"
+    },
+    {
+      "x": 38,
+      "y": 21,
+      "type": "boot"
+    },
+    {
+      "x": 39,
+      "y": 21,
+      "type": "boot"
+    },
+    {
+      "x": 2,
+      "y": 23,
+      "type": "boot"
+    },
+    {
+      "x": 3,
+      "y": 23,
+      "type": "boot"
+    },
+    {
+      "x": 4,
+      "y": 23,
+      "type": "boot"
+    },
+    {
+      "x": 5,
+      "y": 23,
+      "type": "boot"
+    },
+    {
+      "x": 6,
+      "y": 23,
+      "type": "boot"
+    },
+    {
+      "x": 35,
+      "y": 23,
+      "type": "boot"
+    },
+    {
+      "x": 36,
+      "y": 23,
+      "type": "boot"
+    },
+    {
+      "x": 37,
+      "y": 23,
+      "type": "boot"
+    },
+    {
+      "x": 38,
+      "y": 23,
+      "type": "boot"
+    },
+    {
+      "x": 39,
+      "y": 23,
+      "type": "boot"
+    }
+  ],
+  "terrain": [
+    {
+      "x": 10,
+      "y": 10,
+      "type": "terrain"
+    },
+    {
+      "x": 11,
+      "y": 10,
+      "type": "breakableWall"
+    },
+    {
+      "x": 12,
+      "y": 10,
+      "type": "terrain"
+    },
+    {
+      "x": 27,
+      "y": 10,
+      "type": "fragileWall"
+    },
+    {
+      "x": 28,
+      "y": 10,
+      "type": "terrain"
+    },
+    {
+      "x": 29,
+      "y": 10,
+      "type": "fragileWall"
+    },
+    {
+      "x": 10,
+      "y": 14,
+      "type": "breakableWall"
+    },
+    {
+      "x": 11,
+      "y": 14,
+      "type": "terrain"
+    },
+    {
+      "x": 12,
+      "y": 14,
+      "type": "breakableWall"
+    },
+    {
+      "x": 27,
+      "y": 14,
+      "type": "fragileWall"
+    },
+    {
+      "x": 28,
+      "y": 14,
+      "type": "terrain"
+    },
+    {
+      "x": 29,
+      "y": 14,
+      "type": "fragileWall"
+    }
+  ],
+  "units": [
+    {
+      "x": 6,
+      "y": 0,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 35,
+      "y": 0,
+      "type": "builder",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 14,
+      "y": 1,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 15,
+      "y": 1,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 17,
+      "y": 1,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 18,
+      "y": 1,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 20,
+      "y": 1,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 21,
+      "y": 1,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 24,
+      "y": 1,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 25,
+      "y": 1,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 26,
+      "y": 1,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 27,
+      "y": 1,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 36,
+      "y": 1,
+      "type": "builder",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "type": "builder",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "type": "builder",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 14,
+      "y": 2,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 17,
+      "y": 2,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 20,
+      "y": 2,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 24,
+      "y": 2,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 25,
+      "y": 2,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 26,
+      "y": 2,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 27,
+      "y": 2,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 35,
+      "y": 2,
+      "type": "builder",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 37,
+      "y": 2,
+      "type": "builder",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 38,
+      "y": 2,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 39,
+      "y": 2,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "type": "builder",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "type": "builder",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 24,
+      "y": 3,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 25,
+      "y": 3,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 26,
+      "y": 3,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 27,
+      "y": 3,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 38,
+      "y": 3,
+      "type": "builder",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "type": "builder",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 5,
+      "y": 4,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 6,
+      "y": 4,
+      "type": "builder",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 37,
+      "y": 4,
+      "type": "builder",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 38,
+      "y": 4,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 37,
+      "y": 6,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 39,
+      "y": 6,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 21,
+      "y": 8,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 23,
+      "y": 8,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 25,
+      "y": 8,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 38,
+      "y": 8,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 39,
+      "y": 8,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 39,
+      "y": 9,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 37,
+      "y": 10,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 38,
+      "y": 10,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 18,
+      "y": 11,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 19,
+      "y": 11,
+      "type": "builder",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 28,
+      "y": 11,
+      "type": "builder",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 37,
+      "y": 11,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 38,
+      "y": 11,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 39,
+      "y": 11,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 18,
+      "y": 12,
+      "type": "builder",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 27,
+      "y": 12,
+      "type": "builder",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 37,
+      "y": 12,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 38,
+      "y": 12,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 39,
+      "y": 12,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 18,
+      "y": 13,
+      "type": "wall",
+      "slot": 0
+    },
+    {
+      "x": 19,
+      "y": 13,
+      "type": "builder",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 28,
+      "y": 13,
+      "type": "builder",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 37,
+      "y": 13,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 38,
+      "y": 13,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 39,
+      "y": 13,
+      "type": "wall",
+      "slot": 1
+    },
+    {
+      "x": 2,
+      "y": 16,
+      "type": "builder",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 3,
+      "y": 16,
+      "type": "wall",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 4,
+      "y": 16,
+      "type": "soldier",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 5,
+      "y": 16,
+      "type": "stunner",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 33,
+      "y": 16,
+      "type": "builder",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 34,
+      "y": 16,
+      "type": "wall",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 35,
+      "y": 16,
+      "type": "soldier",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 36,
+      "y": 16,
+      "type": "stunner",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 2,
+      "y": 17,
+      "type": "builder",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 3,
+      "y": 17,
+      "type": "wall",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 4,
+      "y": 17,
+      "type": "soldier",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 5,
+      "y": 17,
+      "type": "stunner",
+      "slot": 0,
+      "rooted": true
+    },
+    {
+      "x": 33,
+      "y": 17,
+      "type": "builder",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 34,
+      "y": 17,
+      "type": "wall",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 35,
+      "y": 17,
+      "type": "soldier",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 36,
+      "y": 17,
+      "type": "stunner",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 35,
+      "y": 20,
+      "type": "builder",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 36,
+      "y": 21,
+      "type": "builder",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 2,
+      "y": 22,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 4,
+      "y": 22,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 6,
+      "y": 22,
+      "type": "builder",
+      "slot": 1
+    },
+    {
+      "x": 35,
+      "y": 22,
+      "type": "builder",
+      "slot": 1,
+      "rooted": true
+    },
+    {
+      "x": 37,
+      "y": 22,
+      "type": "builder",
+      "slot": 0
+    },
+    {
+      "x": 39,
+      "y": 22,
+      "type": "builder",
+      "slot": 0
+    }
+  ]
+}

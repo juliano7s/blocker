@@ -15,4 +15,4 @@ public record MapData(
 
 public record GroundEntry(int X, int Y, GroundType Type);
 public record TerrainEntry(int X, int Y, TerrainType Type);
-public record UnitEntry(int X, int Y, BlockType Type, int SlotId);
+public record UnitEntry(int X, int Y, BlockType Type, int SlotId, bool Rooted = false);

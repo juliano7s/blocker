@@ -1,3 +1,5 @@
+using Blocker.Game.Maps;
+using Blocker.Simulation.Maps;
 using Godot;
 
 namespace Blocker.Game.UI;
@@ -51,6 +53,19 @@ public partial class MainMenu : Control
 
 	private void OnPlayTestPressed()
 	{
+		var data = MapFileManager.Load("overload-test.json");
+		if (data == null)
+		{
+			GD.PrintErr("Failed to load overload-test.json for Play Test");
+			return;
+		}
+
+		var assignments = new System.Collections.Generic.List<SlotAssignment>();
+		for (int i = 0; i < data.SlotCount; i++)
+			assignments.Add(new SlotAssignment(i, i));
+
+		GameLaunchData.MapData = data;
+		GameLaunchData.Assignments = assignments;
 		GetTree().ChangeSceneToFile("res://Scenes/Main.tscn");
 	}
 
