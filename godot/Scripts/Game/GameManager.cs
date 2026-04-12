@@ -196,6 +196,7 @@ public partial class GameManager : Node2D
 
 		// Update HUD with selection state
 		_hudBar.SetSelection(_selectionManager.SelectedBlocks);
+		_hudBar.SetControlGroups(_selectionManager.ControlGroups);
 
 		// SP game-over polling. MP path uses _coord.GameEnded directly. We poll
 		// here for the SP path because TickRunner doesn't expose a hook — and

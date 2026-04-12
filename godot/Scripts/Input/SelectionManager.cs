@@ -86,6 +86,12 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 
 	public IReadOnlyList<Block> SelectedBlocks => _selectedBlocks;
 
+	/// <summary>Control groups (1-9) mapped to block IDs.</summary>
+	public IReadOnlyDictionary<int, IReadOnlyList<int>> ControlGroups =>
+		_controlGroups.ToDictionary(
+			kvp => kvp.Key,
+			kvp => (IReadOnlyList<int>)kvp.Value.AsReadOnly());
+
 	/// <summary>Flush pending commands for the tick runner to consume.</summary>
 	public List<Command> FlushCommands()
 	{
