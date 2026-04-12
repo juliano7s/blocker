@@ -38,6 +38,15 @@ public partial class MultiplayerMenu : Control
     private LineEdit _codeEdit = null!;
     private RelayClient _relay = null!;
 
+    // Stored delegates so _ExitTree can unsubscribe before the scene is freed.
+    // Without this, handlers survive on the long-lived RelayClient and fire
+    // against a freed node when the next relay event arrives (e.g. Kicked error
+    // dispatching on SlotConfigScreen also invokes the dead MultiplayerMenu
+    // handler, which throws and prevents SlotConfigScreen's handler from running).
+    private Action? _helloAckedHandler;
+    private Action? _closedHandler;
+    private Action<Blocker.Simulation.Net.ErrorCode>? _errorHandler;
+
     public override async void _Ready()
     {
         var vbox = new VBoxContainer
@@ -86,14 +95,27 @@ public partial class MultiplayerMenu : Control
             _statusLabel.Text = $"Cannot reach server: {_relay.LastError}";
             return;
         }
-        _relay.HelloAcked += () => CallDeferred(nameof(OnHelloAcked));
-        _relay.ConnectionClosed += () => CallDeferred(nameof(OnClosed));
-        _relay.ServerError += (e) => CallDeferred(nameof(OnServerError), (int)e);
+        _helloAckedHandler = () => CallDeferred(nameof(OnHelloAcked));
+        _closedHandler = () => CallDeferred(nameof(OnClosed));
+        _errorHandler = (e) => CallDeferred(nameof(OnServerError), (int)e);
+        _relay.HelloAcked += _helloAckedHandler;
+        _relay.ConnectionClosed += _closedHandler;
+        _relay.ServerError += _errorHandler;
 
         // Drain inbound every frame while the menu is up.
         var drainTimer = new Godot.Timer { WaitTime = 0.016, Autostart = true };
         drainTimer.Timeout += () => _relay.DrainInbound();
         AddChild(drainTimer);
+    }
+
+    public override void _ExitTree()
+    {
+        if (_relay != null)
+        {
+            if (_helloAckedHandler != null) _relay.HelloAcked -= _helloAckedHandler;
+            if (_closedHandler != null) _relay.ConnectionClosed -= _closedHandler;
+            if (_errorHandler != null) _relay.ServerError -= _errorHandler;
+        }
     }
 
     private void OnHelloAcked()
