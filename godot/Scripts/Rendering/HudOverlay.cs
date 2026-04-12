@@ -6,7 +6,7 @@ using Godot;
 namespace Blocker.Game.Rendering;
 
 /// <summary>
-/// HUD overlay: player info, tick counter, population, block count ratio bar.
+/// HUD overlay: player info, time display, population, menu button.
 /// Game bible Section 16.15.
 /// </summary>
 public partial class HudOverlay : CanvasLayer
@@ -14,16 +14,16 @@ public partial class HudOverlay : CanvasLayer
     private GameState? _gameState;
     private GameConfig _config = GameConfig.CreateDefault();
     private int _controllingPlayer;
-    private static readonly Color BgColor = new(0.05f, 0.05f, 0.08f, 0.85f);
-    private static readonly Color TextColor = new(0.85f, 0.85f, 0.85f);
-    private static readonly Color DimTextColor = new(0.5f, 0.5f, 0.55f);
-    private static readonly Color BarBgColor = new(0.15f, 0.15f, 0.18f);
+    private static readonly Color DividerColor = new(0.176f, 0.216f, 0.282f); // #2d3748
 
     private Control? _drawControl;
-    private Button? _exitBtn;
-    private Button? _surrenderBtn;
+    private Button? _menuBtn;
+    private PopupMenu? _menuPopup;
     private Action? _surrenderHandler;
     private bool _surrendered;
+    private bool _showDebugFps = false;
+
+    public void SetShowDebugFps(bool show) => _showDebugFps = show;
 
     public override void _Ready()
     {
@@ -36,35 +36,26 @@ public partial class HudOverlay : CanvasLayer
         _drawControl.MouseFilter = Control.MouseFilterEnum.Ignore;
         AddChild(_drawControl);
 
-        // Exit button — anchored to top-right, inside the top bar
-        _exitBtn = new Button
+        // Menu button (right side)
+        _menuBtn = new Button
         {
-            Text = "✕",
-            Size = new Vector2(24, 24),
-            MouseFilter = Control.MouseFilterEnum.Stop
-        };
-        _exitBtn.SetAnchorsPreset(Control.LayoutPreset.TopRight);
-        _exitBtn.OffsetLeft = -34;
-        _exitBtn.OffsetTop = 4;
-        _exitBtn.OffsetRight = -10;
-        _exitBtn.OffsetBottom = 28;
-        _exitBtn.Pressed += () => GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
-        AddChild(_exitBtn);
-
-        // Surrender button — to the left of the exit button
-        _surrenderBtn = new Button
-        {
-            Text = "Surrender",
+            Text = "☰ Menu",
             MouseFilter = Control.MouseFilterEnum.Stop,
-            TooltipText = "Concede the match",
         };
-        _surrenderBtn.SetAnchorsPreset(Control.LayoutPreset.TopRight);
-        _surrenderBtn.OffsetLeft = -120;
-        _surrenderBtn.OffsetTop = 4;
-        _surrenderBtn.OffsetRight = -40;
-        _surrenderBtn.OffsetBottom = 28;
-        _surrenderBtn.Pressed += OnSurrenderPressed;
-        AddChild(_surrenderBtn);
+        _menuBtn.SetAnchorsPreset(Control.LayoutPreset.TopRight);
+        _menuBtn.OffsetLeft = -90;
+        _menuBtn.OffsetTop = 8;
+        _menuBtn.OffsetRight = -14;
+        _menuBtn.OffsetBottom = 34;
+        _menuBtn.Pressed += OnMenuPressed;
+        AddChild(_menuBtn);
+
+        // Popup menu
+        _menuPopup = new PopupMenu();
+        _menuPopup.AddItem("Surrender", 0);
+        _menuPopup.AddItem("Exit to Menu", 1);
+        _menuPopup.IdPressed += OnMenuItemSelected;
+        AddChild(_menuPopup);
     }
 
     /// <summary>
@@ -74,16 +65,29 @@ public partial class HudOverlay : CanvasLayer
     /// </summary>
     public void SetSurrenderHandler(Action handler) => _surrenderHandler = handler;
 
-    private void OnSurrenderPressed()
+    private void OnMenuPressed()
     {
-        if (_surrendered) return;
-        _surrendered = true;
-        if (_surrenderBtn != null)
+        if (_menuPopup == null || _menuBtn == null) return;
+        var btnRect = _menuBtn.GetGlobalRect();
+        _menuPopup.Position = new Vector2I((int)btnRect.Position.X, (int)(btnRect.Position.Y + btnRect.Size.Y));
+        _menuPopup.Popup();
+    }
+
+    private void OnMenuItemSelected(long id)
+    {
+        switch (id)
         {
-            _surrenderBtn.Disabled = true;
-            _surrenderBtn.Text = "Surrendered";
+            case 0: // Surrender
+                if (!_surrendered)
+                {
+                    _surrendered = true;
+                    _surrenderHandler?.Invoke();
+                }
+                break;
+            case 1: // Exit
+                GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
+                break;
         }
-        _surrenderHandler?.Invoke();
     }
 
     public void SetGameState(GameState state) => _gameState = state;
@@ -130,34 +134,50 @@ public partial class HudOverlay : CanvasLayer
             if (state == null) return;
 
             var viewport = GetViewportRect().Size;
-            const float barHeight = 32f;
-            const float ratioBarHeight = 6f;
-            const float padding = 10f;
-
-            // Top bar background
-            DrawRect(new Rect2(0, 0, viewport.X, barHeight + ratioBarHeight), BgColor);
-
             var font = ThemeDB.FallbackFont;
-            int fontSize = 14;
+
+            // Draw top bar background with gradient
+            HudStyles.DrawPanelBackground(this, new Rect2(0, 0, viewport.X, HudStyles.TopBarHeight));
 
             // Player info (left side)
             int pid = _hud.GetControllingPlayer();
             var playerColor = _hud._config.GetPalette(pid).Base;
+            var lighterBorder = playerColor.Lightened(0.3f);
+
+            float x = 14f;
+            float centerY = HudStyles.TopBarHeight / 2f;
+
+            // Player color square
+            var colorRect = new Rect2(x, centerY - 8, 16, 16);
+            DrawRect(colorRect, playerColor);
+            DrawRect(colorRect, lighterBorder, false, 1f);
+            x += 24;
+
+            // Player name
             string playerName = $"Player {pid}";
+            DrawString(font, new Vector2(x, centerY + 5), playerName,
+                HorizontalAlignment.Left, -1, HudStyles.FontSizeNormal, HudStyles.TextPrimary);
+            x += font.GetStringSize(playerName, HorizontalAlignment.Left, -1, HudStyles.FontSizeNormal).X + 14;
 
-            // Player color indicator
-            float x = padding;
-            DrawRect(new Rect2(x, 8, 16, 16), playerColor);
-            x += 22;
-            DrawString(font, new Vector2(x, 22), playerName, HorizontalAlignment.Left, -1, fontSize, TextColor);
-            x += font.GetStringSize(playerName, HorizontalAlignment.Left, -1, fontSize).X + 20;
+            // Divider
+            DrawLine(new Vector2(x, centerY - 11), new Vector2(x, centerY + 11), DividerColor, 1f);
+            x += 14;
 
-            // Tick counter
-            string tickText = $"Tick {state.TickNumber}";
-            DrawString(font, new Vector2(x, 22), tickText, HorizontalAlignment.Left, -1, fontSize, DimTextColor);
-            x += font.GetStringSize(tickText, HorizontalAlignment.Left, -1, fontSize).X + 20;
+            // Game time (convert ticks to hh:mm:ss)
+            int totalSeconds = state.TickNumber / 12; // Assuming 12 tps
+            int hours = totalSeconds / 3600;
+            int minutes = (totalSeconds % 3600) / 60;
+            int seconds = totalSeconds % 60;
+            string timeText = hours > 0 ? $"{hours}:{minutes:D2}:{seconds:D2}" : $"{minutes:D2}:{seconds:D2}";
+            DrawString(font, new Vector2(x, centerY + 5), timeText,
+                HorizontalAlignment.Left, -1, HudStyles.FontSizeNormal, HudStyles.TextSecondary);
+            x += font.GetStringSize(timeText, HorizontalAlignment.Left, -1, HudStyles.FontSizeNormal).X + 14;
 
-            // Population display
+            // Divider
+            DrawLine(new Vector2(x, centerY - 11), new Vector2(x, centerY + 11), DividerColor, 1f);
+            x += 14;
+
+            // Population
             if (pid < state.Players.Count)
             {
                 var player = state.Players.Find(p => p.Id == pid);
@@ -165,50 +185,22 @@ public partial class HudOverlay : CanvasLayer
                 {
                     int currentPop = state.GetPopulation(pid);
                     string popText = $"Pop: {currentPop} / {player.MaxPopulation}";
-                    DrawString(font, new Vector2(x, 22), popText, HorizontalAlignment.Left, -1, fontSize, TextColor);
+                    DrawString(font, new Vector2(x, centerY + 5), popText,
+                        HorizontalAlignment.Left, -1, HudStyles.FontSizeNormal, HudStyles.TextPrimary);
                 }
             }
 
-            // FPS counter (right side, color-coded)
-            string fpsText = $"{_fps:F0} FPS";
-            var fpsColor = _fps >= 55 ? new Color(0.4f, 0.9f, 0.4f) :
-                           _fps >= 30 ? new Color(0.9f, 0.9f, 0.3f) :
-                           new Color(0.9f, 0.3f, 0.3f);
-            float fpsWidth = font.GetStringSize(fpsText, HorizontalAlignment.Left, -1, fontSize).X;
-            DrawString(font, new Vector2(viewport.X - fpsWidth - 44, 22), fpsText,
-                HorizontalAlignment.Left, -1, fontSize, fpsColor);
-
-            // Block count ratio bar (bottom of top bar)
-            DrawBlockRatioBar(state, new Rect2(0, barHeight, viewport.X, ratioBarHeight));
-        }
-
-        private void DrawBlockRatioBar(GameState state, Rect2 rect)
-        {
-            DrawRect(rect, BarBgColor);
-
-            if (state.Players.Count == 0) return;
-
-            // Count non-wall blocks per player
-            var counts = new Dictionary<int, int>();
-            int total = 0;
-            foreach (var block in state.Blocks)
+            // Debug FPS (right side, only if enabled)
+            if (_hud._showDebugFps)
             {
-                if (block.Type == BlockType.Wall) continue;
-                counts.TryGetValue(block.PlayerId, out int count);
-                counts[block.PlayerId] = count + 1;
-                total++;
-            }
-
-            if (total == 0) return;
-
-            float x = rect.Position.X;
-            foreach (var player in state.Players)
-            {
-                if (!counts.TryGetValue(player.Id, out int count)) continue;
-                float width = rect.Size.X * count / total;
-                var color = _hud._config.GetPalette(player.Id).Base;
-                DrawRect(new Rect2(x, rect.Position.Y, width, rect.Size.Y), color);
-                x += width;
+                string fpsText = $"{_fps:F0} FPS";
+                var fpsColor = _fps >= 55 ? new Color(0.4f, 0.9f, 0.4f) :
+                               _fps >= 30 ? new Color(0.9f, 0.9f, 0.3f) :
+                               new Color(0.9f, 0.3f, 0.3f);
+                float fpsWidth = font.GetStringSize(fpsText, HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall).X;
+                // Position below top bar
+                DrawString(font, new Vector2(viewport.X - fpsWidth - 14, HudStyles.TopBarHeight + 16),
+                    fpsText, HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall, fpsColor);
             }
         }
     }
