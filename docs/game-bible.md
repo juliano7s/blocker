@@ -405,27 +405,22 @@ A player can concede at any time. In team modes, a player's surrender eliminates
 
 ---
 
-## 12. Multiplayer - ** Let's skip for now and implement after the visuals are done **
+## 12. Multiplayer
 
 ### 12.1 Game Modes and Teams
 
-The game supports up to **6 players** across these modes:
+Up to **6 players**. Two modes implemented:
 
-| Mode | Teams | Players |
-|------|-------|---------|
-| 1v1 | 2 teams of 1 | 2 |
-| 2v2 | 2 teams of 2 | 4 |
-| 3v3 | 2 teams of 3 | 6 |
-| 2v2v2 | 3 teams of 2 | 6 |
-| FFA | 6 teams of 1 | Up to 6 |
+| Mode | Team assignment | Slot count |
+|------|----------------|------------|
+| **FFA** | Each slot is its own team (`teamId = slotId`) | 2-6 |
+| **Teams** | Consecutive pairs share a team (`teamId = slotId / 2`) | 2, 4, or 6 (must be even) |
 
-The core abstraction is **teams**, not player count. Every player belongs to a team. All game rules use team membership to determine friend vs. enemy:
+The core abstraction is **teams**, not player count. All game rules use `GameState.AreEnemies` / `AreAllies` for hostility checks:
 
-- **"Enemy"** = any block owned by a player on a different team
-- **"Friendly"** = any block owned by a player on the same team (including your own)
-- Combat thresholds combine across teammates — e.g., 1 Soldier from Player A + 1 Soldier from Player B (same team) = 2 adjacent Soldiers for kill threshold purposes
-- Friendly blocks from teammates count as "friendly neighbors" for overcrowding checks
-- Push waves affect all blocks regardless of team (friendly fire on push is intentional)
+- Combat, ZoC, jumper blocking, stun rays, tower targeting — all team-aware
+- Push waves affect all blocks regardless of team (intentional friendly fire)
+- Ownership checks (command auth, spawning, formations) use `PlayerId`, not team
 
 ### 12.2 Team Win Conditions
 

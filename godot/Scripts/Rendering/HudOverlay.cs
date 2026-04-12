@@ -21,6 +21,9 @@ public partial class HudOverlay : CanvasLayer
 
     private Control? _drawControl;
     private Button? _exitBtn;
+    private Button? _surrenderBtn;
+    private Action? _surrenderHandler;
+    private bool _surrendered;
 
     public override void _Ready()
     {
@@ -47,6 +50,40 @@ public partial class HudOverlay : CanvasLayer
         _exitBtn.OffsetBottom = 28;
         _exitBtn.Pressed += () => GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
         AddChild(_exitBtn);
+
+        // Surrender button — to the left of the exit button
+        _surrenderBtn = new Button
+        {
+            Text = "Surrender",
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            TooltipText = "Concede the match",
+        };
+        _surrenderBtn.SetAnchorsPreset(Control.LayoutPreset.TopRight);
+        _surrenderBtn.OffsetLeft = -120;
+        _surrenderBtn.OffsetTop = 4;
+        _surrenderBtn.OffsetRight = -40;
+        _surrenderBtn.OffsetBottom = 28;
+        _surrenderBtn.Pressed += OnSurrenderPressed;
+        AddChild(_surrenderBtn);
+    }
+
+    /// <summary>
+    /// Provide the callback that submits a Surrender command for the local player.
+    /// GameManager wires this to SelectionManager.SubmitSurrender so the command
+    /// flows through the same lockstep / SP-pending pipeline as anything else.
+    /// </summary>
+    public void SetSurrenderHandler(Action handler) => _surrenderHandler = handler;
+
+    private void OnSurrenderPressed()
+    {
+        if (_surrendered) return;
+        _surrendered = true;
+        if (_surrenderBtn != null)
+        {
+            _surrenderBtn.Disabled = true;
+            _surrenderBtn.Text = "Surrendered";
+        }
+        _surrenderHandler?.Invoke();
     }
 
     public void SetGameState(GameState state) => _gameState = state;

@@ -33,7 +33,7 @@ public static class WardenSystem
 
             foreach (var target in state.Blocks)
             {
-                if (target.PlayerId == warden.PlayerId) continue; // Friendly
+                if (!state.AreEnemies(target, warden)) continue; // Friendly / teammate
                 if (target.IsImmobile) continue; // No point slowing immobile
                 if (target.Pos.ChebyshevDistance(warden.Pos) > Constants.WardenZocRadius) continue;
 
@@ -54,7 +54,7 @@ public static class WardenSystem
             if (warden.Type != BlockType.Warden) continue;
             if (!warden.IsFullyRooted) continue;
             if (warden.IsStunned) continue;
-            if (warden.PlayerId == block.PlayerId) continue;
+            if (!state.AreEnemies(warden, block)) continue; // Friendly / teammate
             if (block.Pos.ChebyshevDistance(warden.Pos) <= Constants.WardenZocRadius)
                 return true;
         }
@@ -76,7 +76,7 @@ public static class WardenSystem
 
         // Collect and sort by distance ascending — closest move first, making room for farther blocks
         var targets = state.Blocks
-            .Where(t => t.PlayerId != warden.PlayerId && !t.IsImmobile && t.Type != BlockType.Wall
+            .Where(t => state.AreEnemies(t, warden) && !t.IsImmobile && t.Type != BlockType.Wall
                         && t.Pos.ChebyshevDistance(warden.Pos) <= Constants.WardenPullRadius)
             .OrderBy(t => t.Pos.ChebyshevDistance(warden.Pos))
             .ToList();

@@ -66,9 +66,9 @@ public static class JumperSystem
                     break;
                 }
 
-                if (blockAtPos.PlayerId == jumper.PlayerId)
+                if (state.AreAllies(blockAtPos, jumper))
                 {
-                    break; // Can't pass through friendlies
+                    break; // Can't pass through friendlies / teammates
                 }
 
                 // Kill enemies in path

@@ -15,6 +15,19 @@ public static class MultiplayerLaunchData
     public static MultiplayerIntent Intent;
     public static string JoinCode = "";
     public static RelayClient? Relay;
+
+    /// <summary>
+    /// True when SlotConfigScreen should reattach to an existing relay+room
+    /// after a rematch (skip the Create Room step and jump straight to the
+    /// lobby panel). Cleared by SlotConfigScreen on consumption.
+    /// </summary>
+    public static bool RematchReattach;
+
+    /// <summary>
+    /// Stashed RoomState from the rematch broadcast. Consumed by SlotConfigScreen
+    /// on reattach to seed the lobby panel before a second broadcast arrives.
+    /// </summary>
+    public static RoomStatePayload? PendingRoomState;
 }
 
 public partial class MultiplayerMenu : Control

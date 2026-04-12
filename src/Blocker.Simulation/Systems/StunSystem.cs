@@ -142,8 +142,8 @@ public static class StunSystem
         var block = state.GetBlockAt(ray.HeadPos);
         if (block == null) return false;
 
-        // Don't hit friendly blocks
-        if (block.PlayerId == ray.PlayerId) return false;
+        // Don't hit friendly blocks (or teammates).
+        if (!state.AreEnemies(block.PlayerId, ray.PlayerId)) return false;
 
         switch (ray.Type)
         {

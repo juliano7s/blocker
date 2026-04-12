@@ -6,6 +6,7 @@ using Blocker.Game.UI;
 using Blocker.Simulation.Core;
 using Blocker.Simulation.Maps;
 using Blocker.Simulation.Net;
+using Blocker.Simulation.Systems;
 using Godot;
 
 namespace Blocker.Game;
@@ -28,6 +29,18 @@ public partial class GameManager : Node2D
 	private EffectManager _effectManager = null!;
 	private readonly HashSet<int> _currentSelectedIds = new();
 
+	// Game-state we hold so rematch can rebuild GameLaunchData on its own.
+	private GameState _gameState = null!;
+	private MapData? _launchMap;
+	private List<SlotAssignment>? _launchAssignments;
+	private MultiplayerSessionState? _launchSession;
+	private LockstepCoordinator? _coord;
+	private bool _gameOverShown;
+
+	// MP rematch / scene-handoff handler — held as a field so _ExitTree can
+	// detach it from the long-lived RelayClient when the scene is freed.
+	private Action<RoomStatePayload>? _mpRoomStateHandler;
+
 	public override void _Ready()
 	{
 		// Initialize config and simulation constants
@@ -41,6 +54,10 @@ public partial class GameManager : Node2D
 			gameState = MapLoader.Load(GameLaunchData.MapData, GameLaunchData.Assignments);
 			GD.Print($"Map loaded from launcher: {GameLaunchData.MapData.Name} " +
 					 $"{gameState.Grid.Width}x{gameState.Grid.Height}, {gameState.Blocks.Count} blocks");
+			// Stash for rematch — _Ready clears the static slots so a fresh launch
+			// after returning to MainMenu doesn't accidentally inherit stale data.
+			_launchMap = GameLaunchData.MapData;
+			_launchAssignments = GameLaunchData.Assignments;
 			GameLaunchData.MapData = null;
 			GameLaunchData.Assignments = null;
 		}
@@ -78,23 +95,28 @@ public partial class GameManager : Node2D
 		// Tick runner: multiplayer when a session was handed in, single-player otherwise.
 		if (GameLaunchData.MultiplayerSession is { } mp)
 		{
+			_launchSession = mp;
 			// Drop the SP TickRunner so it doesn't double-tick the simulation.
 			var spRunner = GetNodeOrNull<TickRunner>("TickRunner");
 			if (spRunner != null) spRunner.QueueFree();
 
-			var coord = new LockstepCoordinator(mp.LocalPlayerId, gameState, mp.Relay, mp.ActivePlayerIds);
+			_coord = new LockstepCoordinator(mp.LocalPlayerId, gameState, mp.Relay, mp.ActivePlayerIds);
 			var mpRunner = new MultiplayerTickRunner { Name = "MultiplayerTickRunner", TickRate = 12 };
 			AddChild(mpRunner);
-			mpRunner.Initialize(coord, mp.Relay, gameState);
+			mpRunner.Initialize(_coord, mp.Relay, gameState);
 			_gridRenderer.SetTickInterval((float)mpRunner.TickInterval);
 			_selectionManager.ControllingPlayer = mp.LocalPlayerId;
 			// Tab hot-seat is for single-player only — in MP it desyncs the sim.
 			_selectionManager.AllowHotSeatSwitch = false;
 			_selectionManager.SetCommandSink(mpRunner);
-			coord.StartGame();
+			_coord.StartGame();
 
-			coord.GameEnded += (winner) => GD.Print($"Game over. Winner: team {winner}");
-			coord.DesyncDetected += () => GD.PrintErr("DESYNC DETECTED");
+			_coord.GameEnded += (winner) =>
+			{
+				GD.Print($"Game over. Winner: team {winner}");
+				CallDeferred(nameof(ShowGameOverOverlayDeferred), winner);
+			};
+			_coord.DesyncDetected += () => GD.PrintErr("DESYNC DETECTED");
 		}
 		else
 		{
@@ -110,6 +132,7 @@ public partial class GameManager : Node2D
 		_hud.SetGameState(gameState);
 		_hud.SetConfig(Config);
 		_hud.SetControllingPlayer(0);
+		_hud.SetSurrenderHandler(() => _selectionManager.SubmitSurrender());
 
 		// Set up bottom HUD bar with minimap
 		_hudBar = new HudBar();
@@ -136,6 +159,9 @@ public partial class GameManager : Node2D
 		// Set background color
 		RenderingServer.SetDefaultClearColor(Config.BackgroundColor);
 
+		// Stash gameState for game-over polling and rematch reconstruction.
+		_gameState = gameState;
+
 		// Clear after consuming so a return-to-menu round trip starts fresh.
 		GameLaunchData.MultiplayerSession = null;
 
@@ -160,5 +186,127 @@ public partial class GameManager : Node2D
 		// Feed camera position and visible area to HudBar minimap
 		var viewSize = GetViewportRect().Size / _camera.Zoom;
 		_hudBar.SetCameraView(_camera.Position, viewSize);
+
+		// SP game-over polling. MP path uses _coord.GameEnded directly. We poll
+		// here for the SP path because TickRunner doesn't expose a hook — and
+		// EliminationSystem.GetWinningTeam is cheap (one O(N) scan).
+		if (!_gameOverShown && _coord == null && _gameState != null)
+		{
+			var winner = EliminationSystem.GetWinningTeam(_gameState);
+			if (winner is int t)
+				ShowGameOverOverlayDeferred(t);
+		}
+	}
+
+	private void ShowGameOverOverlayDeferred(int winningTeam)
+	{
+		if (_gameOverShown) return;
+		_gameOverShown = true;
+
+		var overlay = new GameOverOverlay();
+		int localPid = _selectionManager?.ControllingPlayer ?? 0;
+		var (title, subtitle, accent) = GameOverOverlay.BuildWinnerLabels(
+			winningTeam, localPid, _gameState, Config);
+
+		bool isMp = _launchSession != null;
+		bool isHost = isMp && _launchSession!.LocalPlayerId == 0; // host always owns slot 0
+		bool showRematch = !isMp || isHost; // SP always; MP only host
+		string rematchLabel = "Rematch";
+
+		overlay.Configure(
+			title, subtitle, accent,
+			showRematch, rematchLabel,
+			onRematch: isMp ? OnMpRematchPressed : OnSpRematchPressed,
+			onLeave: OnLeavePressed);
+
+		AddChild(overlay);
+
+		// MP joiner / non-host: still wire RoomState so we follow the host into
+		// the rematch lobby. The host wires it inside OnMpRematchPressed (after
+		// the SendRematch click) so it doesn't accidentally trigger on stale
+		// state during normal play.
+		if (isMp && !isHost)
+			SubscribeMpRematchHandlers();
+	}
+
+	private void OnSpRematchPressed()
+	{
+		// Re-set the launch slots and reload the scene. _Ready will pick up the
+		// MapData/Assignments and rebuild the simulation from scratch.
+		if (_launchMap == null || _launchAssignments == null) return;
+		GameLaunchData.MapData = _launchMap;
+		GameLaunchData.Assignments = _launchAssignments;
+		GetTree().ChangeSceneToFile("res://Scenes/Main.tscn");
+	}
+
+	private void OnMpRematchPressed()
+	{
+		if (_launchSession == null) return;
+		// Subscribe BEFORE sending rematch — relay broadcasts on the same
+		// connection round-trip and we don't want to race the response.
+		SubscribeMpRematchHandlers();
+		_launchSession.Relay.SendRematch();
+	}
+
+	private void OnLeavePressed()
+	{
+		// MP: tear down the relay so a return to MultiplayerMenu starts fresh.
+		// SP: just bail to the main menu.
+		if (_launchSession != null)
+		{
+			try { _launchSession.Relay.SendLeaveRoom(); } catch { }
+			_launchSession.Relay.Dispose();
+			MultiplayerLaunchData.Relay = null;
+		}
+		GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
+	}
+
+	private void SubscribeMpRematchHandlers()
+	{
+		if (_launchSession == null) return;
+		if (_mpRoomStateHandler != null) return; // idempotent
+
+		var relay = _launchSession.Relay;
+		_mpRoomStateHandler = (rs) =>
+		{
+			// Stash so the new SlotConfigScreen can seed its lobby panel
+			// immediately without waiting for a second broadcast.
+			MultiplayerLaunchData.PendingRoomState = rs;
+			CallDeferred(nameof(OnMpRoomStateAfterGameEnded));
+		};
+		relay.RoomStateReceived += _mpRoomStateHandler;
+	}
+
+	private void OnMpRoomStateAfterGameEnded()
+	{
+		// Rematch arrived (relay reset to Lobby and broadcast RoomState). Hand
+		// the user back to the lobby screen with the existing relay attached.
+		if (_launchSession == null) return;
+		bool isHost = _launchSession.LocalPlayerId == 0;
+
+		MultiplayerLaunchData.Relay = _launchSession.Relay;
+		MultiplayerLaunchData.Intent = isHost ? MultiplayerIntent.Host : MultiplayerIntent.Join;
+		MultiplayerLaunchData.RematchReattach = isHost;
+
+		// Detach our coordinator BEFORE the scene change — otherwise it stays
+		// subscribed to relay events alongside the new coordinator the next
+		// game spawns, and the dead coord will silently corrupt _buffers.
+		_coord?.Detach();
+		_coord = null;
+
+		GetTree().ChangeSceneToFile("res://Scenes/SlotConfig.tscn");
+	}
+
+	public override void _ExitTree()
+	{
+		// Detach from the long-lived RelayClient so its background ReceiveLoop
+		// doesn't fire our handlers on a freed scene.
+		_coord?.Detach();
+		_coord = null;
+		if (_launchSession != null && _mpRoomStateHandler != null)
+		{
+			_launchSession.Relay.RoomStateReceived -= _mpRoomStateHandler;
+			_mpRoomStateHandler = null;
+		}
 	}
 }

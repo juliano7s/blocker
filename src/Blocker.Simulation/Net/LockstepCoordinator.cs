@@ -65,6 +65,18 @@ public class LockstepCoordinator
         _relay.PlayerLeft += OnPlayerLeft;
     }
 
+    /// <summary>
+    /// Unsubscribe from the relay so this coordinator stops mutating state when
+    /// the relay outlives the coordinator (rematch flow). After Detach(), this
+    /// instance is dead — its buffers and Fsm should not be touched again.
+    /// </summary>
+    public void Detach()
+    {
+        _relay.CommandsReceived -= OnCommandsReceived;
+        _relay.HashReceived -= OnHashReceived;
+        _relay.PlayerLeft -= OnPlayerLeft;
+    }
+
     public void StartGame()
     {
         if (Fsm != CoordinatorFsm.Lobby) return;

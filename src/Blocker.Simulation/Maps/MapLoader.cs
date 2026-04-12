@@ -124,7 +124,7 @@ public static class MapLoader
         foreach (var assignment in assignments)
         {
             if (state.Players.All(p => p.Id != assignment.PlayerId))
-                state.Players.Add(new Player { Id = assignment.PlayerId, TeamId = assignment.PlayerId });
+                state.Players.Add(new Player { Id = assignment.PlayerId, TeamId = assignment.TeamId });
         }
 
         return state;

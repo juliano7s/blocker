@@ -29,7 +29,6 @@ public sealed class RelayClient : IRelayClient, IDisposable
     public event Action<int, int, IReadOnlyList<Command>>? CommandsReceived;
     public event Action<int, int, uint>? HashReceived;
     public event Action<int, int, LeaveReason>? PlayerLeft;
-    public event Action<int>? SurrenderReceived;
 
     // Lobby-level events — also fired on main thread.
     public event Action? HelloAcked;
@@ -112,29 +111,27 @@ public sealed class RelayClient : IRelayClient, IDisposable
         _outbox.Writer.TryWrite(msg);
     }
 
-    public void SendSurrender()
-    {
-        var msg = new byte[] { Protocol.Surrender, (byte)_localPlayerId };
-        _outbox.Writer.TryWrite(msg);
-    }
-
-    public void SendCreateRoom(byte slotCount, string mapName, byte[] mapBlob)
+    public void SendCreateRoom(byte slotCount, GameMode gameMode, string mapName, byte[] mapBlob)
     {
         var nameBytes = System.Text.Encoding.UTF8.GetBytes(mapName);
         var varBuf = new byte[5];
         int vn = Varint.Write(varBuf, 0, (uint)nameBytes.Length);
         var varBuf2 = new byte[5];
         int vb = Varint.Write(varBuf2, 0, (uint)mapBlob.Length);
-        var msg = new byte[2 + vn + nameBytes.Length + vb + mapBlob.Length];
+        var msg = new byte[3 + vn + nameBytes.Length + vb + mapBlob.Length];
         int o = 0;
         msg[o++] = Protocol.CreateRoom;
         msg[o++] = slotCount;
+        msg[o++] = (byte)gameMode;
         Array.Copy(varBuf, 0, msg, o, vn); o += vn;
         Array.Copy(nameBytes, 0, msg, o, nameBytes.Length); o += nameBytes.Length;
         Array.Copy(varBuf2, 0, msg, o, vb); o += vb;
         Array.Copy(mapBlob, 0, msg, o, mapBlob.Length);
         _outbox.Writer.TryWrite(msg);
     }
+
+    public void SendRematch() =>
+        _outbox.Writer.TryWrite(new byte[] { Protocol.Rematch });
 
     public void SendJoinRoom(string code, byte desiredSlot)
     {
@@ -215,7 +212,6 @@ public sealed class RelayClient : IRelayClient, IDisposable
                     PlayerLeft?.Invoke(pid, (int)effTick, (LeaveReason)reason);
                     break;
                 }
-                case Protocol.Surrender: SurrenderReceived?.Invoke(msg[1]); break;
                 case Protocol.Error: ServerError?.Invoke((ErrorCode)msg[1]); break;
                 case Protocol.Ping: _outbox.Writer.TryWrite(new byte[] { Protocol.Pong }); break;
                 case Protocol.Pong: break;
@@ -231,6 +227,7 @@ public sealed class RelayClient : IRelayClient, IDisposable
         var hostBytes = new byte[16]; Array.Copy(msg, o, hostBytes, 0, 16); o += 16;
         byte slotCount = msg[o++];
         ushort simVer = (ushort)(msg[o] | (msg[o + 1] << 8)); o += 2;
+        GameMode gameMode = (GameMode)msg[o++];
         var (mapNameLen, c1) = Varint.Read(msg, o); o += c1;
         string mapName = System.Text.Encoding.UTF8.GetString(msg, o, (int)mapNameLen); o += (int)mapNameLen;
         var slots = new SlotStateEntry[slotCount];
@@ -239,11 +236,12 @@ public sealed class RelayClient : IRelayClient, IDisposable
             var (nLen, c2) = Varint.Read(msg, o); o += c2;
             string name = System.Text.Encoding.UTF8.GetString(msg, o, (int)nLen); o += (int)nLen;
             byte colorIdx = msg[o++];
+            byte teamId = msg[o++];
             byte flags = msg[o++];
-            slots[i] = new SlotStateEntry(name, colorIdx,
+            slots[i] = new SlotStateEntry(name, colorIdx, teamId,
                 IsOpen: (flags & 1) != 0, IsClosed: (flags & 2) != 0);
         }
-        return new RoomStatePayload(code, new Guid(hostBytes), simVer, mapName, slots);
+        return new RoomStatePayload(code, new Guid(hostBytes), simVer, gameMode, mapName, slots);
     }
 
     private async Task ReceiveLoop()
@@ -295,6 +293,6 @@ public sealed class RelayClient : IRelayClient, IDisposable
 }
 
 public sealed record RoomStatePayload(
-    string Code, Guid HostId, ushort SimulationVersion, string MapName, SlotStateEntry[] Slots);
+    string Code, Guid HostId, ushort SimulationVersion, GameMode GameMode, string MapName, SlotStateEntry[] Slots);
 
-public sealed record SlotStateEntry(string DisplayName, byte ColorIndex, bool IsOpen, bool IsClosed);
+public sealed record SlotStateEntry(string DisplayName, byte ColorIndex, byte TeamId, bool IsOpen, bool IsClosed);

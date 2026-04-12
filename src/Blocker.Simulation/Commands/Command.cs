@@ -14,6 +14,7 @@ public enum CommandType
     MagnetPull,   // Rooted Warden pulls nearby enemies (D key)
     Jump,         // Jumper jumps in cardinal direction (F key + direction)
     AttackMove,   // Move toward target, engage enemies en route (A key + click)
+    Surrender,    // Player-level: marks the issuing player as eliminated. BlockIds is empty.
 }
 
 public record Command(

@@ -15,7 +15,6 @@ public class FakeRelayClient : IRelayClient
     public event Action<int, int, IReadOnlyList<Command>>? CommandsReceived;
     public event Action<int, int, uint>? HashReceived;
     public event Action<int, int, LeaveReason>? PlayerLeft;
-    public event Action<int>? SurrenderReceived;
 
     public FakeRelayClient(int localPlayerId) { LocalPlayerId = localPlayerId; }
 
@@ -41,11 +40,6 @@ public class FakeRelayClient : IRelayClient
     }
 
     public void SendDesyncReport(int tick, GameStateSnapshot snapshot) { /* noop in tests */ }
-    public void SendSurrender()
-    {
-        foreach (var peer in _peers)
-            peer.SurrenderReceived?.Invoke(LocalPlayerId);
-    }
 
     /// <summary>Simulate a disconnect for tests. Raises PlayerLeft on all peers.</summary>
     public void SimulateDisconnect(int effectiveTick)

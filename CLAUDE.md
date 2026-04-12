@@ -97,6 +97,8 @@ blocker/
 
 ## Current phase
 
-**Phase 2: Architecture Design** — complete. Starting Phase 3: Incremental Implementation.
+Core gameplay, all block types, visual effects, and multiplayer (M1 + M2) are implemented and live-tested. 208 xUnit tests. Relay deployed on DigitalOcean.
 
-Next milestone: Grid + Camera + Input — render a grid, scroll around, select cells.
+**Multiplayer M2 complete**: 2-6 players, FFA + Teams modes, surrender, game-over overlay, rematch flow.
+
+Next: polish, playtesting, and whatever comes out of that.

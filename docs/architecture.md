@@ -335,54 +335,37 @@ godot/
 
 ```
 Tick N:
-  1. Local player inputs → Command list for tick N+delay
-  2. Send commands to relay server
-  3. Server broadcasts all players' commands for tick N
-  4. All clients receive complete command set
-  5. Tick(commands) — identical on all clients
-  6. Exchange state hashes — mismatch = pause + diagnostic
+  1. Local player inputs → Command list for tick N+InputDelay
+  2. Send commands to relay via WebSocket (binary)
+  3. Relay fans out commands to all peers in the room
+  4. LockstepCoordinator buffers until all active players submit for tick N
+  5. GameState.Tick(mergedCommands) — identical on all clients
+  6. Exchange FNV-1a state hashes — majority-vote desync detection
 ```
 
-Input delay: 1 tick default, 2 ticks if RTT > 80ms.
+Input delay: 1 tick (fixed in M1/M2). Coordinator FSM: Lobby → Running → Stalled/Desynced/Ended.
 
 ### 4.2 Relay Server
 
-Simple relay — receives commands from all clients, broadcasts to all. No game logic on server. Can be a lightweight WebSocket server (Node.js, C#, or Go — whatever's easiest to deploy).
+C# `HttpListener`-based WebSocket relay (`src/Blocker.Relay/`). No game logic — opaque message fan-out. Deployed via systemd + nginx on DigitalOcean.
+
+Key concepts: rooms (4-char code, up to 6 slots), room lifecycle (Lobby → Playing → Lobby on rematch), token-bucket rate limiting per connection, protocol version handshake on Hello.
+
+Wire protocol: hand-rolled binary, defined in `Protocol.cs`. Ranges: 0x00-0x0F session, 0x10-0x1F tick traffic, 0x20-0x2F diagnostics.
 
 ### 4.3 Replay System
 
-```csharp
-public class ReplayRecorder
-{
-    // Records: simulation version, map, player setup, commands per tick
-    public void RecordTick(int tick, List<Command> commands);
-    public ReplayFile Save();
-}
-
-public class ReplayPlayer
-{
-    // Loads replay, re-simulates tick by tick
-    public GameState Step();  // Advance one tick
-    public void SeekTo(int tick);  // Re-simulate from start to tick N
-}
-```
-
-Replays are just command logs. Determinism guarantees identical playback.
+Not yet implemented. Design: record command logs per tick, replay deterministically.
 
 ---
 
 ## 5. Map Format
 
-Text-based format matching the original game's encoding (Section 15.2). Loaded by `MapLoader` in the simulation layer.
+JSON-based (`MapData` record). Maps live in `godot/Maps/` and `maps/`. Loaded by `MapLoader` in the simulation layer via `MapFileManager` on the Godot side.
 
-Maps are plain text files:
-- One character per cell, one line per row
-- Two-layer format: ground grid + `---` separator + unit grid
-- Width/height inferred from grid dimensions
+A map defines: name, dimensions, slot count, ground layer, terrain layer, and unit placements per slot. The in-game map editor (`MapEditorScene`) reads and writes this format.
 
-The Godot layer reads the parsed `Grid` from the simulation and renders ground types visually (colored cell backgrounds, terrain sprites, zone highlights).
-
-Future: may add a Godot-native map editor that writes this format, or migrate to a binary format for large maps. The text format is the starting point.
+Legacy text format (`.txt`) still supported by `MapLoader.LoadFromFile` for backwards compatibility.
 
 ---
 

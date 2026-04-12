@@ -61,15 +61,12 @@ public class LockstepCoordinatorTests
         public void SendCommands(int tick, IReadOnlyList<Command> c) => _inner.SendCommands(tick, c);
         public void SendHash(int tick, uint hash) => _inner.SendHash(tick, hash ^ 0xDEADBEEFu); // corrupt outgoing
         public void SendDesyncReport(int tick, GameStateSnapshot snap) => _inner.SendDesyncReport(tick, snap);
-        public void SendSurrender() => _inner.SendSurrender();
         public event Action<int, int, IReadOnlyList<Command>>? CommandsReceived
         { add => _inner.CommandsReceived += value; remove => _inner.CommandsReceived -= value; }
         public event Action<int, int, uint>? HashReceived
         { add => _inner.HashReceived += value; remove => _inner.HashReceived -= value; }
         public event Action<int, int, LeaveReason>? PlayerLeft
         { add => _inner.PlayerLeft += value; remove => _inner.PlayerLeft -= value; }
-        public event Action<int>? SurrenderReceived
-        { add => _inner.SurrenderReceived += value; remove => _inner.SurrenderReceived -= value; }
     }
 
     [Fact]

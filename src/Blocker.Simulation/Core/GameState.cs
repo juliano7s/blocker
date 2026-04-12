@@ -37,6 +37,29 @@ public class GameState
     public int GetPopulation(int playerId) =>
         Blocks.Where(b => b.PlayerId == playerId).Sum(b => b.PopCost);
 
+    /// <summary>
+    /// Look up which team a player belongs to. Returns the playerId itself if no
+    /// matching player exists, so callers don't crash on stale references — and so
+    /// FFA (where teamId == playerId) keeps working even before MapLoader has set
+    /// teams up.
+    /// </summary>
+    public int GetTeamFor(int playerId)
+    {
+        for (int i = 0; i < Players.Count; i++)
+            if (Players[i].Id == playerId) return Players[i].TeamId;
+        return playerId;
+    }
+
+    /// <summary>True iff the two players are on different teams (i.e. hostile).</summary>
+    public bool AreEnemies(int playerIdA, int playerIdB) =>
+        playerIdA != playerIdB && GetTeamFor(playerIdA) != GetTeamFor(playerIdB);
+
+    /// <summary>True iff two blocks are on different teams.</summary>
+    public bool AreEnemies(Block a, Block b) => AreEnemies(a.PlayerId, b.PlayerId);
+
+    /// <summary>True iff two blocks are on the same team (allies or self).</summary>
+    public bool AreAllies(Block a, Block b) => !AreEnemies(a, b);
+
     public Block AddBlock(BlockType type, int playerId, GridPos pos)
     {
         var block = new Block
@@ -108,6 +131,20 @@ public class GameState
     {
         foreach (var cmd in commands)
         {
+            // Player-level commands bypass the per-block loop. Surrender carries
+            // an empty BlockIds list — it acts on the Player record, not on units.
+            if (cmd.Type == CommandType.Surrender)
+            {
+                var player = Players.FirstOrDefault(p => p.Id == cmd.PlayerId);
+                if (player != null && !player.IsEliminated)
+                {
+                    player.IsEliminated = true;
+                    VisualEvents.Add(new VisualEvent(
+                        VisualEventType.PlayerEliminated, new GridPos(0, 0), player.Id));
+                }
+                continue;
+            }
+
             foreach (var blockId in cmd.BlockIds)
             {
                 var block = GetBlock(blockId);
@@ -393,7 +430,7 @@ public class GameState
                 {
                     var neighbor = block.Pos + offset;
                     var other = GetBlockAt(neighbor);
-                    if (other != null && other.PlayerId != block.PlayerId && other.Type != BlockType.Wall)
+                    if (other != null && AreEnemies(other, block) && other.Type != BlockType.Wall)
                     {
                         adjacentEnemy = true;
                         break;

@@ -8,7 +8,9 @@ namespace Blocker.Simulation.Net;
 /// </summary>
 public static class Protocol
 {
-    public const byte ProtocolVersion = 1;
+    // Bumped 1→2 for M2: CreateRoom carries GameMode; RoomState carries
+    // GameMode + per-slot TeamId. Mismatched clients are rejected on Hello.
+    public const byte ProtocolVersion = 2;
     public const ushort SimulationVersion = 1;
 
     // Session / lobby — 0x00–0x0F
@@ -20,12 +22,13 @@ public static class Protocol
     public const byte LeaveRoom    = 0x06;
     public const byte StartGame    = 0x07;
     public const byte GameStarted  = 0x08;
+    public const byte Rematch      = 0x09;
 
     // Tick traffic — 0x10–0x1F
     public const byte Commands     = 0x10;
     public const byte Hash         = 0x11;
     public const byte PlayerLeft   = 0x12;
-    public const byte Surrender    = 0x13;
+    // 0x13 reserved (was Surrender; now sent as a Command in the Commands stream).
 
     // Diagnostics — 0x20–0x2F
     public const byte DesyncReport = 0x20;
@@ -39,6 +42,36 @@ public enum LeaveReason : byte
     Disconnected = 0,
     Surrender    = 1,
     Kicked       = 2,
+}
+
+/// <summary>
+/// Game mode for a multiplayer room. The relay carries this byte verbatim;
+/// every peer derives team assignments locally from (slotId, GameMode).
+/// </summary>
+public enum GameMode : byte
+{
+    /// <summary>Each slot is its own team. Default for any slot count.</summary>
+    Ffa = 0,
+    /// <summary>Pairs of consecutive slots share a team: (0,1)→0, (2,3)→1, (4,5)→2.</summary>
+    Teams = 1,
+}
+
+public static class GameModeExtensions
+{
+    /// <summary>Deterministic team assignment for the given slot under this mode.</summary>
+    public static int TeamForSlot(this GameMode mode, int slotId) => mode switch
+    {
+        GameMode.Teams => slotId / 2,
+        _              => slotId,
+    };
+
+    /// <summary>True if this mode is valid for the given slot count.</summary>
+    public static bool IsValidFor(this GameMode mode, int slotCount) => mode switch
+    {
+        // Teams requires even slot count: every slot must have a partner.
+        GameMode.Teams => slotCount >= 2 && slotCount % 2 == 0,
+        _              => slotCount >= 2,
+    };
 }
 
 public enum ErrorCode : byte

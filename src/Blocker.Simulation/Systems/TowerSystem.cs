@@ -278,10 +278,10 @@ public static class TowerSystem
                 var block = state.GetBlockAt(pos);
                 if (block == null) continue;
 
-                if (block.PlayerId != center.PlayerId)
+                if (state.AreEnemies(block, center))
                     return true; // Enemy found
 
-                // Friendly block doesn't block LoS for scanning
+                // Friendly / teammate block doesn't block LoS for scanning
             }
         }
 

@@ -42,7 +42,7 @@ public static class CombatSystem
                     {
                         var neighbor = state.GetBlockAt(block.Pos + offset);
                         if (neighbor != null && neighbor.Type == BlockType.Soldier
-                            && IsEnemy(block, neighbor) && !neighbor.IsMobile
+                            && IsEnemy(state, block, neighbor) && !neighbor.IsMobile
                             && !toKill.Contains(neighbor.Id))
                         {
                             hasRootedEnemySoldier = true;
@@ -58,7 +58,7 @@ public static class CombatSystem
                             var pos = block.Pos + offset;
                             var neighbor = state.GetBlockAt(pos);
                             if (neighbor != null && neighbor.Type == BlockType.Soldier
-                                && IsEnemy(block, neighbor) && !neighbor.IsMobile)
+                                && IsEnemy(state, block, neighbor) && !neighbor.IsMobile)
                             {
                                 soldierHpLoss.TryGetValue(neighbor.Id, out int loss);
                                 soldierHpLoss[neighbor.Id] = loss + 1;
@@ -103,7 +103,7 @@ public static class CombatSystem
                 var neighbor = state.GetBlockAt(neighborPos);
                 if (neighbor == null) continue;
                 if (neighbor.Type != BlockType.Soldier) continue;
-                if (neighbor.PlayerId == block.PlayerId) continue; // Same team
+                if (!state.AreEnemies(block, neighbor)) continue;
                 if (toKill.Contains(neighbor.Id)) continue;
 
                 var pair = block.Id < neighbor.Id ? (block.Id, neighbor.Id) : (neighbor.Id, block.Id);
@@ -154,7 +154,7 @@ public static class CombatSystem
             var neighbor = state.GetBlockAt(target.Pos + offset);
             if (neighbor == null) continue;
 
-            if (IsEnemy(target, neighbor))
+            if (IsEnemy(state, target, neighbor))
             {
                 if (neighbor.Type == BlockType.Soldier)
                     orthoEnemySoldiers++;
@@ -174,7 +174,7 @@ public static class CombatSystem
         {
             var neighbor = state.GetBlockAt(target.Pos + offset);
             if (neighbor == null) continue;
-            if (IsEnemy(target, neighbor) && neighbor.Type == BlockType.Soldier)
+            if (IsEnemy(state, target, neighbor) && neighbor.Type == BlockType.Soldier)
                 diagEnemySoldiers++;
         }
 
@@ -250,7 +250,7 @@ public static class CombatSystem
         foreach (var offset in offsets)
         {
             var neighbor = state.GetBlockAt(target.Pos + offset);
-            if (neighbor != null && neighbor.Type == BlockType.Soldier && IsEnemy(target, neighbor))
+            if (neighbor != null && neighbor.Type == BlockType.Soldier && IsEnemy(state, target, neighbor))
                 count++;
         }
         return count;
@@ -263,7 +263,7 @@ public static class CombatSystem
         {
             var pos = target.Pos + offset;
             var neighbor = state.GetBlockAt(pos);
-            if (neighbor != null && neighbor.Type == BlockType.Soldier && IsEnemy(target, neighbor))
+            if (neighbor != null && neighbor.Type == BlockType.Soldier && IsEnemy(state, target, neighbor))
                 yield return pos;
         }
     }
@@ -296,9 +296,8 @@ public static class CombatSystem
         }
     }
 
-    private static bool IsEnemy(Block a, Block b)
-    {
-        // TODO: Use team system when teams are implemented
-        return a.PlayerId != b.PlayerId;
-    }
+    // Local thunk: combat ran most checks via IsEnemy(a,b) before teams existed.
+    // We now defer to GameState.AreEnemies which understands team membership;
+    // call sites pass `state` through.
+    private static bool IsEnemy(GameState state, Block a, Block b) => state.AreEnemies(a, b);
 }

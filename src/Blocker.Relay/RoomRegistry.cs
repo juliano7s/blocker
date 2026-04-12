@@ -15,7 +15,7 @@ public sealed class RoomRegistry
     public IEnumerable<Room> All() => _rooms.Values;
 
     public Room? TryCreate(Guid hostId, string ip, int maxRoomsPerIp,
-                           ushort simVersion, byte[] mapBlob, string mapName, int slotCount)
+                           ushort simVersion, byte[] mapBlob, string mapName, int slotCount, byte gameMode)
     {
         int count = _roomsPerIp.GetOrAdd(ip, 0);
         if (count >= maxRoomsPerIp) return null;
@@ -30,7 +30,8 @@ public sealed class RoomRegistry
                 SimulationVersion = simVersion,
                 MapBlob = mapBlob,
                 MapName = mapName,
-                SlotCount = slotCount
+                SlotCount = slotCount,
+                GameMode = gameMode
             };
             if (_rooms.TryAdd(code, room))
             {
