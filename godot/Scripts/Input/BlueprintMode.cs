@@ -25,6 +25,7 @@ public class BlueprintMode
 
     public BlueprintType ActiveType { get; private set; }
     public int Rotation { get; private set; } // 0, 1, 2, 3 = 0°, 90°, 180°, 270°
+    private bool _manuallyRotated; // true once user presses R; stops auto-rotation
 
     public record struct PlacedGhost(BlueprintType Type, GridPos Position, int Rotation, float PlacedAt);
     public List<PlacedGhost> PlacedGhosts { get; } = [];
@@ -40,14 +41,59 @@ public class BlueprintMode
         {
             ActiveType = type;
             Rotation = 0;
+            _manuallyRotated = false;
         }
     }
 
-    public void Deactivate() => ActiveType = BlueprintType.None;
+    public void Deactivate()
+    {
+        ActiveType = BlueprintType.None;
+        _manuallyRotated = false;
+    }
 
     public void Rotate()
     {
         Rotation = (Rotation + 1) % 4;
+        _manuallyRotated = true;
+    }
+
+    /// <summary>
+    /// Auto-set rotation so the formation faces away from the nearest map edge.
+    /// Only applies when the user hasn't manually rotated (pressed R).
+    /// </summary>
+    public void AutoRotate(GridPos hoverPos, int mapWidth, int mapHeight)
+    {
+        if (!IsActive || _manuallyRotated) return;
+
+        int distLeft = hoverPos.X;
+        int distRight = mapWidth - 1 - hoverPos.X;
+        int distTop = hoverPos.Y;
+        int distBottom = mapHeight - 1 - hoverPos.Y;
+
+        int minDist = Math.Min(Math.Min(distLeft, distRight), Math.Min(distTop, distBottom));
+
+        // Determine which direction the formation should face (away from closest edge)
+        // Ties broken by picking the first match in priority order
+        bool isNest = ActiveType is BlueprintType.BuilderNest or BlueprintType.SoldierNest or BlueprintType.StunnerNest;
+
+        if (isNest)
+        {
+            // Nest open side at each rotation: rot0=LEFT, rot1=UP, rot2=RIGHT, rot3=DOWN
+            // We want open side to face AWAY from closest edge
+            if (distLeft == minDist) Rotation = 2;       // Face RIGHT (away from left edge)
+            else if (distTop == minDist) Rotation = 3;    // Face DOWN (away from top edge)
+            else if (distRight == minDist) Rotation = 0;  // Face LEFT (away from right edge)
+            else Rotation = 1;                             // Face UP (away from bottom edge)
+        }
+        else
+        {
+            // Towers/Supply: primary extension at each rotation: rot0=RIGHT, rot1=DOWN, rot2=LEFT, rot3=UP
+            // We want extension to face AWAY from closest edge
+            if (distLeft == minDist) Rotation = 0;       // Face RIGHT
+            else if (distTop == minDist) Rotation = 1;    // Face DOWN
+            else if (distRight == minDist) Rotation = 2;  // Face LEFT
+            else Rotation = 3;                             // Face UP
+        }
     }
 
     public void ClearGhosts() => PlacedGhosts.Clear();

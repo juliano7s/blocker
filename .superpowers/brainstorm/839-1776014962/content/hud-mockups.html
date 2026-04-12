@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>HUD Design Comparison</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0d1117;
+      color: #e5e5e5;
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 24px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 8px;
+      font-size: 24px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #888;
+      margin-bottom: 32px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .mockup-card {
+      background: #161b22;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      border: 3px solid transparent;
+      transition: border-color 0.2s;
+    }
+    .mockup-card:hover {
+      border-color: #3b82f6;
+    }
+    .mockup-card.selected {
+      border-color: #22c55e;
+    }
+    .mockup-label {
+      padding: 16px;
+      background: #1c2128;
+      border-bottom: 1px solid #30363d;
+    }
+    .mockup-label h2 {
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+    .mockup-label p {
+      font-size: 13px;
+      color: #888;
+    }
+    .game-area {
+      height: 300px;
+      position: relative;
+      background: linear-gradient(135deg, #0a0e14 0%, #131920 100%);
+    }
+    /* Grid pattern */
+    .grid-pattern {
+      position: absolute;
+      top: 45px;
+      left: 10px;
+      right: 10px;
+      bottom: 110px;
+      background-image:
+        linear-gradient(rgba(58,134,255,0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(58,134,255,0.1) 1px, transparent 1px);
+      background-size: 20px 20px;
+      border: 1px solid rgba(58,134,255,0.2);
+      border-radius: 4px;
+    }
+    /* Blocks */
+    .block {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+    }
+    .block.blue { background: #3b82f6; }
+    .block.red { background: #ef4444; }
+
+    /* Top bar styles */
+    .top-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 12px;
+      font-size: 12px;
+    }
+    .top-bar.floating {
+      background: rgba(10, 14, 20, 0.7);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .top-bar.solid {
+      background: linear-gradient(180deg, #141922 0%, #0c1015 100%);
+      border-bottom: 2px solid #2d3748;
+    }
+    .player-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .player-color {
+      width: 14px;
+      height: 14px;
+      background: #3b82f6;
+      border-radius: 3px;
+    }
+    .divider {
+      width: 1px;
+      height: 20px;
+      background: #2d3748;
+    }
+    .menu-btn {
+      margin-left: auto;
+      background: rgba(255,255,255,0.08);
+      padding: 5px 10px;
+      border-radius: 4px;
+      color: #aaa;
+    }
+    .solid .menu-btn {
+      background: #0c1015;
+      border: 1px solid #2d3748;
+    }
+
+    /* Spawn toggles */
+    .spawn-toggles-floating {
+      position: absolute;
+      top: 55px;
+      right: 20px;
+      background: rgba(10, 14, 20, 0.8);
+      backdrop-filter: blur(8px);
+      border-radius: 6px;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .spawn-toggles-inline {
+      display: flex;
+      gap: 4px;
+      background: #0c1015;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid #2d3748;
+      margin-right: 8px;
+    }
+    .spawn-toggle {
+      width: 18px;
+      height: 18px;
+      border-radius: 3px;
+    }
+    .spawn-toggle.builder { background: #3b82f6; }
+    .spawn-toggle.soldier { background: #22c55e; opacity: 0.4; }
+    .spawn-toggle.stunner { background: #a855f7; }
+
+    /* Bottom bar */
+    .bottom-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 100px;
+      background: linear-gradient(180deg, #141922 0%, #0c1015 100%);
+      border-top: 2px solid #2d3748;
+      display: flex;
+      gap: 4px;
+      padding: 6px;
+    }
+    .panel {
+      background: #0a0e14;
+      border-radius: 4px;
+      border: 2px solid #2d3748;
+      padding: 8px;
+    }
+    .minimap {
+      width: 90px;
+      position: relative;
+    }
+    .minimap-inner {
+      position: absolute;
+      inset: 10px;
+      background: #0d1117;
+      border-radius: 2px;
+    }
+    .minimap-dot {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      border-radius: 1px;
+    }
+    .minimap-viewport {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 25px;
+      height: 18px;
+      border: 1px solid rgba(255,255,255,0.6);
+    }
+    .selection-panel {
+      flex: 1;
+    }
+    .selection-label {
+      font-size: 10px;
+      color: #666;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    .unit-grid {
+      display: flex;
+      gap: 4px;
+    }
+    .unit-icon {
+      width: 22px;
+      height: 22px;
+      background: #3b82f6;
+      border-radius: 3px;
+      border: 1px solid #5b9cf6;
+    }
+    .command-panel {
+      width: 90px;
+    }
+    .command-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 4px;
+    }
+    .command-btn {
+      width: 34px;
+      height: 34px;
+      background: #1a1f28;
+      border-radius: 4px;
+      border: 1px solid #2d3748;
+      position: relative;
+    }
+    .command-btn .hotkey {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 9px;
+      color: #555;
+    }
+
+    .instructions {
+      text-align: center;
+      margin-top: 24px;
+      color: #666;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>HUD Design: Approach A vs B</h1>
+  <p class="subtitle">Click to select which direction feels right</p>
+
+  <div class="grid">
+    <!-- Approach A -->
+    <div class="mockup-card" onclick="this.classList.toggle('selected')">
+      <div class="mockup-label">
+        <h2>A: Floating Top, Grounded Bottom</h2>
+        <p>Semi-transparent top bar, spawn toggles float on right</p>
+      </div>
+      <div class="game-area">
+        <div class="grid-pattern"></div>
+
+        <!-- Blocks -->
+        <div class="block blue" style="top: 90px; left: 60px;"></div>
+        <div class="block blue" style="top: 90px; left: 78px;"></div>
+        <div class="block blue" style="top: 108px; left: 60px;"></div>
+        <div class="block red" style="top: 120px; left: 180px;"></div>
+        <div class="block red" style="top: 120px; left: 198px;"></div>
+
+        <!-- Floating top bar -->
+        <div class="top-bar floating">
+          <div class="player-badge">
+            <div class="player-color"></div>
+            <span>Player 1</span>
+          </div>
+          <span style="color: #888;">03:42</span>
+          <span>Pop: 12/20</span>
+          <div class="menu-btn">☰</div>
+        </div>
+
+        <!-- Floating spawn toggles -->
+        <div class="spawn-toggles-floating">
+          <div class="spawn-toggle builder"></div>
+          <div class="spawn-toggle soldier"></div>
+          <div class="spawn-toggle stunner"></div>
+        </div>
+
+        <!-- Bottom bar -->
+        <div class="bottom-bar">
+          <div class="panel minimap">
+            <div class="minimap-inner">
+              <div class="minimap-dot" style="top: 20%; left: 20%; background: #3b82f6;"></div>
+              <div class="minimap-dot" style="top: 50%; left: 70%; background: #ef4444;"></div>
+            </div>
+            <div class="minimap-viewport"></div>
+          </div>
+          <div class="panel selection-panel">
+            <div class="selection-label">Selected: 3 Builders</div>
+            <div class="unit-grid">
+              <div class="unit-icon"></div>
+              <div class="unit-icon"></div>
+              <div class="unit-icon"></div>
+            </div>
+          </div>
+          <div class="panel command-panel">
+            <div class="command-grid">
+              <div class="command-btn"><span class="hotkey">F</span></div>
+              <div class="command-btn"><span class="hotkey">W</span></div>
+              <div class="command-btn"><span class="hotkey">G</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Approach B -->
+    <div class="mockup-card" onclick="this.classList.toggle('selected')">
+      <div class="mockup-label">
+        <h2>B: Unified Frame</h2>
+        <p>Solid top and bottom bars, spawn toggles in top bar</p>
+      </div>
+      <div class="game-area">
+        <div class="grid-pattern"></div>
+
+        <!-- Blocks -->
+        <div class="block blue" style="top: 90px; left: 60px;"></div>
+        <div class="block blue" style="top: 90px; left: 78px;"></div>
+        <div class="block blue" style="top: 108px; left: 60px;"></div>
+        <div class="block red" style="top: 120px; left: 180px;"></div>
+        <div class="block red" style="top: 120px; left: 198px;"></div>
+
+        <!-- Solid top bar -->
+        <div class="top-bar solid">
+          <div class="player-badge">
+            <div class="player-color"></div>
+            <span>Player 1</span>
+          </div>
+          <div class="divider"></div>
+          <span style="color: #888;">03:42</span>
+          <div class="divider"></div>
+          <span>Pop: 12/20</span>
+          <div class="spawn-toggles-inline">
+            <div class="spawn-toggle builder"></div>
+            <div class="spawn-toggle soldier"></div>
+            <div class="spawn-toggle stunner"></div>
+          </div>
+          <div class="menu-btn">☰</div>
+        </div>
+
+        <!-- Bottom bar -->
+        <div class="bottom-bar">
+          <div class="panel minimap">
+            <div class="minimap-inner">
+              <div class="minimap-dot" style="top: 20%; left: 20%; background: #3b82f6;"></div>
+              <div class="minimap-dot" style="top: 50%; left: 70%; background: #ef4444;"></div>
+            </div>
+            <div class="minimap-viewport"></div>
+          </div>
+          <div class="panel selection-panel">
+            <div class="selection-label">Selected: 3 Builders</div>
+            <div class="unit-grid">
+              <div class="unit-icon"></div>
+              <div class="unit-icon"></div>
+              <div class="unit-icon"></div>
+            </div>
+          </div>
+          <div class="panel command-panel">
+            <div class="command-grid">
+              <div class="command-btn"><span class="hotkey">F</span></div>
+              <div class="command-btn"><span class="hotkey">W</span></div>
+              <div class="command-btn"><span class="hotkey">G</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="instructions">Click a mockup to select it, then let me know in the terminal</p>
+</body>
+</html>

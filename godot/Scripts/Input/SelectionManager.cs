@@ -136,6 +136,12 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 				_paintedCells.Add(gridPos);
 		}
 
+		// Auto-rotate blueprint based on hover position (only if user hasn't manually rotated)
+		if (_blueprintMode && _hoveredCell.HasValue)
+		{
+			_blueprint.AutoRotate(_hoveredCell.Value, _gameState.Grid.Width, _gameState.Grid.Height);
+		}
+
 		// Clean up dead/removed blocks from selection
 		_selectedBlocks.RemoveAll(b => !_gameState.Blocks.Contains(b));
 

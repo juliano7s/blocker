@@ -1,0 +1,58 @@
+<h2>HUD Design: Approach A vs B</h2>
+<p class="subtitle">Click to select which direction feels right</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Floating Top, Grounded Bottom</h3>
+      <p>Semi-transparent top bar overlays the game. Solid bottom bar with clear panel borders. Spawn toggles float on the right side of the game area.</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Top bar blends into game</li>
+            <li>More game area visible</li>
+            <li>Lighter visual weight</li>
+            <li>Spawn toggles always visible, separate from HUD</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Mixed visual language (transparent + solid)</li>
+            <li>Floating elements may feel disconnected</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Unified Frame</h3>
+      <p>Top and bottom bars share the same solid panel treatment. Spawn toggles integrated into top bar. Consistent "cockpit" feel around the game area.</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Consistent frame around game</li>
+            <li>Clear HUD boundaries</li>
+            <li>Traditional RTS feel</li>
+            <li>Everything in one visual system</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Takes more screen space</li>
+            <li>Heavier visual presence</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top: 24px;">I'll show detailed visual mockups of whichever you pick</p>

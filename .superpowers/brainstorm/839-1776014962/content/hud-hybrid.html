@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>HUD Design - Hybrid B + Floating Toggles</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0d1117;
+      color: #e5e5e5;
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 24px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 8px;
+      font-size: 24px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #888;
+      margin-bottom: 32px;
+    }
+    .mockup-container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .mockup-card {
+      background: #161b22;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 2px solid #2d3748;
+    }
+    .mockup-label {
+      padding: 16px;
+      background: #1c2128;
+      border-bottom: 1px solid #30363d;
+    }
+    .mockup-label h2 {
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+    .mockup-label p {
+      font-size: 13px;
+      color: #888;
+    }
+    .game-area {
+      height: 400px;
+      position: relative;
+      background: linear-gradient(135deg, #0a0e14 0%, #131920 100%);
+    }
+    .grid-pattern {
+      position: absolute;
+      top: 50px;
+      left: 10px;
+      right: 10px;
+      bottom: 120px;
+      background-image:
+        linear-gradient(rgba(58,134,255,0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(58,134,255,0.1) 1px, transparent 1px);
+      background-size: 20px 20px;
+      border: 1px solid rgba(58,134,255,0.2);
+      border-radius: 4px;
+    }
+    .block {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-radius: 2px;
+    }
+    .block.blue { background: #3b82f6; }
+    .block.red { background: #ef4444; }
+
+    /* Solid top bar (from B) */
+    .top-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 42px;
+      background: linear-gradient(180deg, #141922 0%, #0c1015 100%);
+      border-bottom: 2px solid #2d3748;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 14px;
+      font-size: 13px;
+    }
+    .player-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .player-color {
+      width: 16px;
+      height: 16px;
+      background: #3b82f6;
+      border-radius: 3px;
+      border: 1px solid #5b9cf6;
+    }
+    .divider {
+      width: 1px;
+      height: 22px;
+      background: #2d3748;
+    }
+    .menu-btn {
+      margin-left: auto;
+      background: #0c1015;
+      padding: 6px 12px;
+      border-radius: 4px;
+      border: 1px solid #2d3748;
+      color: #aaa;
+      cursor: pointer;
+    }
+    .menu-btn:hover {
+      background: #1a1f28;
+      color: #e5e5e5;
+    }
+
+    /* Floating spawn toggles (from A) */
+    .spawn-toggles {
+      position: absolute;
+      top: 65px;
+      right: 25px;
+      background: rgba(12, 16, 21, 0.9);
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border: 2px solid #2d3748;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .spawn-toggle {
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      cursor: pointer;
+      position: relative;
+      transition: opacity 0.15s;
+    }
+    .spawn-toggle.builder { background: #3b82f6; }
+    .spawn-toggle.soldier { background: #22c55e; }
+    .spawn-toggle.stunner { background: #a855f7; }
+    .spawn-toggle.paused {
+      opacity: 0.35;
+    }
+    .spawn-toggle .hotkey {
+      position: absolute;
+      bottom: 2px;
+      right: 3px;
+      font-size: 9px;
+      color: rgba(255,255,255,0.6);
+      font-weight: bold;
+    }
+
+    /* Bottom bar */
+    .bottom-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 110px;
+      background: linear-gradient(180deg, #141922 0%, #0c1015 100%);
+      border-top: 2px solid #2d3748;
+      display: flex;
+      gap: 6px;
+      padding: 8px;
+    }
+    .panel {
+      background: #0a0e14;
+      border-radius: 6px;
+      border: 2px solid #2d3748;
+      padding: 10px;
+    }
+    .minimap {
+      width: 120px;
+      position: relative;
+    }
+    .minimap-label {
+      font-size: 9px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .minimap-inner {
+      position: absolute;
+      top: 22px;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      background: #0d1117;
+      border-radius: 3px;
+      border: 1px solid #2d3748;
+    }
+    .minimap-dot {
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      border-radius: 1px;
+    }
+    .minimap-viewport {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 30px;
+      height: 20px;
+      border: 1px solid rgba(255,255,255,0.7);
+      border-radius: 1px;
+    }
+    .selection-panel {
+      flex: 1;
+    }
+    .panel-label {
+      font-size: 10px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .unit-grid {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .unit-icon {
+      width: 26px;
+      height: 26px;
+      background: #3b82f6;
+      border-radius: 4px;
+      border: 2px solid #5b9cf6;
+      cursor: pointer;
+    }
+    .unit-icon:hover {
+      border-color: #93c5fd;
+    }
+    .command-panel {
+      width: 120px;
+    }
+    .command-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+    }
+    .command-btn {
+      width: 32px;
+      height: 32px;
+      background: #1a1f28;
+      border-radius: 5px;
+      border: 1px solid #2d3748;
+      position: relative;
+      cursor: pointer;
+    }
+    .command-btn:hover {
+      background: #252b36;
+      border-color: #3d4654;
+    }
+    .command-btn.disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .command-btn .hotkey {
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 9px;
+      color: #666;
+    }
+    .command-btn .icon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 14px;
+      color: #888;
+    }
+
+    .notes {
+      margin-top: 24px;
+      padding: 16px;
+      background: #161b22;
+      border-radius: 8px;
+      border: 1px solid #2d3748;
+    }
+    .notes h3 {
+      font-size: 14px;
+      margin-bottom: 12px;
+      color: #aaa;
+    }
+    .notes ul {
+      font-size: 13px;
+      color: #888;
+      padding-left: 20px;
+    }
+    .notes li {
+      margin-bottom: 6px;
+    }
+    .notes code {
+      background: #0d1117;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 12px;
+      color: #7ee787;
+    }
+  </style>
+</head>
+<body>
+  <h1>Hybrid: Solid Frame + Floating Toggles</h1>
+  <p class="subtitle">Unified frame from B, with floating spawn toggles from A</p>
+
+  <div class="mockup-container">
+    <div class="mockup-card">
+      <div class="game-area">
+        <div class="grid-pattern"></div>
+
+        <!-- Blocks -->
+        <div class="block blue" style="top: 110px; left: 80px;"></div>
+        <div class="block blue" style="top: 110px; left: 100px;"></div>
+        <div class="block blue" style="top: 130px; left: 80px;"></div>
+        <div class="block blue" style="top: 130px; left: 100px;"></div>
+        <div class="block blue" style="top: 150px; left: 90px;"></div>
+        <div class="block red" style="top: 140px; left: 280px;"></div>
+        <div class="block red" style="top: 140px; left: 300px;"></div>
+        <div class="block red" style="top: 160px; left: 290px;"></div>
+
+        <!-- Solid top bar -->
+        <div class="top-bar">
+          <div class="player-badge">
+            <div class="player-color"></div>
+            <span style="font-weight: 500;">Player 1</span>
+          </div>
+          <div class="divider"></div>
+          <span style="color: #888;">03:42</span>
+          <div class="divider"></div>
+          <span>Pop: 12 / 20</span>
+          <div class="menu-btn">☰ Menu</div>
+        </div>
+
+        <!-- Floating spawn toggles -->
+        <div class="spawn-toggles">
+          <div class="spawn-toggle builder" title="Builder spawning: ON">
+            <span class="hotkey">1</span>
+          </div>
+          <div class="spawn-toggle soldier paused" title="Soldier spawning: PAUSED">
+            <span class="hotkey">2</span>
+          </div>
+          <div class="spawn-toggle stunner" title="Stunner spawning: ON">
+            <span class="hotkey">3</span>
+          </div>
+        </div>
+
+        <!-- Bottom bar -->
+        <div class="bottom-bar">
+          <div class="panel minimap">
+            <div class="minimap-label">Minimap</div>
+            <div class="minimap-inner">
+              <div class="minimap-dot" style="top: 25%; left: 20%; background: #3b82f6;"></div>
+              <div class="minimap-dot" style="top: 25%; left: 25%; background: #3b82f6;"></div>
+              <div class="minimap-dot" style="top: 55%; left: 65%; background: #ef4444;"></div>
+              <div class="minimap-dot" style="top: 55%; left: 70%; background: #ef4444;"></div>
+            </div>
+            <div class="minimap-viewport"></div>
+          </div>
+          <div class="panel selection-panel">
+            <div class="panel-label">Selected: 5 Builders</div>
+            <div class="unit-grid">
+              <div class="unit-icon"></div>
+              <div class="unit-icon"></div>
+              <div class="unit-icon"></div>
+              <div class="unit-icon"></div>
+              <div class="unit-icon"></div>
+            </div>
+          </div>
+          <div class="panel command-panel">
+            <div class="panel-label">Commands</div>
+            <div class="command-grid">
+              <div class="command-btn" title="Root (F)">
+                <span class="icon">⌾</span>
+                <span class="hotkey">F</span>
+              </div>
+              <div class="command-btn" title="Wall (W)">
+                <span class="icon">▣</span>
+                <span class="hotkey">W</span>
+              </div>
+              <div class="command-btn" title="Push (G)">
+                <span class="icon">↠</span>
+                <span class="hotkey">G</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <h3>Design decisions</h3>
+      <ul>
+        <li><strong>Top bar:</strong> Solid frame — player info, game time, population, menu button</li>
+        <li><strong>Spawn toggles:</strong> Float at top-right of game area, hotkeys <code>1</code> <code>2</code> <code>3</code>. Dimmed = paused</li>
+        <li><strong>Minimap:</strong> Clear border, labeled, viewport indicator</li>
+        <li><strong>Selection:</strong> Clickable unit icons (click = select one, shift+click = deselect)</li>
+        <li><strong>Commands:</strong> Icon grid with hotkey in corner, tooltip on hover</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>
