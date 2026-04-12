@@ -16,6 +16,7 @@
 [ext_resource type="Script" uid="uid://cbo06ubgj3cnd" path="res://Scripts/Audio/AudioConfig.cs" id="9_audioconfig"]
 [ext_resource type="AudioStream" uid="uid://bxtnv7ggs83er" path="res://Assets/Sounds/command-root.ogg" id="10_c4ay3"]
 [ext_resource type="AudioStream" uid="uid://d0u85jdwux1c6" path="res://Assets/Sounds/builder-spawn.ogg" id="11_aht7i"]
+[ext_resource type="AudioStream" uid="uid://dmg3mx2aw7qrg" path="res://Assets/Sounds/builder-select1.ogg" id="11_jyqft"]
 [ext_resource type="AudioStream" uid="uid://d1u1scdohux8k" path="res://Assets/Sounds/soldier-spawn.ogg" id="12_5jffn"]
 [ext_resource type="AudioStream" uid="uid://pbk4kc8aiowu" path="res://Assets/Sounds/spawn-warden.ogg" id="13_kpo4j"]
 [ext_resource type="AudioStream" uid="uid://bhkowjs1c0x3f" path="res://Assets/Sounds/supply-completed.ogg" id="14_4n42c"]
@@ -165,6 +166,7 @@ glow_hdr_threshold = 0.63
 
 [sub_resource type="Resource" id="Resource_audio"]
 script = ExtResource("9_audioconfig")
+SelectBuilder = ExtResource("11_jyqft")
 MoveCommand = ExtResource("8_jyqft")
 RootStart = ExtResource("10_c4ay3")
 UprootStart = ExtResource("16_xvtyr")

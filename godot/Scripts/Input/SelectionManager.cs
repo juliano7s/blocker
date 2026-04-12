@@ -92,6 +92,30 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 			kvp => kvp.Key,
 			kvp => (IReadOnlyList<int>)kvp.Value.AsReadOnly());
 
+	/// <summary>Select only the specified block (from HUD click).</summary>
+	public void SelectBlockById(int blockId)
+	{
+		if (_gameState == null) return;
+		var block = _gameState.Blocks.FirstOrDefault(b => b.Id == blockId);
+		if (block != null)
+		{
+			_selectedBlocks.Clear();
+			_selectedBlocks.Add(block);
+		}
+	}
+
+	/// <summary>Remove the specified block from selection (from HUD shift-click).</summary>
+	public void DeselectBlockById(int blockId)
+	{
+		_selectedBlocks.RemoveAll(b => b.Id == blockId);
+	}
+
+	/// <summary>Toggle blueprint mode by type (from HUD click).</summary>
+	public void ToggleBlueprintMode(int blueprintType)
+	{
+		_blueprint.Toggle((BlueprintMode.BlueprintType)blueprintType);
+	}
+
 	/// <summary>Flush pending commands for the tick runner to consume.</summary>
 	public List<Command> FlushCommands()
 	{

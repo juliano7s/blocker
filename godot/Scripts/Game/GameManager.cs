@@ -128,6 +128,14 @@ public partial class GameManager : Node2D
 		_hudBar.SetGameState(gameState);
 		_hudBar.SetConfig(Config);
 		_hudBar.MinimapCameraJump += pos => _camera.JumpTo(pos);
+		_hudBar.UnitClicked += (blockId, shiftHeld) =>
+		{
+			if (shiftHeld)
+				_selectionManager.DeselectBlockById(blockId);
+			else
+				_selectionManager.SelectBlockById(blockId);
+		};
+		_hudBar.BlueprintClicked += type => _selectionManager.ToggleBlueprintMode(type);
 
 		// Set up floating spawn toggles (top-right of game area)
 		_spawnToggles = new SpawnToggles();
@@ -143,8 +151,7 @@ public partial class GameManager : Node2D
 		togglesAnchor.AddChild(_spawnToggles);
 
 		// Tell camera about HUD coverage so it offsets the visible area
-		// Top bar: 32px bar + 6px ratio bar = 38px. Bottom bar: 150px.
-		_camera.SetHudInsets(38f, 150f);
+		_camera.SetHudInsets(HudStyles.TopBarHeight, HudStyles.BottomBarHeight);
 		_camera.CenterOnGrid();
 
 		// Set up effect manager

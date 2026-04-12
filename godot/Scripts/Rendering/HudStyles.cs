@@ -20,10 +20,13 @@ public static class HudStyles
 
     // Dimensions
     public const float TopBarHeight = 42f;
-    public const float BottomBarHeight = 110f;
+    public const float BottomBarHeight = 220f;
     public const float PanelBorderWidth = 2f;
     public const float PanelGap = 6f;
-    public const float FixedPanelWidth = 120f;
+
+    // Bottom bar panel ratios (20% / 60% / 20%)
+    public const float SidePanelRatio = 0.20f;
+    public const float CenterPanelRatio = 0.60f;
 
     // Font sizes
     public const int FontSizeNormal = 13;

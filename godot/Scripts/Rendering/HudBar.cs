@@ -19,6 +19,7 @@ public partial class HudBar : CanvasLayer
     [Signal] public delegate void ControlGroupClickedEventHandler(int groupIndex, bool ctrlHeld);
     [Signal] public delegate void UnitClickedEventHandler(int blockId, bool shiftHeld);
     [Signal] public delegate void CommandClickedEventHandler(string commandKey);
+    [Signal] public delegate void BlueprintClickedEventHandler(int blueprintType);
 
     public override void _Ready()
     {
@@ -52,36 +53,33 @@ public partial class HudBar : CanvasLayer
         hbox.MouseFilter = Control.MouseFilterEnum.Ignore;
         margin.AddChild(hbox);
 
-        // Left: Minimap (fixed width)
+        // Left: Minimap (20%)
         _minimap = new MinimapPanel
         {
-            CustomMinimumSize = new Vector2(HudStyles.FixedPanelWidth, 0),
             MouseFilter = Control.MouseFilterEnum.Stop
         };
-        _minimap.SizeFlagsHorizontal = Control.SizeFlags.Fill;
+        _minimap.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        _minimap.SizeFlagsStretchRatio = HudStyles.SidePanelRatio;
         _minimap.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         _minimap.CameraJumpRequested += pos => EmitSignal(SignalName.MinimapCameraJump, pos);
         hbox.AddChild(_minimap);
 
-        // Center: Selection panel (flexible)
-        _selectionPanel = new SelectionPanel
-        {
-            CustomMinimumSize = new Vector2(0, 0),
-        };
+        // Center: Selection panel (60%)
+        _selectionPanel = new SelectionPanel();
         _selectionPanel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        _selectionPanel.SizeFlagsStretchRatio = HudStyles.CenterPanelRatio;
         _selectionPanel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         _selectionPanel.ControlGroupClicked += (idx, ctrl) => EmitSignal(SignalName.ControlGroupClicked, idx, ctrl);
         _selectionPanel.UnitClicked += (id, shift) => EmitSignal(SignalName.UnitClicked, id, shift);
         hbox.AddChild(_selectionPanel);
 
-        // Right: Command card (fixed width)
-        _commandCard = new CommandCard
-        {
-            CustomMinimumSize = new Vector2(HudStyles.FixedPanelWidth, 0),
-        };
-        _commandCard.SizeFlagsHorizontal = Control.SizeFlags.Fill;
+        // Right: Command card (20%)
+        _commandCard = new CommandCard();
+        _commandCard.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        _commandCard.SizeFlagsStretchRatio = HudStyles.SidePanelRatio;
         _commandCard.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         _commandCard.CommandClicked += key => EmitSignal(SignalName.CommandClicked, key);
+        _commandCard.BlueprintClicked += type => EmitSignal(SignalName.BlueprintClicked, type);
         hbox.AddChild(_commandCard);
     }
 

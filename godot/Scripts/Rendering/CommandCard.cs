@@ -4,15 +4,18 @@ using Godot;
 namespace Blocker.Game.Rendering;
 
 /// <summary>
-/// Right panel showing available commands for current selection.
+/// Right panel showing available commands and blueprint icons.
+/// Top section: unit commands. Bottom section: blueprint icons.
 /// </summary>
 public partial class CommandCard : Control
 {
     [Signal] public delegate void CommandClickedEventHandler(string commandKey);
+    [Signal] public delegate void BlueprintClickedEventHandler(int blueprintType);
 
     private IReadOnlyList<Block>? _selectedBlocks;
 
     private record CommandDef(string Key, string Name, string Icon, string Hotkey, Func<Block, bool> Available, Func<Block, bool>? Conditional = null);
+    private record BlueprintDef(int Type, string Name, string Icon, string Hotkey);
 
     private static readonly CommandDef[] AllCommands =
     [
@@ -26,9 +29,23 @@ public partial class CommandCard : Control
         new("magnet", "Magnet", "🧲", "M", b => b.Type == BlockType.Warden && b.IsFullyRooted),
     ];
 
-    private const float ButtonSize = 32f;
-    private const float ButtonGap = 5f;
+    // Blueprint types match BlueprintMode.BlueprintType enum (1-6)
+    private static readonly BlueprintDef[] AllBlueprints =
+    [
+        new(1, "Builder Nest", "🏠", "1"),
+        new(2, "Soldier Nest", "⚔", "2"),
+        new(3, "Stunner Nest", "⚡", "3"),
+        new(4, "Supply", "📦", "4"),
+        new(5, "Stun Tower", "🗼", "5"),
+        new(6, "Soldier Tower", "🏰", "6"),
+    ];
+
+    private const float ButtonSize = 36f;
+    private const float ButtonGap = 4f;
     private const int Columns = 3;
+    private const float SectionGap = 16f;
+
+    private float _blueprintSectionY;
 
     public void SetSelection(IReadOnlyList<Block>? blocks) => _selectedBlocks = blocks;
 
@@ -48,23 +65,43 @@ public partial class CommandCard : Control
         HudStyles.DrawInnerPanel(this, rect);
 
         var font = ThemeDB.FallbackFont;
+        float y = 8f;
 
-        // Label
-        DrawString(font, new Vector2(10, 14), "COMMANDS",
+        // === COMMANDS SECTION ===
+        DrawString(font, new Vector2(10, y + 12), "COMMANDS",
             HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall, HudStyles.TextDim);
+        y += 20f;
 
-        if (_selectedBlocks == null || _selectedBlocks.Count == 0)
-            return;
+        if (_selectedBlocks != null && _selectedBlocks.Count > 0)
+        {
+            var available = GetAvailableCommands();
+            y = DrawCommandGrid(font, available, y);
+        }
+        else
+        {
+            DrawString(font, new Vector2(10, y + 14), "No selection",
+                HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall, HudStyles.TextSecondary);
+            y += 24f;
+        }
 
-        // Get available commands
-        var available = GetAvailableCommands();
+        y += SectionGap;
 
-        float startY = 24f;
+        // === BLUEPRINTS SECTION ===
+        _blueprintSectionY = y;
+        DrawString(font, new Vector2(10, y + 12), "BLUEPRINTS",
+            HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall, HudStyles.TextDim);
+        y += 20f;
+
+        DrawBlueprintGrid(font, y);
+    }
+
+    private float DrawCommandGrid(Font font, List<(CommandDef cmd, bool isConditional)> commands, float startY)
+    {
         float x = 10f;
         float y = startY;
         int col = 0;
 
-        foreach (var (cmd, isConditional) in available)
+        foreach (var (cmd, isConditional) in commands)
         {
             var btnRect = new Rect2(x, y, ButtonSize, ButtonSize);
 
@@ -82,14 +119,54 @@ public partial class CommandCard : Control
 
             // Icon
             var iconColor = isConditional ? HudStyles.TextDim : HudStyles.TextSecondary;
-            var iconSize = font.GetStringSize(cmd.Icon, HorizontalAlignment.Left, -1, 14);
-            DrawString(font, new Vector2(x + (ButtonSize - iconSize.X) / 2, y + 20), cmd.Icon,
-                HorizontalAlignment.Left, -1, 14, iconColor);
+            var iconSize = font.GetStringSize(cmd.Icon, HorizontalAlignment.Left, -1, 16);
+            DrawString(font, new Vector2(x + (ButtonSize - iconSize.X) / 2, y + 24), cmd.Icon,
+                HorizontalAlignment.Left, -1, 16, iconColor);
 
             // Hotkey
             var hotkeyColor = isConditional ? HudStyles.TextDim with { A = 0.5f } : HudStyles.TextDim;
             DrawString(font, new Vector2(btnRect.End.X - 10, btnRect.End.Y - 4), cmd.Hotkey,
                 HorizontalAlignment.Right, -1, HudStyles.FontSizeHotkey, hotkeyColor);
+
+            col++;
+            if (col >= Columns)
+            {
+                col = 0;
+                x = 10f;
+                y += ButtonSize + ButtonGap;
+            }
+            else
+            {
+                x += ButtonSize + ButtonGap;
+            }
+        }
+
+        // Return Y position after last row
+        return col > 0 ? y + ButtonSize + ButtonGap : y;
+    }
+
+    private void DrawBlueprintGrid(Font font, float startY)
+    {
+        float x = 10f;
+        float y = startY;
+        int col = 0;
+
+        foreach (var bp in AllBlueprints)
+        {
+            var btnRect = new Rect2(x, y, ButtonSize, ButtonSize);
+
+            // Button background
+            DrawRect(btnRect, HudStyles.PanelBgTop);
+            DrawRect(btnRect, HudStyles.PanelBorder, false, 1f);
+
+            // Icon
+            var iconSize = font.GetStringSize(bp.Icon, HorizontalAlignment.Left, -1, 16);
+            DrawString(font, new Vector2(x + (ButtonSize - iconSize.X) / 2, y + 24), bp.Icon,
+                HorizontalAlignment.Left, -1, 16, HudStyles.TextSecondary);
+
+            // Hotkey
+            DrawString(font, new Vector2(btnRect.End.X - 10, btnRect.End.Y - 4), bp.Hotkey,
+                HorizontalAlignment.Right, -1, HudStyles.FontSizeHotkey, HudStyles.TextDim);
 
             col++;
             if (col >= Columns)
@@ -140,10 +217,20 @@ public partial class CommandCard : Control
     {
         if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
         {
+            // Check command buttons
             string? cmdKey = GetCommandAt(mb.Position);
             if (cmdKey != null)
             {
                 EmitSignal(SignalName.CommandClicked, cmdKey);
+                AcceptEvent();
+                return;
+            }
+
+            // Check blueprint buttons
+            int? bpType = GetBlueprintAt(mb.Position);
+            if (bpType != null)
+            {
+                EmitSignal(SignalName.BlueprintClicked, bpType.Value);
                 AcceptEvent();
             }
         }
@@ -151,8 +238,11 @@ public partial class CommandCard : Control
 
     private string? GetCommandAt(Vector2 pos)
     {
+        if (_selectedBlocks == null || _selectedBlocks.Count == 0)
+            return null;
+
         var available = GetAvailableCommands();
-        float startY = 24f;
+        float startY = 28f; // After label
         float x = 10f;
         float y = startY;
         int col = 0;
@@ -170,6 +260,34 @@ public partial class CommandCard : Control
             var btnRect = new Rect2(x, y, ButtonSize, ButtonSize);
             if (btnRect.HasPoint(pos))
                 return cmd.Key;
+
+            col++;
+            if (col >= Columns)
+            {
+                col = 0;
+                x = 10f;
+                y += ButtonSize + ButtonGap;
+            }
+            else
+            {
+                x += ButtonSize + ButtonGap;
+            }
+        }
+        return null;
+    }
+
+    private int? GetBlueprintAt(Vector2 pos)
+    {
+        float startY = _blueprintSectionY + 20f; // After label
+        float x = 10f;
+        float y = startY;
+        int col = 0;
+
+        foreach (var bp in AllBlueprints)
+        {
+            var btnRect = new Rect2(x, y, ButtonSize, ButtonSize);
+            if (btnRect.HasPoint(pos))
+                return bp.Type;
 
             col++;
             if (col >= Columns)
