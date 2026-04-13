@@ -29,6 +29,7 @@ public partial class AudioManager : Node
         VisualEventType.CommandMoveIssued,
         VisualEventType.CommandRootIssued,
         VisualEventType.CommandUprootIssued,
+        VisualEventType.CommandWallIssued,
         VisualEventType.WallConverted,
         // Formation events are private
         VisualEventType.BuilderNestFormed,
@@ -147,6 +148,7 @@ public partial class AudioManager : Node
             VisualEventType.CommandMoveIssued => Config.MoveCommand,
             VisualEventType.CommandRootIssued => Config.RootStart,
             VisualEventType.CommandUprootIssued => Config.UprootStart,
+            VisualEventType.CommandWallIssued => Config.WallConvert,
 
             // Block state transitions
             VisualEventType.BlockRooted => Config.RootComplete,

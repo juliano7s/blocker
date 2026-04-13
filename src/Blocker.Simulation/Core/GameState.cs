@@ -150,6 +150,10 @@ public class GameState
                 var block = GetBlock(blockId);
                 if (block == null || block.PlayerId != cmd.PlayerId) continue;
 
+                // Emit visual/audio event at receipt time so the player gets
+                // feedback even when the command is auto-queued.
+                EmitCommandReceiptEvent(block, cmd);
+
                 var queued = new QueuedCommand(cmd.Type, cmd.TargetPos, cmd.Direction);
 
                 if (cmd.Queue)
@@ -159,9 +163,24 @@ public class GameState
                 }
                 else
                 {
-                    // Immediate: clear queue and execute
+                    // Immediate: clear queue
                     block.CommandQueue.Clear();
-                    ExecuteCommand(block, queued);
+
+                    // Root on rooting/uprooting block = immediate toggle (cancel)
+                    bool isRootingOrUprooting = block.State is BlockState.Rooting or BlockState.Uprooting;
+                    if (cmd.Type == CommandType.Root && isRootingOrUprooting)
+                    {
+                        ExecuteCommand(block, queued);
+                    }
+                    else if (IsAutoQueueBusy(block))
+                    {
+                        // Auto-queue: "do this next" when busy (rooting/uprooting/immobile cooldown)
+                        block.CommandQueue.Enqueue(queued);
+                    }
+                    else
+                    {
+                        ExecuteCommand(block, queued);
+                    }
                 }
             }
         }
@@ -187,7 +206,6 @@ public class GameState
                 {
                     block.MoveTarget = cmd.TargetPos.Value;
                     block.IsAttackMoving = false;
-                    VisualEvents.Add(new VisualEvent(VisualEventType.CommandMoveIssued, block.Pos, block.PlayerId, Direction: DirectionFromDelta(block.Pos, cmd.TargetPos.Value), BlockId: block.Id));
                 }
                 break;
 
@@ -196,13 +214,11 @@ public class GameState
                 {
                     block.MoveTarget = cmd.TargetPos.Value;
                     block.IsAttackMoving = true;
-                    VisualEvents.Add(new VisualEvent(VisualEventType.CommandMoveIssued, block.Pos, block.PlayerId, Direction: DirectionFromDelta(block.Pos, cmd.TargetPos.Value), BlockId: block.Id));
                 }
                 break;
 
             case CommandType.Root:
                 RootingSystem.ToggleRoot(block);
-                EmitRootCommandEvent(block);
                 // Auto-chain: if W was queued during rooting, it stays in queue
                 break;
 
@@ -252,28 +268,25 @@ public class GameState
         switch (cmd.Type)
         {
             case CommandType.Move:
-                if (!block.IsMobile) return false; // Wait until mobile
+                if (!block.IsMobile) return true; // Drop — rooted block can't move
                 if (cmd.TargetPos.HasValue)
                 {
                     block.MoveTarget = cmd.TargetPos.Value;
                     block.IsAttackMoving = false;
-                    VisualEvents.Add(new VisualEvent(VisualEventType.CommandMoveIssued, block.Pos, block.PlayerId, Direction: DirectionFromDelta(block.Pos, cmd.TargetPos.Value), BlockId: block.Id));
                 }
                 return true;
 
             case CommandType.AttackMove:
-                if (!block.IsMobile) return false;
+                if (!block.IsMobile) return true; // Drop — rooted block can't attack-move
                 if (cmd.TargetPos.HasValue)
                 {
                     block.MoveTarget = cmd.TargetPos.Value;
                     block.IsAttackMoving = true;
-                    VisualEvents.Add(new VisualEvent(VisualEventType.CommandMoveIssued, block.Pos, block.PlayerId, Direction: DirectionFromDelta(block.Pos, cmd.TargetPos.Value), BlockId: block.Id));
                 }
                 return true;
 
             case CommandType.Root:
                 RootingSystem.ToggleRoot(block);
-                EmitRootCommandEvent(block);
                 return true;
 
             case CommandType.ConvertToWall:
@@ -319,23 +332,65 @@ public class GameState
         if (block.MoveTarget.HasValue) return false;
         if (block.State == BlockState.Rooting) return false;
         if (block.State == BlockState.Uprooting) return false;
+        if (block.IsOnCooldown && !block.MobileCooldown) return false; // Immobile cooldown
         return true;
     }
 
+    private static bool IsBlockBusy(Block block) => !IsBlockIdle(block);
+
     /// <summary>
-    /// Emit the appropriate root/uproot command event based on the block's current state.
-    /// Called after ToggleRoot which changes the state.
+    /// Whether a block is in a state where immediate commands should be auto-queued
+    /// rather than executed (or dropped). This is narrower than IsBlockBusy: having
+    /// a MoveTarget is NOT auto-queue-busy because immediate commands should just
+    /// replace the current target.
     /// </summary>
-    private void EmitRootCommandEvent(Block block)
+    private static bool IsAutoQueueBusy(Block block)
     {
-        var evtType = block.State switch
+        if (block.State == BlockState.Rooting) return true;
+        if (block.State == BlockState.Uprooting) return true;
+        if (block.IsOnCooldown && !block.MobileCooldown) return true; // Immobile cooldown
+        return false;
+    }
+
+    /// <summary>
+    /// Emit visual/audio event at command receipt time based on the block's
+    /// current state and the command type. Gives player feedback even when
+    /// the command is auto-queued.
+    /// </summary>
+    private void EmitCommandReceiptEvent(Block block, Command cmd)
+    {
+        switch (cmd.Type)
         {
-            BlockState.Rooting => VisualEventType.CommandRootIssued,
-            BlockState.Uprooting => VisualEventType.CommandUprootIssued,
-            _ => (VisualEventType?)null
-        };
-        if (evtType.HasValue)
-            VisualEvents.Add(new VisualEvent(evtType.Value, block.Pos, block.PlayerId, BlockId: block.Id));
+            case CommandType.Move:
+            case CommandType.AttackMove:
+                if (cmd.TargetPos.HasValue && block.IsMobile)
+                {
+                    VisualEvents.Add(new VisualEvent(VisualEventType.CommandMoveIssued,
+                        block.Pos, block.PlayerId,
+                        Direction: DirectionFromDelta(block.Pos, cmd.TargetPos.Value),
+                        BlockId: block.Id));
+                }
+                break;
+
+            case CommandType.Root:
+                // Determine what state the root will transition to
+                var rootEvtType = block.State switch
+                {
+                    BlockState.Mobile => VisualEventType.CommandRootIssued,
+                    BlockState.Rooting => VisualEventType.CommandUprootIssued,    // Cancel rooting
+                    BlockState.Rooted => VisualEventType.CommandUprootIssued,
+                    BlockState.Uprooting => VisualEventType.CommandRootIssued,    // Cancel uprooting
+                    _ => (VisualEventType?)null
+                };
+                if (rootEvtType.HasValue)
+                    VisualEvents.Add(new VisualEvent(rootEvtType.Value, block.Pos, block.PlayerId, BlockId: block.Id));
+                break;
+
+            case CommandType.ConvertToWall:
+                VisualEvents.Add(new VisualEvent(VisualEventType.CommandWallIssued,
+                    block.Pos, block.PlayerId, BlockId: block.Id));
+                break;
+        }
     }
 
     /// <summary>

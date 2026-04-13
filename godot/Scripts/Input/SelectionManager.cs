@@ -466,7 +466,6 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 		if (!_gameState!.Grid.InBounds(gridPos)) return;
 
 		var blockIds = _selectedBlocks
-			.Where(b => b.IsMobile)
 			.Select(b => b.Id)
 			.ToList();
 

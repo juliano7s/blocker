@@ -108,6 +108,7 @@ public partial class EffectManager : Node2D
         VisualEventType.CommandMoveIssued => true,
         VisualEventType.CommandRootIssued => true,
         VisualEventType.CommandUprootIssued => true,
+        VisualEventType.CommandWallIssued => true,
         VisualEventType.WallConverted => true,
         // Formation events are private - you see your own formations form
         VisualEventType.BuilderNestFormed => true,
@@ -164,6 +165,13 @@ public partial class EffectManager : Node2D
             case VisualEventType.CommandUprootIssued:
                 AddEffect(EffectFactory.LightningConverge(this, pos, color,
                     maxSegs: 10, duration: 900f, trail: 0.12f));
+                break;
+
+            // Wall convert command: quick flash
+            case VisualEventType.CommandWallIssued:
+                AddEffect(EffectFactory.LightningBurst(this, pos, color,
+                    maxSegs: 8, duration: 500f, trail: 0.1f,
+                    contProb: 0.7f, branchProb: 0.3f));
                 break;
 
             // ─── State transition effects ───────────────────────────

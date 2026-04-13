@@ -42,6 +42,7 @@ public enum VisualEventType
     CommandMoveIssued,
     CommandRootIssued,
     CommandUprootIssued,
+    CommandWallIssued,
 }
 
 public readonly record struct VisualEvent(

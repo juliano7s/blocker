@@ -97,4 +97,179 @@ public class CommandQueueTests
         Assert.Equal(new GridPos(5, 1), builder.MoveTarget);
         Assert.Empty(builder.CommandQueue);
     }
+
+    // --- Auto-queue tests ---
+
+    [Fact]
+    public void AutoQueue_MoveWhileRooting()
+    {
+        var state = CreateState();
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 5));
+
+        // Start rooting
+        state.ProcessCommands([new Command(0, CommandType.Root, [builder.Id])]);
+        Assert.Equal(BlockState.Rooting, builder.State);
+
+        // Immediate move while rooting — should auto-queue
+        state.ProcessCommands([new Command(0, CommandType.Move, [builder.Id], new GridPos(7, 7))]);
+        Assert.Single(builder.CommandQueue);
+        Assert.Equal(CommandType.Move, builder.CommandQueue.Peek().Type);
+        Assert.Equal(new GridPos(7, 7), builder.CommandQueue.Peek().TargetPos);
+    }
+
+    [Fact]
+    public void AutoQueue_ReplacesPreviousAutoQueue()
+    {
+        var state = CreateState();
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 5));
+
+        // Start rooting
+        state.ProcessCommands([new Command(0, CommandType.Root, [builder.Id])]);
+
+        // Auto-queue first move
+        state.ProcessCommands([new Command(0, CommandType.Move, [builder.Id], new GridPos(7, 7))]);
+        Assert.Single(builder.CommandQueue);
+
+        // Auto-queue second move — should replace first
+        state.ProcessCommands([new Command(0, CommandType.Move, [builder.Id], new GridPos(8, 8))]);
+        Assert.Single(builder.CommandQueue);
+        Assert.Equal(new GridPos(8, 8), builder.CommandQueue.Peek().TargetPos);
+    }
+
+    [Fact]
+    public void AutoQueue_RootWhileRooting_IsImmediateToggle()
+    {
+        var state = CreateState();
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 5));
+
+        // Start rooting
+        state.ProcessCommands([new Command(0, CommandType.Root, [builder.Id])]);
+        Assert.Equal(BlockState.Rooting, builder.State);
+
+        // Root again while rooting — should toggle to uprooting immediately (not queue)
+        state.ProcessCommands([new Command(0, CommandType.Root, [builder.Id])]);
+        Assert.Equal(BlockState.Uprooting, builder.State);
+        Assert.Empty(builder.CommandQueue);
+    }
+
+    [Fact]
+    public void AutoQueue_RootWhileUprooting_IsImmediateToggle()
+    {
+        var state = CreateState();
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 5));
+
+        // Start rooting, then toggle to uprooting
+        state.ProcessCommands([new Command(0, CommandType.Root, [builder.Id])]);
+        state.ProcessCommands([new Command(0, CommandType.Root, [builder.Id])]);
+        Assert.Equal(BlockState.Uprooting, builder.State);
+
+        // Root again while uprooting — should toggle back to rooting immediately
+        state.ProcessCommands([new Command(0, CommandType.Root, [builder.Id])]);
+        Assert.Equal(BlockState.Rooting, builder.State);
+        Assert.Empty(builder.CommandQueue);
+    }
+
+    [Fact]
+    public void AutoQueue_MoveDuringImmobileCooldown()
+    {
+        var state = CreateState();
+        var jumper = state.AddBlock(BlockType.Jumper, 0, new GridPos(5, 5));
+        jumper.Cooldown = 5; // Immobile cooldown (MobileCooldown is false by default)
+
+        // Immediate move while on immobile cooldown — should auto-queue
+        state.ProcessCommands([new Command(0, CommandType.Move, [jumper.Id], new GridPos(7, 5))]);
+        Assert.Single(jumper.CommandQueue);
+        Assert.Equal(CommandType.Move, jumper.CommandQueue.Peek().Type);
+    }
+
+    [Fact]
+    public void AutoQueue_RootDuringImmobileCooldown()
+    {
+        var state = CreateState();
+        var jumper = state.AddBlock(BlockType.Jumper, 0, new GridPos(5, 5));
+        jumper.Cooldown = 5; // Immobile cooldown (MobileCooldown is false by default)
+
+        // Root while on immobile cooldown — should auto-queue (not immediate toggle)
+        state.ProcessCommands([new Command(0, CommandType.Root, [jumper.Id])]);
+        Assert.Single(jumper.CommandQueue);
+        Assert.Equal(CommandType.Root, jumper.CommandQueue.Peek().Type);
+    }
+
+    [Fact]
+    public void NoAutoQueue_DuringMobileCooldown()
+    {
+        var state = CreateState();
+        var jumper = state.AddBlock(BlockType.Jumper, 0, new GridPos(5, 5));
+        jumper.Cooldown = 3;
+        jumper.MobileCooldown = true; // Mobile cooldown — can still move
+
+        // Immediate move during mobile cooldown — should execute directly
+        state.ProcessCommands([new Command(0, CommandType.Move, [jumper.Id], new GridPos(7, 5))]);
+        Assert.Empty(jumper.CommandQueue);
+        Assert.Equal(new GridPos(7, 5), jumper.MoveTarget);
+    }
+
+    [Fact]
+    public void AutoQueue_MoveDroppedWhenRooted()
+    {
+        var state = CreateState();
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 5));
+
+        // Start rooting
+        state.ProcessCommands([new Command(0, CommandType.Root, [builder.Id])]);
+
+        // Auto-queue move
+        state.ProcessCommands([new Command(0, CommandType.Move, [builder.Id], new GridPos(7, 7))]);
+        Assert.Single(builder.CommandQueue);
+
+        // Complete rooting — block is now Rooted
+        builder.State = BlockState.Rooted;
+        builder.RootProgress = Constants.RootTicks;
+
+        // Process queue — move should be dropped (rooted block can't move)
+        state.ProcessCommands([]);
+        Assert.Empty(builder.CommandQueue);
+        Assert.Null(builder.MoveTarget);
+    }
+
+    [Fact]
+    public void AutoQueue_MoveExecutesAfterUprooting()
+    {
+        var state = CreateState();
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 5));
+
+        // Start rooting, then toggle to uprooting
+        state.ProcessCommands([new Command(0, CommandType.Root, [builder.Id])]);
+        state.ProcessCommands([new Command(0, CommandType.Root, [builder.Id])]);
+        Assert.Equal(BlockState.Uprooting, builder.State);
+
+        // Auto-queue move while uprooting
+        state.ProcessCommands([new Command(0, CommandType.Move, [builder.Id], new GridPos(7, 7))]);
+        Assert.Single(builder.CommandQueue);
+
+        // Complete uprooting — block is now Mobile
+        builder.State = BlockState.Mobile;
+        builder.RootProgress = 0;
+
+        // Process queue — move should execute
+        state.ProcessCommands([]);
+        Assert.Equal(new GridPos(7, 7), builder.MoveTarget);
+        Assert.Empty(builder.CommandQueue);
+    }
+
+    [Fact]
+    public void ShiftQueue_StillWorksDuringRooting()
+    {
+        var state = CreateState();
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 5));
+
+        // Start rooting
+        state.ProcessCommands([new Command(0, CommandType.Root, [builder.Id])]);
+
+        // Shift+queue multiple moves
+        state.ProcessCommands([new Command(0, CommandType.Move, [builder.Id], new GridPos(3, 3), Queue: true)]);
+        state.ProcessCommands([new Command(0, CommandType.Move, [builder.Id], new GridPos(1, 1), Queue: true)]);
+
+        Assert.Equal(2, builder.CommandQueue.Count);
+    }
 }
