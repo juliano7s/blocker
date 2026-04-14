@@ -305,7 +305,7 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 					else
 						IssueCommandToSelected(CommandType.Root, shiftHeld);
 					break;
-				case Key.W:
+				case Key.V:
 					IssueCommandToSelected(CommandType.ConvertToWall, shiftHeld);
 					break;
 				case Key.S when !key.IsCommandOrControlPressed():
@@ -317,7 +317,7 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 					else
 						IssueCommandToSelected(CommandType.SelfDestruct, shiftHeld);
 					break;
-				case Key.T:
+				case Key.Z:
 					IssueCommandToSelected(CommandType.CreateTower, shiftHeld);
 					break;
 				case Key.G:
@@ -331,7 +331,7 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 						GD.Print("Attack-move: click target");
 					}
 					break;
-				case Key.R:
+				case Key.B:
 					if (_blueprintMode)
 					{
 						_blueprint.Rotate();
@@ -376,14 +376,63 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 					_selectedBlocks.Clear();
 					GD.Print($"Switched to Player {ControllingPlayer}");
 					break;
-				// Blueprint keys 1-6 (without Ctrl) or Control groups 0-9 (Ctrl+N / bare for 7-0)
-				case >= Key.Key1 and <= Key.Key6 when !key.CtrlPressed:
+				case Key.Q:
 					if (_selectedBlocks.Count > 0)
 					{
-						_blueprint.Toggle((BlueprintMode.BlueprintType)(key.Keycode - Key.Key0));
+						_blueprint.Toggle(BlueprintMode.BlueprintType.BuilderNest);
 						_attackMoveMode = false;
 						GD.Print(_blueprintMode
-							? $"Blueprint: {_blueprint.ActiveType} (R=rotate, click=place, X=clear ghosts)"
+							? $"Blueprint: {_blueprint.ActiveType} (B=rotate, click=place, X=clear ghosts)"
+							: "Blueprint deactivated");
+					}
+					break;
+				case Key.W:
+					if (_selectedBlocks.Count > 0)
+					{
+						_blueprint.Toggle(BlueprintMode.BlueprintType.SoldierNest);
+						_attackMoveMode = false;
+						GD.Print(_blueprintMode
+							? $"Blueprint: {_blueprint.ActiveType} (B=rotate, click=place, X=clear ghosts)"
+							: "Blueprint deactivated");
+					}
+					break;
+				case Key.E:
+					if (_selectedBlocks.Count > 0)
+					{
+						_blueprint.Toggle(BlueprintMode.BlueprintType.StunnerNest);
+						_attackMoveMode = false;
+						GD.Print(_blueprintMode
+							? $"Blueprint: {_blueprint.ActiveType} (B=rotate, click=place, X=clear ghosts)"
+							: "Blueprint deactivated");
+					}
+					break;
+				case Key.R:
+					if (_selectedBlocks.Count > 0)
+					{
+						_blueprint.Toggle(BlueprintMode.BlueprintType.Supply);
+						_attackMoveMode = false;
+						GD.Print(_blueprintMode
+							? $"Blueprint: {_blueprint.ActiveType} (B=rotate, click=place, X=clear ghosts)"
+							: "Blueprint deactivated");
+					}
+					break;
+				case Key.T:
+					if (_selectedBlocks.Count > 0)
+					{
+						_blueprint.Toggle(BlueprintMode.BlueprintType.SoldierTower);
+						_attackMoveMode = false;
+						GD.Print(_blueprintMode
+							? $"Blueprint: {_blueprint.ActiveType} (B=rotate, click=place, X=clear ghosts)"
+							: "Blueprint deactivated");
+					}
+					break;
+				case Key.Y:
+					if (_selectedBlocks.Count > 0)
+					{
+						_blueprint.Toggle(BlueprintMode.BlueprintType.StunTower);
+						_attackMoveMode = false;
+						GD.Print(_blueprintMode
+							? $"Blueprint: {_blueprint.ActiveType} (B=rotate, click=place, X=clear ghosts)"
 							: "Blueprint deactivated");
 					}
 					break;
@@ -908,8 +957,6 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 		// Command queue paths (dotted lines through waypoints)
 		foreach (var block in _selectedBlocks)
 		{
-			if (block.CommandQueue.Count == 0) continue;
-
 			var from = GridRenderer.GridToWorld(block.MoveTarget ?? block.Pos);
 			foreach (var cmd in block.CommandQueue)
 			{
