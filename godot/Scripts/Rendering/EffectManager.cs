@@ -75,6 +75,16 @@ public partial class EffectManager : Node2D
     // ─── Selection ───────────────────────────────────────────────────
 
     /// <summary>
+    /// Called by GridRenderer when a dying block's heat-up animation completes.
+    /// Spawns the DashedTendrils explosion effect at the block's last position.
+    /// </summary>
+    public void SpawnDeathExplosion(GridPos pos, Color color)
+    {
+        AddEffect(EffectFactory.DashedTendrils(this, pos, Colors.OrangeRed,
+            duration: 800f, 10, 2, 8, 0.3f));
+    }
+
+    /// <summary>
     /// Called by GameManager each frame with current selected block IDs.
     /// Spawns SelectSquares on newly selected blocks — LOCAL PLAYER ONLY.
     /// Bible §16.5: Selection — 3 concentric squares, 350ms.
@@ -184,10 +194,8 @@ public partial class EffectManager : Node2D
 
             // ─── State transition effects ───────────────────────────
 
-            // Death: Dashed tendrils exploding outward
+            // Death: heat-up handled by GridRenderer, tendrils spawn after animation completes
             case VisualEventType.BlockDied:
-                AddEffect(EffectFactory.DashedTendrils(this, pos, color,
-                    duration: 800f, 10, 2, 8, 0.3f));
                 break;
 
             // Block spawn: type-specific (see SpawnBlockSpawnEffect)

@@ -159,6 +159,9 @@ public partial class GameManager : Node2D
 		_effectManager.SetGameState(gameState);
 		_effectManager.SetConfig(Config);
 
+		// Wire GridRenderer → EffectManager for death explosion callbacks
+		_gridRenderer.SetEffectManager(_effectManager);
+
 		// Set up audio manager
 		_audioManager = GetNode<AudioManager>("AudioManager");
 		_audioManager.SetGameState(gameState);

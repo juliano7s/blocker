@@ -45,6 +45,14 @@ public partial class GridRenderer : Node2D
 	private readonly HashSet<int> _liveIdSet = new();
 	private readonly List<int> _deadIds = new();
 
+	// Dying blocks: heat-up animation before explosion into tendrils
+	private record struct DyingBlockData(Vector2 WorldPos, GridPos GridPos, Color Color, float DeathTime);
+	private readonly Dictionary<int, DyingBlockData> _dyingBlocks = new();
+	private const float DeathAnimationDuration = 0.25f; // 250ms heat-up before explosion
+
+	private EffectManager? _effectManager;
+	public void SetEffectManager(EffectManager em) => _effectManager = em;
+
 	// Reusable collections for formation joiner rendering — avoids per-frame allocation
 	private readonly List<(int Id, GridPos Pos)> _formationMembers = new();
 	private readonly HashSet<GridPos> _formationPosSet = new();
@@ -71,6 +79,12 @@ public partial class GridRenderer : Node2D
 	public void SetGameState(GameState state)
 	{
 		_gameState = state;
+
+		// Clean up stale warden ZoC rects from previous game state
+		foreach (var (_, rect) in _wardenZocRects)
+			rect.QueueFree();
+		_wardenZocRects.Clear();
+
 		QueueRedraw();
 	}
 
@@ -78,10 +92,19 @@ public partial class GridRenderer : Node2D
 	{
 		if (_gameState != null)
 		{
-			// Consume visual events for death effects
+			// Consume visual events for death effects and jumper ghost trails
 			float now = (float)Time.GetTicksMsec() / 1000f;
 			foreach (var evt in _gameState.VisualEvents)
 			{
+				// Capture dying blocks for heat-up animation
+				if (evt.Type == VisualEventType.BlockDied && evt.BlockId.HasValue && !_dyingBlocks.ContainsKey(evt.BlockId.Value))
+				{
+					var dyingColor = evt.PlayerId.HasValue ? _config.GetPalette(evt.PlayerId.Value).Base : Colors.White;
+					var dyingWorldPos = _visualPositions.TryGetValue(evt.BlockId.Value, out var dvp)
+						? dvp : GridToWorld(evt.Position);
+					_dyingBlocks[evt.BlockId.Value] = new DyingBlockData(dyingWorldPos, evt.Position, dyingColor, now);
+				}
+
 				// Jumper ghost trails from moves and jumps
 			if (evt.Type == VisualEventType.BlockMoved && evt.BlockId.HasValue)
 			{
@@ -198,16 +221,30 @@ public partial class GridRenderer : Node2D
 			// Clean up ghost trails
 			_ghostTrails.RemoveAll(g => now - g.StartTime > (g.IsJump ? 0.3f : 0.5f));
 
+			// Complete dying block animations — spawn tendrils on explosion
+			_deadIds.Clear();
+			foreach (var (id, dying) in _dyingBlocks)
+			{
+				if (now - dying.DeathTime >= DeathAnimationDuration)
+				{
+					_effectManager?.SpawnDeathExplosion(dying.GridPos, dying.Color);
+					_deadIds.Add(id);
+				}
+			}
+			foreach (var id in _deadIds)
+				_dyingBlocks.Remove(id);
+
+			// Clean up visual state for blocks no longer live AND not in dying animation
 			_deadIds.Clear();
 			foreach (var id in _visualPositions.Keys)
-				if (!_liveIdSet.Contains(id))
+				if (!_liveIdSet.Contains(id) && !_dyingBlocks.ContainsKey(id))
 					_deadIds.Add(id);
 			foreach (var id in _deadIds)
 				_visualPositions.Remove(id);
 
 			_deadIds.Clear();
 			foreach (var id in _idleAngles.Keys)
-				if (!_liveIdSet.Contains(id))
+				if (!_liveIdSet.Contains(id) && !_dyingBlocks.ContainsKey(id))
 					_deadIds.Add(id);
 			foreach (var id in _deadIds)
 			{
@@ -215,6 +252,9 @@ public partial class GridRenderer : Node2D
 				_idleCooldowns.Remove(id);
 			}
 		}
+
+		// Update warden ZoC shader-based sine rings
+		UpdateWardenZoC();
 
 		QueueRedraw();
 	}
@@ -337,6 +377,37 @@ public partial class GridRenderer : Node2D
 			if (_selectedIds.Contains(block.Id))
 			{
 				DrawDashedRect(rect.Grow(1f), _config.SelectionBorderColor, 0.7f, _config.SelectionDashLength, _config.SelectionGapLength);
+			}
+		}
+
+		// Draw dying blocks — heat-up glow before explosion
+		float drawNow = (float)Time.GetTicksMsec() / 1000f;
+		foreach (var (_, dying) in _dyingBlocks)
+		{
+			float elapsed = drawNow - dying.DeathTime;
+			float progress = Mathf.Clamp(elapsed / DeathAnimationDuration, 0f, 1f);
+
+			// Ease-in cubic: slow start, fast end — feels like pressure building
+			float heat = progress * progress * progress;
+
+			// Color shifts from original toward white-hot
+			var heatColor = dying.Color.Lerp(Colors.White, heat);
+
+			var rect = new Rect2(
+				dying.WorldPos.X - CellSize / 2f + BlockInset,
+				dying.WorldPos.Y - CellSize / 2f + BlockInset,
+				CellSize - BlockInset * 2,
+				CellSize - BlockInset * 2
+			);
+
+			// Draw the heated block body
+			DrawRect(rect, heatColor);
+
+			// Growing glow as heat intensifies
+			if (heat > 0.15f)
+			{
+				float glowRadius = CellSize * (0.4f + 0.8f * heat);
+				QueueGlowCircle(dying.WorldPos, glowRadius, heatColor with { A = heat * 0.7f });
 			}
 		}
 

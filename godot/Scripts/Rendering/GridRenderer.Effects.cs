@@ -10,49 +10,82 @@ namespace Blocker.Game.Rendering;
 /// </summary>
 public partial class GridRenderer : Node2D
 {
-    private void DrawWardenZoC()
+    // Warden ZoC: shader-based sine rings per rooted warden
+    private readonly Dictionary<int, ColorRect> _wardenZocRects = new();
+    private static readonly Shader _gridRingsShader = GD.Load<Shader>("res://Assets/Shaders/grid_rings.gdshader");
+
+    private void UpdateWardenZoC()
     {
-        foreach (var block in _gameState!.Blocks)
+        if (_gameState == null) return;
+
+        var grid = _gameState.Grid;
+        int zocR = Constants.WardenZocRadius;
+        var gridPixelSize = new Vector2(grid.Width * CellSize, grid.Height * CellSize);
+
+        // Collect active rooted wardens
+        var activeWardens = new HashSet<int>();
+        foreach (var block in _gameState.Blocks)
         {
             if (block.Type != BlockType.Warden) continue;
             if (!block.IsFullyRooted || block.IsStunned) continue;
 
-            var playerColor = _config.GetPalette(block.PlayerId).WardenZocColor;
-            int zocR = Constants.WardenZocRadius;
+            activeWardens.Add(block.Id);
 
-            // Wave propagation: expanding ring through cells
-            float waveCycleMs = _config.WardenZocWaveCycleMs;
-            float cycle = ((float)Time.GetTicksMsec() % waveCycleMs) / waveCycleMs;
-            float waveFront = cycle * (zocR + 1); // wave position in cell units
-
-            // Highlight each cell within ZoC range (Chebyshev distance)
-            for (int dy = -zocR; dy <= zocR; dy++)
+            // Create ColorRect + ShaderMaterial if new
+            if (!_wardenZocRects.TryGetValue(block.Id, out var rect))
             {
-                for (int dx = -zocR; dx <= zocR; dx++)
+                var mat = new ShaderMaterial { Shader = _gridRingsShader };
+                var playerColor = _config.GetPalette(block.PlayerId).WardenZocColor;
+
+                mat.SetShaderParameter("grid_size", new Vector2(grid.Width, grid.Height));
+                mat.SetShaderParameter("cell_size", CellSize);
+                mat.SetShaderParameter("max_radius", (float)zocR + 1f);
+                mat.SetShaderParameter("trail", 2f);
+                mat.SetShaderParameter("ring_color", playerColor);
+                mat.SetShaderParameter("fade_mult", 1f);
+                mat.SetShaderParameter("mode", 2); // sine rings
+                mat.SetShaderParameter("loop_mode", true);
+                mat.SetShaderParameter("base_alpha", 0.04f);
+                mat.SetShaderParameter("progress", 0f);
+                mat.SetShaderParameter("age_ms", 0f);
+
+                rect = new ColorRect
                 {
-                    if (dx == 0 && dy == 0) continue;
+                    Position = new Vector2(GridPadding, GridPadding),
+                    Size = gridPixelSize,
+                    Material = mat,
+                    MouseFilter = Control.MouseFilterEnum.Ignore,
+                };
+                AddChild(rect);
+                _wardenZocRects[block.Id] = rect;
+            }
 
-                    int cx = block.Pos.X + dx;
-                    int cy = block.Pos.Y + dy;
-                    if (!_gameState!.Grid.InBounds(new GridPos(cx, cy))) continue;
+            // Update center to follow warden position (in grid coords)
+            var mat2 = (ShaderMaterial)rect.Material;
+            mat2.SetShaderParameter("center", new Vector2(block.Pos.X + 0.5f, block.Pos.Y + 0.5f));
+            mat2.SetShaderParameter("age_ms", (float)Time.GetTicksMsec());
+            // Progress drives the expanding wave — loop so it resets
+            float waveCycleMs = 2500f;
+            mat2.SetShaderParameter("progress", ((float)Time.GetTicksMsec() % waveCycleMs) / waveCycleMs);
+        }
 
-                    float dist = Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy));
-
-                    // Wave ring: gaussian around the wave front
-                    float ringStr = Mathf.Exp(-3f * Mathf.Pow(dist - waveFront, 2));
-                    // Trace: cells already passed by wave stay faintly lit
-                    float traceStr = dist < waveFront ? 0.03f : 0f;
-                    // Distance fade: farther cells are dimmer
-                    float distFade = 1f - (dist - 1f) / (zocR + 1);
-
-                    float alpha = (traceStr + 0.10f * ringStr) * distFade;
-                    if (alpha < 0.005f) continue;
-
-                    var cellRect = new Rect2(cx * CellSize + GridPadding, cy * CellSize + GridPadding, CellSize, CellSize);
-                    QueueGlowCircle(cellRect.GetCenter(), CellSize * 0.35f, playerColor with { A = alpha });
-                }
+        // Remove ColorRects for wardens that are no longer active
+        var stale = new List<int>();
+        foreach (var (id, rect) in _wardenZocRects)
+        {
+            if (!activeWardens.Contains(id))
+            {
+                rect.QueueFree();
+                stale.Add(id);
             }
         }
+        foreach (var id in stale)
+            _wardenZocRects.Remove(id);
+    }
+
+    private void DrawWardenZoC()
+    {
+        // Legacy entry point kept for compatibility — all work done in UpdateWardenZoC
     }
 
     private void DrawRays()
