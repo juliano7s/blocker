@@ -948,10 +948,12 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 		foreach (var block in _selectedBlocks)
 		{
 			if (block.MoveTarget.HasValue)
-			{
-				var targetCenter = GridRenderer.GridToWorld(block.MoveTarget.Value);
-				DrawCircle(targetCenter, GridRenderer.CellSize * 0.12f, MoveTargetColor);
-			}
+            {
+                var from = GridRenderer.GridToWorld(block.Pos);
+                var to = GridRenderer.GridToWorld(block.MoveTarget.Value);
+                DrawDashedLine(from, to, QueuePathColor, 1f, 3f, 4f);
+                DrawCircle(to, GridRenderer.CellSize * 0.12f, QueuePathColor);
+            }
 		}
 
 		// Command queue paths (dotted lines through waypoints)
