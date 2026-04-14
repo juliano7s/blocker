@@ -21,5 +21,3 @@ Thumbs.db
 .DS_Store
 
 godot/data_Blocker.Game_windows_x86_64/
-.pi/
-godot/*.sln
