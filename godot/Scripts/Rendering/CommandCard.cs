@@ -14,6 +14,10 @@ public partial class CommandCard : Control
 
     private IReadOnlyList<Block>? _selectedBlocks;
 
+    // Hover state
+    private string? _hoveredCommandKey;
+    private int? _hoveredBlueprintType;
+
     private record CommandDef(string Key, string Name, string Icon, string Hotkey, Func<Block, bool> Available, Func<Block, bool>? Conditional = null);
     private record BlueprintDef(int Type, string Name, string Icon, string Hotkey);
 
@@ -104,12 +108,18 @@ public partial class CommandCard : Control
         foreach (var (cmd, isConditional) in commands)
         {
             var btnRect = new Rect2(x, y, ButtonSize, ButtonSize);
+            bool hovered = !isConditional && _hoveredCommandKey == cmd.Key;
 
             // Button background
             if (isConditional)
             {
                 DrawRect(btnRect, HudStyles.PanelBgTop with { A = 0.4f });
                 DrawRect(btnRect, HudStyles.PanelBorder with { A = 0.4f }, false, 1f);
+            }
+            else if (hovered)
+            {
+                DrawRect(btnRect, HudStyles.PanelBgTop.Lightened(0.15f));
+                DrawRect(btnRect, HudStyles.PanelBorder.Lightened(0.3f), false, 1f);
             }
             else
             {
@@ -118,13 +128,17 @@ public partial class CommandCard : Control
             }
 
             // Icon
-            var iconColor = isConditional ? HudStyles.TextDim : HudStyles.TextSecondary;
+            var iconColor = isConditional ? HudStyles.TextDim
+                : hovered ? HudStyles.TextPrimary
+                : HudStyles.TextSecondary;
             var iconSize = font.GetStringSize(cmd.Icon, HorizontalAlignment.Left, -1, 16);
             DrawString(font, new Vector2(x + (ButtonSize - iconSize.X) / 2, y + 24), cmd.Icon,
                 HorizontalAlignment.Left, -1, 16, iconColor);
 
             // Hotkey
-            var hotkeyColor = isConditional ? HudStyles.TextDim with { A = 0.5f } : HudStyles.TextDim;
+            var hotkeyColor = isConditional ? HudStyles.TextDim with { A = 0.5f }
+                : hovered ? HudStyles.TextSecondary
+                : HudStyles.TextDim;
             DrawString(font, new Vector2(btnRect.End.X - 10, btnRect.End.Y - 4), cmd.Hotkey,
                 HorizontalAlignment.Right, -1, HudStyles.FontSizeHotkey, hotkeyColor);
 
@@ -154,17 +168,28 @@ public partial class CommandCard : Control
         foreach (var bp in AllBlueprints)
         {
             var btnRect = new Rect2(x, y, ButtonSize, ButtonSize);
+            bool hovered = _hoveredBlueprintType == bp.Type;
 
             // Button background
-            DrawRect(btnRect, HudStyles.PanelBgTop);
-            DrawRect(btnRect, HudStyles.PanelBorder, false, 1f);
+            if (hovered)
+            {
+                DrawRect(btnRect, HudStyles.PanelBgTop.Lightened(0.15f));
+                DrawRect(btnRect, HudStyles.PanelBorder.Lightened(0.3f), false, 1f);
+            }
+            else
+            {
+                DrawRect(btnRect, HudStyles.PanelBgTop);
+                DrawRect(btnRect, HudStyles.PanelBorder, false, 1f);
+            }
 
             // Icon
+            var iconColor = hovered ? HudStyles.TextPrimary : HudStyles.TextSecondary;
             var iconSize = font.GetStringSize(bp.Icon, HorizontalAlignment.Left, -1, 16);
             DrawString(font, new Vector2(x + (ButtonSize - iconSize.X) / 2, y + 24), bp.Icon,
-                HorizontalAlignment.Left, -1, 16, HudStyles.TextSecondary);
+                HorizontalAlignment.Left, -1, 16, iconColor);
 
             // Hotkey
+            var hotkeyColor = hovered ? HudStyles.TextSecondary : HudStyles.TextDim;
             DrawString(font, new Vector2(btnRect.End.X - 10, btnRect.End.Y - 4), bp.Hotkey,
                 HorizontalAlignment.Right, -1, HudStyles.FontSizeHotkey, HudStyles.TextDim);
 
@@ -215,7 +240,11 @@ public partial class CommandCard : Control
 
     public override void _GuiInput(InputEvent @event)
     {
-        if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
+        if (@event is InputEventMouseMotion mm)
+        {
+            UpdateHover(mm.Position);
+        }
+        else if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
         {
             // Check command buttons
             string? cmdKey = GetCommandAt(mb.Position);
@@ -234,6 +263,20 @@ public partial class CommandCard : Control
                 AcceptEvent();
             }
         }
+    }
+
+    private void UpdateHover(Vector2 pos)
+    {
+        string? cmd = GetCommandAt(pos);
+        int? bp = cmd != null ? null : GetBlueprintAt(pos);
+
+        _hoveredCommandKey = cmd;
+        _hoveredBlueprintType = bp;
+
+        bool overClickable = cmd != null || bp != null;
+        MouseDefaultCursorShape = overClickable
+            ? Control.CursorShape.PointingHand
+            : Control.CursorShape.Arrow;
     }
 
     private string? GetCommandAt(Vector2 pos)

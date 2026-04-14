@@ -14,24 +14,29 @@ public static class HudStyles
     public static readonly Color InnerPanelBg = new(0.039f, 0.055f, 0.078f);  // #0a0e14
 
     // Text colors
-    public static readonly Color TextPrimary = new(0.898f, 0.898f, 0.898f);   // #e5e5e5
-    public static readonly Color TextSecondary = new(0.533f, 0.533f, 0.533f); // #888888
-    public static readonly Color TextDim = new(0.333f, 0.333f, 0.333f);       // #555555
+    public static readonly Color TextPrimary = new(0.95f, 0.95f, 0.95f);     // #f2f2f2
+    public static readonly Color TextSecondary = new(0.75f, 0.75f, 0.75f);   // #bfbfbf
+    public static readonly Color TextDim = new(0.55f, 0.55f, 0.55f);         // #8c8c8c
 
     // Dimensions
     public const float TopBarHeight = 42f;
-    public const float BottomBarHeight = 180f;
     public const float PanelBorderWidth = 2f;
     public const float PanelGap = 6f;
 
-    // Bottom bar panel ratios (20% / 60% / 20%)
-    public const float SidePanelRatio = 0.20f;
-    public const float CenterPanelRatio = 0.60f;
+    // Bottom HUD — two floating groups (not a full-width bar)
+    public const float BottomPanelMargin = 10f;
+    // Left group: minimap (square)
+    public const float MinimapSize = 220f;
+    // Right group: info panel (wide, short) + command card (square, taller)
+    public const float InfoPanelWidth = 480f;
+    public const float InfoPanelHeight = 110f;
+    public const float CommandCardWidth = 300f;
+    public const float CommandCardHeight = 180f;
 
     // Font sizes
-    public const int FontSizeNormal = 13;
-    public const int FontSizeSmall = 10;
-    public const int FontSizeHotkey = 9;
+    public const int FontSizeNormal = 14;
+    public const int FontSizeSmall = 11;
+    public const int FontSizeHotkey = 10;
 
     /// <summary>Draw a panel background with gradient and border.</summary>
     public static void DrawPanelBackground(Control control, Rect2 rect)

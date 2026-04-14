@@ -11,10 +11,6 @@
 
 
 # Visuals
- - Soldier kill: when a block is killed by soldier adjacency, make it so the killed block stays some milliseconds in place, where it quickly builds up alpha (like it's heating from the inside) until it disappears triggering the DashedTendrils effect.
-
- - Some effects are duplicated. We need to review if they are being triggered multiple times
-
  - Blueprints:
 
  - Towers: they have no formation visuals (outline + diamond). These need to also be added to the PlayerPalette
@@ -45,10 +41,8 @@
  - pathfinding: units are preferring to go in a large L path instead of "diagonally" (zigzagging)
 
 # Hud
- - With the bottom hud now, the screen seems off center. I can scroll up much more than I can scroll down.
- - The middle part of the hub could be thinner than the minimap and the command card
  - The whole bottom bar is a bit too large. We can probably split the minimap to one side and make the info panel and the command card to the right
- - Commands should be clickable, all buttons should have a hover highlight if they are enabled
+ - Commands should be clickable, all buttons should have a hover highlight and mouse pointer if they are enabled
  - multiple selected units should show the unit icons, right now they are just different colors
  - blueprints have generic icons, they should a miniature version of the formation
  - some commands are wrong in the card (jumper jumps with F and can't root; uproot is F and not U)

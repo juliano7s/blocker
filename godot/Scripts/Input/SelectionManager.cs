@@ -92,6 +92,50 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 			kvp => kvp.Key,
 			kvp => (IReadOnlyList<int>)kvp.Value.AsReadOnly());
 
+	/// <summary>Issue a command by its UI key (from CommandCard). Mirrors hotkey logic.</summary>
+	public void IssueCommandByKey(string commandKey, bool queue = false)
+	{
+		switch (commandKey)
+		{
+			case "root":
+				IssueCommandToSelected(CommandType.Root, queue);
+				break;
+			case "uproot":
+				IssueCommandToSelected(CommandType.Root, queue);
+				break;
+			case "wall":
+				IssueCommandToSelected(CommandType.ConvertToWall, queue);
+				break;
+			case "push":
+				IssueDirectionalCommand(CommandType.TogglePush, queue);
+				break;
+			case "explode":
+				IssueCommandToSelected(CommandType.SelfDestruct, queue);
+				break;
+			case "stun":
+				IssueDirectionalCommand(CommandType.FireStunRay, queue);
+				break;
+			case "jump":
+				if (_selectedBlocks.Any(b => b.Type == BlockType.Jumper))
+				{
+					var nonJumpers = _selectedBlocks.Where(b => b.Type != BlockType.Jumper).ToList();
+					if (nonJumpers.Count > 0)
+					{
+						var ids = nonJumpers.Select(b => b.Id).ToList();
+						EmitCommand(new Command(ControllingPlayer, CommandType.Root, ids, Queue: queue));
+					}
+					_jumpMode = true;
+					_blueprint.Deactivate();
+					_attackMoveMode = false;
+					GD.Print("Jump: click target direction");
+				}
+				break;
+			case "magnet":
+				IssueCommandToSelected(CommandType.MagnetPull, queue);
+				break;
+			}
+	}
+
 	/// <summary>Select only the specified block (from HUD click).</summary>
 	public void SelectBlockById(int blockId)
 	{
