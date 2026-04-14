@@ -44,6 +44,9 @@ public partial class AudioManager : Node
         VisualEventType.SupplyDissolved,
         VisualEventType.StunTowerDissolved,
         VisualEventType.SoldierTowerDissolved,
+        VisualEventType.BlockSpawned,
+        VisualEventType.BlockRooted,
+        VisualEventType.BlockUprooted,
     };
 
     // Selection tracking - fire sound on newly selected blocks

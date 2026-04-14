@@ -31,6 +31,10 @@ public partial class EffectManager : Node2D
     // Selection tracking: detect newly selected blocks and fire one-shot effects
     private readonly HashSet<int> _prevSelectedIds = new();
 
+    // Track last processed tick to avoid playing effects multiple times per tick
+    // (VisualEvents persist until next tick clears them, but _Process runs every frame)
+    private int _lastProcessedTick = -1;
+
     public void SetGameState(GameState state) => _gameState = state;
     public void SetConfig(GameConfig config) => _config = config;
     public void SetControllingPlayer(int playerId) => _controllingPlayer = playerId;
@@ -44,9 +48,13 @@ public partial class EffectManager : Node2D
     {
         if (_gameState == null) return;
 
-        // 1. Consume new visual events → spawn effects
-        foreach (var evt in _gameState.VisualEvents)
-            SpawnEffects(evt);
+        // 1. Consume new visual events → spawn effects (ONCE per tick)
+       if (_gameState.TickNumber != _lastProcessedTick)
+       {
+           _lastProcessedTick = _gameState.TickNumber;
+           foreach (var evt in _gameState.VisualEvents)
+               SpawnEffects(evt);
+       }
 
         // 2. Update active effects (age + shader uniforms)
         float dtMs = (float)delta * 1000f;
