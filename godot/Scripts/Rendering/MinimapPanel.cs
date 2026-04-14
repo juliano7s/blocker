@@ -99,8 +99,8 @@ public partial class MinimapPanel : Control
         HudStyles.DrawInnerPanel(this, new Rect2(Vector2.Zero, panelSize));
 
         // Label
-        DrawString(font, new Vector2(10, 14), "MINIMAP",
-            HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall, HudStyles.TextDim);
+        // DrawString(font, new Vector2(10, 14), "MINIMAP",
+            // HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall, HudStyles.TextDim);
 
         var (scale, gridOffX, gridOffY) = ComputeLayout();
 

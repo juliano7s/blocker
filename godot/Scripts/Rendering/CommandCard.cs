@@ -20,30 +20,30 @@ public partial class CommandCard : Control
     private static readonly CommandDef[] AllCommands =
     [
         new("root", "Root", "⌾", "F", b => b.Type != BlockType.Wall && !b.IsFullyRooted && b.State != BlockState.Rooting),
-        new("uproot", "Uproot", "⊙", "U", b => b.IsFullyRooted || b.State == BlockState.Rooting),
-        new("wall", "Wall", "▣", "W", b => b.Type == BlockType.Builder && b.IsFullyRooted),
+        new("uproot", "Uproot", "⊙", "F", b => b.IsFullyRooted || b.State == BlockState.Rooting),
+        new("wall", "Wall", "▣", "V", b => b.Type == BlockType.Builder && b.IsFullyRooted),
         new("push", "Push", "↠", "G", b => b.Type == BlockType.Builder && b.IsFullyRooted && !b.IsInFormation),
         new("explode", "Explode", "✸", "D", b => b.Type == BlockType.Soldier, b => b.IsFullyRooted),
         new("stun", "Stun", "⚡", "S", b => b.Type == BlockType.Stunner && b.IsFullyRooted),
-        new("jump", "Jump", "⤴", "J", b => b.Type == BlockType.Jumper),
-        new("magnet", "Magnet", "🧲", "M", b => b.Type == BlockType.Warden && b.IsFullyRooted),
+        new("jump", "Jump", "⤴", "F", b => b.Type == BlockType.Jumper),
+        new("magnet", "Magnet", "🧲", "D", b => b.Type == BlockType.Warden && b.IsFullyRooted),
     ];
 
     // Blueprint types match BlueprintMode.BlueprintType enum (1-6)
     private static readonly BlueprintDef[] AllBlueprints =
     [
-        new(1, "Builder Nest", "🏠", "1"),
-        new(2, "Soldier Nest", "⚔", "2"),
-        new(3, "Stunner Nest", "⚡", "3"),
-        new(4, "Supply", "📦", "4"),
-        new(5, "Stun Tower", "🗼", "5"),
-        new(6, "Soldier Tower", "🏰", "6"),
+        new(1, "Builder Nest", "🏠", "Q"),
+        new(2, "Soldier Nest", "⚔", "W"),
+        new(3, "Stunner Nest", "⚡", "E"),
+        new(4, "Supply", "📦", "R"),
+        new(5, "Stun Tower", "🗼", "T"),
+        new(6, "Soldier Tower", "🏰", "Y"),
     ];
 
-    private const float ButtonSize = 36f;
+    private const float ButtonSize = 38f;
     private const float ButtonGap = 4f;
-    private const int Columns = 3;
-    private const float SectionGap = 16f;
+    private const int Columns = 6;
+    private const float SectionGap = 10f;
 
     private float _blueprintSectionY;
 

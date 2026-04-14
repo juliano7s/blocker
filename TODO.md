@@ -11,6 +11,8 @@
 
 
 # Visuals
+ - Soldier kill: when a block is killed by soldier adjacency, make it so the killed block stays some milliseconds in place, where it quickly builds up alpha (like it's heating from the inside) until it disappears triggering the DashedTendrils effect.
+
  - Some effects are duplicated. We need to review if they are being triggered multiple times
 
  - Blueprints:

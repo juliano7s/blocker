@@ -53,6 +53,18 @@ public static class EffectFactory
             contract: true, fadeSpeed: 0f);
     }
 
+    /// <summary>
+    /// Lightning rendered in reverse — wave sweeps inward toward origin.
+    /// Distinct from LightningConverge (which fades outer segments; this reverses the wave direction).
+    /// </summary>
+    public static LineEffect ConvergingDrain(Node2D parent, GridPos origin, Color color,
+        int maxSegs = 50, float duration = 1000f, float trail = 0.15f,
+        float contProb = 0.85f, float branchProb = 0.50f)
+    {
+        var paths = EffectShapes.LightningBurst(origin.X, origin.Y, Rng, maxSegs, contProb, branchProb);
+        return CreateLineEffect(parent, paths, color, duration, trail: trail, reverse: true);
+    }
+
     /// <summary>Lightning from one edge direction (e.g., trail behind movement).</summary>
     public static LineEffect LightningTrail(Node2D parent, GridPos origin, int dx, int dy,
         Color color, float duration = 1200f, int maxSegs = 30, float trail = 0.15f,
@@ -153,6 +165,47 @@ public static class EffectFactory
         return CreateLineEffect(parent, paths, color, duration, trail: trail);
     }
 
+    /// <summary>Bezier arc chain — 8 arcs to random nearby targets.</summary>
+    public static LineEffect ArcChain(Node2D parent, GridPos origin, Color color,
+        float duration = 1200f, int arcCount = 8, int subSegs = 4, float trail = 0.1f)
+    {
+        var paths = EffectShapes.ArcChain(origin.X, origin.Y, Rng, arcCount, subSegs);
+        return CreateLineEffect(parent, paths, color, duration, trail: trail);
+    }
+
+    /// <summary>BFS right-angle random walk — each segment is its own short path.</summary>
+    public static LineEffect CircuitTrace(Node2D parent, GridPos origin, Color color,
+        float duration = 1400f, int maxSegs = 50, float trail = 0.15f)
+    {
+        var paths = EffectShapes.CircuitTrace(origin.X, origin.Y, Rng, maxSegs);
+        return CreateLineEffect(parent, paths, color, duration, trail: trail);
+    }
+
+    /// <summary>4-directional lines with sine perpendicular displacement and random branches.</summary>
+    public static LineEffect WavePulse(Node2D parent, GridPos origin, Color color,
+        float duration = 1500f, int reach = 12, float trail = 0.2f)
+    {
+        var paths = EffectShapes.WavePulse(origin.X, origin.Y, Rng, reach);
+        return CreateLineEffect(parent, paths, color, duration, trail: trail);
+    }
+
+    /// <summary>3 parallel lanes in all 4 directions — straight sine-ripple shape.</summary>
+    public static LineEffect SineRipple(Node2D parent, GridPos origin, Color color,
+        float duration = 2000f, int laneCount = 3, int reach = 10, float trail = 0.2f)
+    {
+        var paths = EffectShapes.SineRipple(origin.X, origin.Y, laneCount, reach);
+        return CreateLineEffect(parent, paths, color, duration, trail: trail);
+    }
+
+    /// <summary>Looping ZoC dashed pulse — cardinal radials + diagonal staircases, dashed.</summary>
+    public static LineEffect ZocDashedPulse(Node2D parent, GridPos origin, Color color,
+        float duration = 2200f, int zocR = 6, float trail = 0.12f)
+    {
+        var paths = EffectShapes.ZocDashedPulse(origin.X, origin.Y, zocR);
+        return CreateLineEffect(parent, paths, color, duration, trail: trail,
+            dashed: true, loopMode: true, baseAlpha: 0.10f);
+    }
+
     // ─── Factory Internals ──────────────────────────────────────────
 
     private static LineEffect CreateLineEffect(
@@ -160,16 +213,18 @@ public static class EffectFactory
         List<(Vector2[] Points, float DistStart, float DistEnd)> paths,
         Color color, float duration, float trail,
         bool reverse = false, bool dashed = false, bool flicker = false,
-        bool contract = false, float fadeSpeed = 0.7f)
+        bool contract = false, float fadeSpeed = 0.7f,
+        bool loopMode = false, float baseAlpha = 0f)
     {
-        var coreMat = MakeLineMat(color, trail, 0.85f, reverse, dashed, flicker, contract, fadeSpeed);
-        var glowMat = MakeLineMat(color, trail, 0.12f, reverse, dashed, flicker, contract, fadeSpeed);
+        var coreMat = MakeLineMat(color, trail, 0.85f, reverse, dashed, flicker, contract, fadeSpeed, loopMode, baseAlpha);
+        var glowMat = MakeLineMat(color, trail, 0.12f, reverse, dashed, flicker, contract, fadeSpeed, loopMode, baseAlpha);
 
         var effect = new LineEffect
         {
             Duration = duration,
             CoreMat = coreMat,
             GlowMat = glowMat,
+            Looping = loopMode,
         };
 
         foreach (var (gridPoints, ds, de) in paths)
@@ -184,7 +239,8 @@ public static class EffectFactory
 
     private static ShaderMaterial MakeLineMat(Color color, float trail, float fadeMult,
         bool reverse = false, bool dashed = false, bool flicker = false,
-        bool contract = false, float fadeSpeed = 0.7f)
+        bool contract = false, float fadeSpeed = 0.7f,
+        bool loopMode = false, float baseAlpha = 0f)
     {
         var mat = new ShaderMaterial { Shader = _lineWaveShader };
         mat.SetShaderParameter("line_color", color);
@@ -195,6 +251,8 @@ public static class EffectFactory
         mat.SetShaderParameter("flicker", flicker);
         mat.SetShaderParameter("contract", contract);
         mat.SetShaderParameter("fade_speed", fadeSpeed);
+        mat.SetShaderParameter("loop_mode", loopMode);
+        mat.SetShaderParameter("base_alpha", baseAlpha);
         return mat;
     }
 

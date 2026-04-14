@@ -166,6 +166,40 @@ public partial class EffectPlayground : Node2D
 		new("SelectSquares", "3 concentric squares — blink outward on selection",
 			new ParamDef("duration", 350, 50, 2000, 50),
 			new ParamDef("trail", 0.15f, 0.01f, 0.5f, 0.01f)),
+
+		new("ConvergingDrain", "Lightning wave sweeping inward (reverse direction)",
+			new ParamDef("maxSegs", 50, 4, 200, 1),
+			new ParamDef("duration", 1000, 100, 5000, 50),
+			new ParamDef("trail", 0.15f, 0.01f, 0.5f, 0.01f),
+			new ParamDef("contProb", 0.85f, 0f, 1f, 0.01f),
+			new ParamDef("branchProb", 0.50f, 0f, 1f, 0.01f)),
+
+		new("ArcChain", "Bezier arc chain to random nearby targets",
+			new ParamDef("arcCount", 8, 2, 20, 1),
+			new ParamDef("subSegs", 4, 2, 12, 1),
+			new ParamDef("duration", 1200, 100, 5000, 50),
+			new ParamDef("trail", 0.1f, 0.01f, 0.5f, 0.01f)),
+
+		new("CircuitTrace", "BFS right-angle random walk, each segment its own path",
+			new ParamDef("maxSegs", 50, 4, 200, 1),
+			new ParamDef("duration", 1400, 100, 5000, 50),
+			new ParamDef("trail", 0.15f, 0.01f, 0.5f, 0.01f)),
+
+		new("WavePulse", "4-directional lines with sine displacement and branches",
+			new ParamDef("reach", 12, 2, 30, 1),
+			new ParamDef("duration", 1500, 100, 5000, 50),
+			new ParamDef("trail", 0.2f, 0.01f, 0.5f, 0.01f)),
+
+		new("SineRipple", "Parallel lanes in all 4 directions",
+			new ParamDef("laneCount", 3, 1, 7, 1),
+			new ParamDef("reach", 10, 2, 30, 1),
+			new ParamDef("duration", 2000, 100, 5000, 50),
+			new ParamDef("trail", 0.2f, 0.01f, 0.5f, 0.01f)),
+
+		new("ZocDashedPulse", "Looping dashed ZoC — cardinal radials + diagonal staircases",
+			new ParamDef("zocR", 6, 2, 15, 1),
+			new ParamDef("duration", 2200, 100, 5000, 50),
+			new ParamDef("trail", 0.12f, 0.01f, 0.5f, 0.01f)),
 	};
 
 	private readonly record struct ParamDef(string Name, float Default, float Min, float Max, float Step);
@@ -691,6 +725,40 @@ public partial class EffectPlayground : Node2D
 			"SelectSquares" => EffectFactory.SelectSquares(this, pos, _effectColor,
 				duration: P("SelectSquares", "duration"),
 				trail: P("SelectSquares", "trail")),
+
+			"ConvergingDrain" => EffectFactory.ConvergingDrain(this, pos, _effectColor,
+				maxSegs: (int)P("ConvergingDrain", "maxSegs"),
+				duration: P("ConvergingDrain", "duration"),
+				trail: P("ConvergingDrain", "trail"),
+				contProb: P("ConvergingDrain", "contProb"),
+				branchProb: P("ConvergingDrain", "branchProb")),
+
+			"ArcChain" => EffectFactory.ArcChain(this, pos, _effectColor,
+				duration: P("ArcChain", "duration"),
+				arcCount: (int)P("ArcChain", "arcCount"),
+				subSegs: (int)P("ArcChain", "subSegs"),
+				trail: P("ArcChain", "trail")),
+
+			"CircuitTrace" => EffectFactory.CircuitTrace(this, pos, _effectColor,
+				duration: P("CircuitTrace", "duration"),
+				maxSegs: (int)P("CircuitTrace", "maxSegs"),
+				trail: P("CircuitTrace", "trail")),
+
+			"WavePulse" => EffectFactory.WavePulse(this, pos, _effectColor,
+				duration: P("WavePulse", "duration"),
+				reach: (int)P("WavePulse", "reach"),
+				trail: P("WavePulse", "trail")),
+
+			"SineRipple" => EffectFactory.SineRipple(this, pos, _effectColor,
+				duration: P("SineRipple", "duration"),
+				laneCount: (int)P("SineRipple", "laneCount"),
+				reach: (int)P("SineRipple", "reach"),
+				trail: P("SineRipple", "trail")),
+
+			"ZocDashedPulse" => EffectFactory.ZocDashedPulse(this, pos, _effectColor,
+				duration: P("ZocDashedPulse", "duration"),
+				zocR: (int)P("ZocDashedPulse", "zocR"),
+				trail: P("ZocDashedPulse", "trail")),
 
 			_ => null
 		};

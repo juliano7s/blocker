@@ -16,7 +16,8 @@
       "Bash(GODOT_SDK_PATH=\"C:/Program Files/Godot/GodotSharp/Tools/nupkgs\" dotnet test tests/Blocker.Simulation.Tests/)",
       "PowerShell(dotnet test:*)",
       "PowerShell(dotnet build:*)",
-      "PowerShell(dotnet run:*)"
+      "PowerShell(dotnet run:*)",
+      "mcp__claude_ai_notes-mcp__search_notes"
     ]
   },
   "hooks": {

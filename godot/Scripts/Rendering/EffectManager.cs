@@ -158,13 +158,13 @@ public partial class EffectManager : Node2D
             case VisualEventType.CommandRootIssued:
                 AddEffect(EffectFactory.LightningBurst(this, pos, color,
                     maxSegs: 18, duration: 900f, trail: 0.12f,
-                    contProb: 0.78f, branchProb: 0.44f));
+                    contProb: 0.9f, branchProb: 0.35f));
                 break;
 
             // Uproot start: Same as root but fades outer-first, ~28 segs, 900ms
             case VisualEventType.CommandUprootIssued:
                 AddEffect(EffectFactory.LightningConverge(this, pos, color,
-                    maxSegs: 10, duration: 900f, trail: 0.12f));
+                    maxSegs: 15, duration: 1000f, trail: 0.10f, 0.55f, 0.45f));
                 break;
 
             // Wall convert command: quick flash
@@ -179,7 +179,7 @@ public partial class EffectManager : Node2D
             // Death: Dashed tendrils exploding outward
             case VisualEventType.BlockDied:
                 AddEffect(EffectFactory.DashedTendrils(this, pos, color,
-                    duration: 800f));
+                    duration: 800f, 10, 2, 8, 0.3f));
                 break;
 
             // Block spawn: type-specific (see SpawnBlockSpawnEffect)
@@ -340,15 +340,13 @@ public partial class EffectManager : Node2D
 
             // Soldier spawn: 6 jittery arms from back edge, 1000ms
             case BlockType.Soldier:
-                AddEffect(EffectFactory.JitterArms(this, pos, -1, 0, color,
+                AddEffect(EffectFactory.JitterArms(this, pos, 1, 0, color,
                     duration: 1000f, armCount: 6, armLen: 4));
                 break;
 
-            // Stunner spawn: Fast branching from all edges, ~36 segs, 600ms
+            // Stunner spawn: arc chain
             case BlockType.Stunner:
-                AddEffect(EffectFactory.LightningBurst(this, pos, color,
-                    maxSegs: 36, duration: 600f, trail: 0.18f,
-                    contProb: 0.88f, branchProb: 0.60f));
+                AddEffect(EffectFactory.ArcChain(this, pos, color, 900f, 4, 2, 0.15f));
                 break;
 
             // Warden spawn: Dashed tendrils

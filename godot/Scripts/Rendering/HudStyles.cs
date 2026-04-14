@@ -20,7 +20,7 @@ public static class HudStyles
 
     // Dimensions
     public const float TopBarHeight = 42f;
-    public const float BottomBarHeight = 220f;
+    public const float BottomBarHeight = 180f;
     public const float PanelBorderWidth = 2f;
     public const float PanelGap = 6f;
 

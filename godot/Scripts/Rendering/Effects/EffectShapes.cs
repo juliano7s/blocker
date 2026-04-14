@@ -295,6 +295,207 @@ public static class EffectShapes
         return new List<(Vector2[], float, float)> { (pts, 0f, 1f) };
     }
 
+    // ─── Arc Chain ──────────────────────────────────────────────────
+    // Bezier arc chain: 8 arcs from center, each to a random nearby target.
+
+    public static List<(Vector2[] Points, float DistStart, float DistEnd)> ArcChain(
+        int cx, int cy, Random rng, int arcCount = 8, int subSegs = 4)
+    {
+        var allPts = new List<Vector2>();
+        float x = cx + 0.5f, y = cy + 0.5f;
+
+        for (int a = 0; a < arcCount; a++)
+        {
+            float tx = cx + rng.Next(-5, 6) + 0.5f;
+            float ty = cy + rng.Next(-5, 6) + 0.5f;
+
+            float midOffX = (rng.NextSingle() - 0.5f) * 2f;
+            float midOffY = (rng.NextSingle() - 0.5f) * 2f;
+            float midX = (x + tx) / 2f + midOffX;
+            float midY = (y + ty) / 2f + midOffY;
+
+            for (int i = 0; i <= subSegs; i++)
+            {
+                float t = (float)i / subSegs;
+                float px = (1 - t) * (1 - t) * x + 2 * (1 - t) * t * midX + t * t * tx;
+                float py = (1 - t) * (1 - t) * y + 2 * (1 - t) * t * midY + t * t * ty;
+                allPts.Add(new Vector2(px, py));
+            }
+
+            x = tx; y = ty;
+        }
+
+        return new List<(Vector2[], float, float)> { (allPts.ToArray(), 0f, 1f) };
+    }
+
+    // ─── Circuit Trace ──────────────────────────────────────────────
+    // BFS right-angle random walk from cell edges; each segment is its own path.
+
+    public static List<(Vector2[] Points, float DistStart, float DistEnd)> CircuitTrace(
+        int cx, int cy, Random rng, int maxSegs = 50)
+    {
+        var segs = new List<(float X1, float Y1, float X2, float Y2, float Dist)>();
+        var frontier = new List<(float X, float Y, int Dx, int Dy, float Dist)>
+        {
+            (cx + 1, cy + 0.5f, 1, 0, 0),
+            (cx,     cy + 0.5f, -1, 0, 0),
+            (cx + 0.5f, cy + 1, 0, 1, 0),
+            (cx + 0.5f, cy,     0, -1, 0),
+        };
+        float maxDist = 0;
+
+        while (frontier.Count > 0 && segs.Count < maxSegs)
+        {
+            int idx = rng.Next(frontier.Count);
+            var item = frontier[idx];
+            frontier.RemoveAt(idx);
+
+            float nx = item.X + item.Dx, ny = item.Y + item.Dy;
+            segs.Add((item.X, item.Y, nx, ny, item.Dist));
+            if (item.Dist > maxDist) maxDist = item.Dist;
+
+            if (rng.NextSingle() < 0.7f)
+                frontier.Add((nx, ny, item.Dx, item.Dy, item.Dist + 1));
+            if (rng.NextSingle() < 0.35f)
+            {
+                int pdx = item.Dy == 0 ? 0 : (rng.NextSingle() < 0.5f ? 1 : -1);
+                int pdy = item.Dy == 0 ? (rng.NextSingle() < 0.5f ? 1 : -1) : 0;
+                frontier.Add((nx, ny, pdx, pdy, item.Dist + 1));
+            }
+        }
+
+        var paths = new List<(Vector2[], float, float)>();
+        foreach (var s in segs)
+        {
+            float normDist = maxDist > 0 ? s.Dist / maxDist : 0f;
+            paths.Add((new Vector2[] { new(s.X1, s.Y1), new(s.X2, s.Y2) }, normDist, normDist));
+        }
+
+        return paths;
+    }
+
+    // ─── Wave Pulse ─────────────────────────────────────────────────
+    // 4-directional lines with sine perpendicular displacement + random branches.
+
+    public static List<(Vector2[] Points, float DistStart, float DistEnd)> WavePulse(
+        int cx, int cy, Random rng, int reach = 12)
+    {
+        var paths = new List<(Vector2[], float, float)>();
+        int[][] dirs = { new[] { 1, 0 }, new[] { -1, 0 }, new[] { 0, 1 }, new[] { 0, -1 } };
+
+        foreach (var d in dirs)
+        {
+            int dx = d[0], dy = d[1];
+            var pts = new List<Vector2>();
+
+            for (int dist = 0; dist < reach; dist++)
+            {
+                float bx = cx + 0.5f + dx * dist;
+                float by = cy + 0.5f + dy * dist;
+                float perpAmt = 0.3f * MathF.Sin(dist * 1.2f + rng.NextSingle() * 0.5f);
+                float px = dy != 0 ? perpAmt : 0;
+                float py = dx != 0 ? perpAmt : 0;
+                pts.Add(new Vector2(bx + px, by + py));
+            }
+
+            paths.Add((pts.ToArray(), 0f, 1f));
+
+            // Random perpendicular branches
+            for (int i = 0; i < pts.Count; i++)
+            {
+                if (rng.NextSingle() < 0.4f)
+                {
+                    float bpx = dy == 0 ? 0 : (rng.NextSingle() < 0.5f ? 1 : -1);
+                    float bpy = dx == 0 ? 0 : (rng.NextSingle() < 0.5f ? 1 : -1);
+                    var from = pts[i];
+                    var to = from + new Vector2(bpx, bpy);
+                    float normDist = (float)i / pts.Count;
+                    paths.Add((new[] { from, to }, normDist, normDist + 0.05f));
+                }
+            }
+        }
+
+        return paths;
+    }
+
+    // ─── Sine Ripple ────────────────────────────────────────────────
+    // 3 parallel lanes per direction (4 directions), straight lines.
+
+    public static List<(Vector2[] Points, float DistStart, float DistEnd)> SineRipple(
+        int cx, int cy, int laneCount = 3, int reach = 10)
+    {
+        var paths = new List<(Vector2[], float, float)>();
+        int[][] dirs = { new[] { 1, 0 }, new[] { -1, 0 }, new[] { 0, 1 }, new[] { 0, -1 } };
+
+        foreach (var d in dirs)
+        {
+            int dx = d[0], dy = d[1];
+            for (int lane = 0; lane < laneCount; lane++)
+            {
+                float offX = dx != 0 ? cx + 0.5f : cx + (lane - 1) * 0.5f + 0.5f;
+                float offY = dy != 0 ? cy + 0.5f : cy + (lane - 1) * 0.5f + 0.5f;
+
+                var pts = new Vector2[reach + 1];
+                for (int i = 0; i <= reach; i++)
+                    pts[i] = new Vector2(offX + dx * i, offY + dy * i);
+
+                paths.Add((pts, 0f, 1f));
+            }
+        }
+
+        return paths;
+    }
+
+    // ─── ZoC Dashed Pulse ───────────────────────────────────────────
+    // Cardinal radial lines + diagonal staircase paths. Used with dashed + loopMode.
+
+    public static List<(Vector2[] Points, float DistStart, float DistEnd)> ZocDashedPulse(
+        int cx, int cy, int zocR = 6)
+    {
+        var paths = new List<(Vector2[], float, float)>();
+        int[][] dirs = { new[] { 1, 0 }, new[] { -1, 0 }, new[] { 0, 1 }, new[] { 0, -1 } };
+
+        // Cardinal radial lines (2 lanes each direction)
+        foreach (var d in dirs)
+        {
+            int dx = d[0], dy = d[1];
+            for (int lane = 0; lane < 2; lane++)
+            {
+                float offX = dy != 0 ? (lane == 0 ? cx : cx + 1) : cx + 0.5f;
+                float offY = dx != 0 ? (lane == 0 ? cy : cy + 1) : cy + 0.5f;
+
+                var pts = new Vector2[zocR + 1];
+                for (int i = 0; i <= zocR; i++)
+                    pts[i] = new Vector2(offX + dx * i, offY + dy * i);
+
+                paths.Add((pts, 0f, (float)(zocR - 1) / zocR));
+            }
+        }
+
+        // Diagonal staircase lines (4 diagonal directions)
+        int[] ddx = { 1, 1, -1, -1 };
+        int[] ddy = { 1, -1, 1, -1 };
+        for (int dir = 0; dir < 4; dir++)
+        {
+            var pts = new List<Vector2>();
+            int sx = cx + (ddx[dir] > 0 ? 1 : 0);
+            int sy = cy + (ddy[dir] > 0 ? 1 : 0);
+
+            for (int i = 0; i < zocR; i++)
+            {
+                int gx = sx + ddx[dir] * i;
+                int gy = sy + ddy[dir] * i;
+                pts.Add(new Vector2(gx, gy));
+                pts.Add(new Vector2(gx + ddx[dir], gy));
+                pts.Add(new Vector2(gx + ddx[dir], gy + ddy[dir]));
+            }
+
+            paths.Add((pts.ToArray(), 0f, 1f));
+        }
+
+        return paths;
+    }
+
     // ─── Select Squares ────────────────────────────────────────────
     // 3 concentric squares around cell center, expanding inward→outward.
 
