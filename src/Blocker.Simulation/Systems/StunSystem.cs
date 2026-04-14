@@ -64,7 +64,7 @@ public static class StunSystem
 
         // Apply cooldown — stunner moves at 1/3 speed during cooldown
         stunner.Cooldown = Constants.StunCooldown;
-        stunner.MoveTarget = null; // Stop current movement
+        stunner.MobileCooldown = true;
 
         state.VisualEvents.Add(new VisualEvent(
             VisualEventType.StunRayFired, stunner.Pos, stunner.PlayerId,
@@ -127,9 +127,6 @@ public static class StunSystem
         {
             if (block.StunTimer > 0)
                 block.StunTimer--;
-
-            if (block.Cooldown > 0)
-                block.Cooldown--;
         }
     }
 

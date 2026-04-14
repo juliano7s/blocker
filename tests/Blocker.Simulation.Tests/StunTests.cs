@@ -134,9 +134,12 @@ public class StunTests
 
         StunSystem.FireStunRay(state, stunner, Direction.Right);
         Assert.Equal(Constants.StunCooldown, stunner.Cooldown);
+        Assert.True(stunner.MobileCooldown);
 
-        StunSystem.Tick(state);
+        // Cooldowns decay in GameState.Tick step 6
+        state.Tick(null);
         Assert.Equal(Constants.StunCooldown - 1, stunner.Cooldown);
+        Assert.True(stunner.MobileCooldown); // Still on cooldown
     }
 
     [Fact]
@@ -176,6 +179,35 @@ public class StunTests
 
         Assert.False(result);
         Assert.Contains(stunner, state.Blocks);
+    }
+
+    [Fact]
+    public void StunnerMovesAtThirdSpeedDuringCooldown()
+    {
+        var state = CreateState();
+        var stunner = state.AddBlock(BlockType.Stunner, 0, new GridPos(5, 5));
+
+        // Fire stun ray — triggers cooldown with MobileCooldown
+        StunSystem.FireStunRay(state, stunner, Direction.Right);
+        Assert.True(stunner.MobileCooldown);
+        stunner.MoveTarget = new GridPos(5, 0); // Move upward
+
+        // Update ZoC to apply 3× slowdown: EffectiveMoveInterval = 2 * 3 = 6
+        WardenSystem.UpdateZoC(state);
+        Assert.Equal(Constants.StunnerMoveInterval * 3, stunner.EffectiveMoveInterval);
+
+        // TickNumber starts at 0; movement fires when TickNumber % 6 == 0
+        // So the stunner moves on tick 0, then tick 6, tick 12, etc.
+        state.Tick(); // Tick 0 — stunner moves
+        Assert.Equal(new GridPos(5, 4), stunner.Pos);
+
+        // Next 5 ticks — no movement (ticks 1-5)
+        for (int i = 0; i < 5; i++)
+            state.Tick();
+        Assert.Equal(new GridPos(5, 4), stunner.Pos); // Still same cell
+
+        state.Tick(); // Tick 6 — stunner moves again
+        Assert.Equal(new GridPos(5, 3), stunner.Pos);
     }
 
     [Fact]

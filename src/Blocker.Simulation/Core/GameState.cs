@@ -336,8 +336,6 @@ public class GameState
         return true;
     }
 
-    private static bool IsBlockBusy(Block block) => !IsBlockIdle(block);
-
     /// <summary>
     /// Whether a block is in a state where immediate commands should be auto-queued
     /// rather than executed (or dropped). This is narrower than IsBlockBusy: having
@@ -437,13 +435,13 @@ public class GameState
         // Step 5: Stun — advance rays, apply effects, decay cooldowns
         StunSystem.Tick(this);
 
-        // Step 6: Variant cooldowns — decay Jumper jump cooldowns
+        // Step 6: Decay ability cooldowns (Jumper jump, Stunner fire, Warden pull)
         foreach (var block in Blocks)
         {
-            if (block.Type == BlockType.Jumper && block.IsOnCooldown)
+            if (block.Cooldown > 0)
             {
                 block.Cooldown--;
-                if (!block.IsOnCooldown)
+                if (block.Cooldown == 0)
                     block.MobileCooldown = false;
             }
         }

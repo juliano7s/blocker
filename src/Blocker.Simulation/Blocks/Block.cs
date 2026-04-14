@@ -43,7 +43,7 @@ public class Block
     // Jumper state
     public bool HasCombo { get; set; }        // Can jump again immediately after killing
     public bool IsJumping { get; set; }       // Currently mid-jump (for animation)
-    public bool MobileCooldown { get; set; }  // True when cooldown came from consuming combo (can move, can't jump)
+    public bool MobileCooldown { get; set; }  // True when cooldown allows movement (Jumper combo, Stunner post-fire)
 
     // Command queue (Section 10.6)
     public Queue<QueuedCommand> CommandQueue { get; } = new();
