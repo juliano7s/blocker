@@ -133,6 +133,9 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 			case "magnet":
 				IssueCommandToSelected(CommandType.MagnetPull, queue);
 				break;
+			case "tower":
+				IssueCommandToSelected(CommandType.CreateTower, queue);
+				break;
 			}
 	}
 
@@ -750,6 +753,12 @@ private static readonly Color MoveTargetColor = new(0.3f, 0.9f, 0.3f, 0.6f);
 			{
 				// move → root (for builders becoming part of nests, soldiers/stunners for nests/towers)
 				EmitCommand(new Command(ControllingPlayer, CommandType.Root, [block.Id], Queue: true));
+
+				if ((_blueprint.ActiveType == BlueprintMode.BlueprintType.SoldierTower && role == "soldier") ||
+					(_blueprint.ActiveType == BlueprintMode.BlueprintType.StunTower && role == "stunner"))
+				{
+					EmitCommand(new Command(ControllingPlayer, CommandType.CreateTower, [block.Id], Queue: true));
+				}
 			}
 		}
 

@@ -151,6 +151,8 @@ public static class StunSystem
                     // Walls block and are killed by stun rays
                     state.VisualEvents.Add(new VisualEvent(
                         VisualEventType.StunRayHit, ray.HeadPos, ray.PlayerId, BlockId: block.Id));
+                    state.VisualEvents.Add(new VisualEvent(
+                        VisualEventType.BlockDied, ray.HeadPos, block.PlayerId, BlockId: block.Id));
                     state.RemoveBlock(block);
                     return true; // Ray stops at walls
                 }
@@ -168,6 +170,8 @@ public static class StunSystem
 
                 state.VisualEvents.Add(new VisualEvent(
                     VisualEventType.BlastRayFired, ray.HeadPos, ray.PlayerId, BlockId: block.Id));
+                state.VisualEvents.Add(new VisualEvent(
+                    VisualEventType.BlockDied, ray.HeadPos, block.PlayerId, BlockId: block.Id));
                 state.RemoveBlock(block);
                 return true;
         }

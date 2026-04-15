@@ -55,6 +55,39 @@ public partial class GridRenderer : Node2D
 
             DrawFormationJoiners(_formationMembers, outlineColor, alpha);
         }
+
+        foreach (var tower in _gameState!.Towers)
+        {
+            var palette = _config.GetPalette(tower.PlayerId);
+            var (outlineColor, outlineGlow, diamondColor) = GetTowerStyle(tower.Type, palette);
+            float alpha = tower.TeardownTimer > 0 ? 0.45f : 0.9f;
+
+            _formationMembers.Clear();
+            var centerBlock = _gameState.GetBlock(tower.CenterId);
+            if (centerBlock != null)
+            {
+                _formationMembers.Add((tower.CenterId, centerBlock.Pos));
+                var blockRect = GetFormationBlockRect(centerBlock.Pos);
+                DrawFormationBlock(blockRect, outlineColor with { A = alpha }, outlineGlow with { A = alpha * 0.35f }, diamondColor with { A = alpha });
+
+                if (tower.TeardownTimer > 0)
+                    DrawTeardownOverlay(centerBlock, tower.TeardownTimer);
+            }
+
+            foreach (var builderId in tower.BuilderDirections.Keys)
+            {
+                var block = _gameState.GetBlock(builderId);
+                if (block == null) continue;
+                _formationMembers.Add((builderId, block.Pos));
+                var blockRect = GetFormationBlockRect(block.Pos);
+                DrawFormationBlock(blockRect, outlineColor with { A = alpha }, outlineGlow with { A = alpha * 0.35f }, diamondColor with { A = alpha });
+
+                if (tower.TeardownTimer > 0)
+                    DrawTeardownOverlay(block, tower.TeardownTimer);
+            }
+
+            DrawFormationJoiners(_formationMembers, outlineColor, alpha);
+        }
     }
 
     /// <summary>
@@ -161,6 +194,14 @@ public partial class GridRenderer : Node2D
             NestType.Soldier => (palette.SoldierNestOutline, palette.SoldierNestOutlineGlow, palette.SoldierNestDiamond),
             NestType.Stunner => (palette.StunnerNestOutline, palette.StunnerNestOutlineGlow, palette.StunnerNestDiamond),
             _ => (palette.BuilderNestOutline, palette.BuilderNestOutlineGlow, palette.BuilderNestDiamond),
+        };
+
+    private static (Color Outline, Color OutlineGlow, Color Diamond) GetTowerStyle(TowerType type, PlayerPalette palette) =>
+        type switch
+        {
+            TowerType.Stun => (palette.StunTowerOutline, palette.StunTowerOutlineGlow, palette.StunTowerDiamond),
+            TowerType.Soldier => (palette.SoldierTowerOutline, palette.SoldierTowerOutlineGlow, palette.SoldierTowerDiamond),
+            _ => (palette.StunTowerOutline, palette.StunTowerOutlineGlow, palette.StunTowerDiamond),
         };
 
     private void DrawNestProgress()

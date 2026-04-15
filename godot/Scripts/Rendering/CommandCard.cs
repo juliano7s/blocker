@@ -31,6 +31,7 @@ public partial class CommandCard : Control
         new("stun", "Stun", "⚡", "S", b => b.Type == BlockType.Stunner && b.IsFullyRooted),
         new("jump", "Jump", "⤴", "F", b => b.Type == BlockType.Jumper),
         new("magnet", "Magnet", "🧲", "D", b => b.Type == BlockType.Warden && b.IsFullyRooted),
+        new("tower", "Tower", "🗼", "Z", b => b.Type == BlockType.Soldier || b.Type == BlockType.Stunner, b => b.IsFullyRooted && !b.IsInFormation),
     ];
 
     // Blueprint types match BlueprintMode.BlueprintType enum (1-6)

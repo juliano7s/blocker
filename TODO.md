@@ -13,10 +13,7 @@
 # Visuals
  - Blueprints:
 
- - Towers: they have no formation visuals (outline + diamond). These need to also be added to the PlayerPalette
-
  - Shaders: Only one is being applied. Directional bloom is a bit weird, generates some permanent artifacts. Screen distortion is too intense.
-
 # Gameplay
 
 ## Nugget Blocks

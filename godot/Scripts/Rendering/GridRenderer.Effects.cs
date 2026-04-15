@@ -140,68 +140,38 @@ public partial class GridRenderer : Node2D
 
         var offset = ray.Direction.ToOffset();
 
-        // Stun rays: one-shot expansion like explosion (no repeating pulse)
+        // Stun and Blast rays: one-shot expansion like explosion (no repeating pulse)
         // Wavefront at ray.Distance, cells behind it fade to nothing
-        // Blast rays: repeating pulse wave
-        float pulse;
         const float fadeLength = 2.5f;
 
-        if (ray.Type == RayType.Stun)
-            {
-                // No repeating cycle — wavefront is exactly where the ray head is
-                // Skip origin only if a block sits there (center ray over the stunner)
-                // Side rays originate on empty cells beside the stunner, so include i=0
-                int start = _gameState!.GetBlockAt(ray.Origin) != null ? 1 : 0;
-                for (int i = start; i <= ray.Distance; i++)
-            {
-                var cellPos = new GridPos(ray.Origin.X + offset.X * i, ray.Origin.Y + offset.Y * i);
-
-                // Age = how far behind the wavefront this cell is
-                float age = ray.Distance - i;
-                float brightness = Math.Max(0f, 1f - age / fadeLength);
-
-                // White-hot pilot cell at the wavefront
-                bool isPilot = i == ray.Distance && !ray.IsExpired;
-                float cellAlpha;
-                if (isPilot)
-                    cellAlpha = brightness * alpha * 1.2f;
-                else
-                    cellAlpha = brightness * alpha * 0.8f;
-
-                if (cellAlpha < 0.01f) continue;
-
-                Color cellColor = isPilot
-                    ? Colors.White with { A = cellAlpha }
-                    : baseColor with { A = cellAlpha };
-
-                var cellRect = new Rect2(cellPos.X * CellSize + GridPadding, cellPos.Y * CellSize + GridPadding, CellSize, CellSize);
-                DrawRect(cellRect, cellColor);
-            }
-        }
-        else
+        // No repeating cycle — wavefront is exactly where the ray head is
+        // Skip origin only if a block sits there (center ray over the stunner/soldier)
+        // Side rays originate on empty cells beside the tower, so include i=0
+        int start = _gameState!.GetBlockAt(ray.Origin) != null ? 1 : 0;
+        for (int i = start; i <= ray.Distance; i++)
         {
-            // Blast rays: repeating traveling pulse wave (800ms cycle)
-            pulse = ((float)Time.GetTicksMsec() % 800f) / 800f;
+            var cellPos = new GridPos(ray.Origin.X + offset.X * i, ray.Origin.Y + offset.Y * i);
 
-            for (int i = 0; i <= ray.Distance; i++)
-            {
-                var cellPos = new GridPos(ray.Origin.X + offset.X * i, ray.Origin.Y + offset.Y * i);
+            // Age = how far behind the wavefront this cell is
+            float age = ray.Distance - i;
+            float brightness = Math.Max(0f, 1f - age / fadeLength);
 
-                float distNorm = ray.Distance > 0 ? (float)i / ray.Distance : 0;
-                float ringStr = Mathf.Exp(-6f * Mathf.Pow(distNorm - pulse, 2));
-                float traceStr = distNorm < pulse ? 0.2f : 0.05f;
-                float cellAlpha = alpha * (traceStr + 0.6f * ringStr);
+            // White-hot pilot cell at the wavefront
+            bool isPilot = i == ray.Distance && !ray.IsExpired;
+            float cellAlpha;
+            if (isPilot)
+                cellAlpha = brightness * alpha * 1.2f;
+            else
+                cellAlpha = brightness * alpha * 0.8f;
 
-                var cellRect = new Rect2(cellPos.X * CellSize + GridPadding, cellPos.Y * CellSize + GridPadding, CellSize, CellSize);
-                DrawRect(cellRect, baseColor with { A = cellAlpha });
-            }
+            if (cellAlpha < 0.01f) continue;
 
-            // White-hot pilot cell for blast rays (the lethal head)
-            if (!ray.IsExpired)
-            {
-                var headRect = new Rect2(ray.HeadPos.X * CellSize + GridPadding, ray.HeadPos.Y * CellSize + GridPadding, CellSize, CellSize);
-                DrawRect(headRect, Colors.White with { A = alpha * 0.9f });
-            }
+            Color cellColor = isPilot
+                ? Colors.White with { A = cellAlpha }
+                : baseColor with { A = cellAlpha };
+
+            var cellRect = new Rect2(cellPos.X * CellSize + GridPadding, cellPos.Y * CellSize + GridPadding, CellSize, CellSize);
+            DrawRect(cellRect, cellColor);
         }
     }
 

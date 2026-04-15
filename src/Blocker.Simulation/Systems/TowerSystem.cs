@@ -238,9 +238,17 @@ public static class TowerSystem
             (center.Pos + perps.right, range - 1),
         };
 
-        foreach (var (origin, rayRange) in origins)
+        for (int r = 0; r < origins.Length; r++)
         {
-            var startPos = origin + dirOffset;
+            var (origin, rayRange) = origins[r];
+            bool isSideRay = r > 0;
+
+            // Center ray starts one cell ahead (tower occupies origin).
+            // Side rays start AT the perpendicular cell beside the tower so their
+            // head is one step behind the center, forming the > arrow shape.
+            var startPos = isSideRay ? origin : origin + dirOffset;
+            int startDist = isSideRay ? 0 : 1;
+
             if (!state.Grid.InBounds(startPos)) continue;
 
             var ray = new Ray
@@ -251,7 +259,7 @@ public static class TowerSystem
                 Origin = origin,
                 Direction = dir,
                 HeadPos = startPos,
-                Distance = 1,
+                Distance = startDist,
                 Range = rayRange,
                 AdvanceInterval = advanceInterval,
                 FadeTicks = Constants.StunRayFade

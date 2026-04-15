@@ -97,7 +97,7 @@ TowerConfig:
   StunTowerFireInterval = 16, StunTowerRange = 4
   SoldierTowerFireInterval = 12, SoldierTowerRange = 5
   StunTowerRayAdvanceInterval = 2
-  BlastTowerRayAdvanceInterval = 1
+  BlastTowerRayAdvanceInterval = 2
 
 PushConfig:
   WaveInterval = 8, Range = 4, Knockback = 3

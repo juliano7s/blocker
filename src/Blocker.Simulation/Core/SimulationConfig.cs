@@ -85,7 +85,7 @@ public record TowerConfig
     public int StunTowerRayAdvanceInterval { get; init; } = 2;
     public int SoldierTowerFireInterval { get; init; } = 12;
     public int SoldierTowerRange { get; init; } = 5;
-    public int BlastTowerRayAdvanceInterval { get; init; } = 1;
+    public int BlastTowerRayAdvanceInterval { get; init; } = 2;
 }
 
 public record PushConfig

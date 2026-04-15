@@ -78,7 +78,7 @@ public partial class GameConfig : Resource
     [Export] public int StunTowerRayAdvanceInterval { get; set; } = 2;
     [Export] public int SoldierTowerFireInterval { get; set; } = 12;
     [Export] public int SoldierTowerRange { get; set; } = 5;
-    [Export] public int BlastTowerRayAdvanceInterval { get; set; } = 1;
+    [Export] public int BlastTowerRayAdvanceInterval { get; set; } = 2;
 
     [ExportGroup("Push")]
     [Export] public int PushWaveInterval { get; set; } = 8;
