@@ -11,9 +11,7 @@ public enum TowerType
 /// </summary>
 public class Tower
 {
-    private static int _nextId;
-
-    public int Id { get; } = Interlocked.Increment(ref _nextId);
+    public int Id { get; init; }
     public TowerType Type { get; init; }
     public int PlayerId { get; init; }
 
@@ -49,7 +47,4 @@ public class Tower
         TowerType.Soldier => Constants.SoldierTowerRange,
         _ => 4
     };
-
-    /// <summary>Reset the ID counter. Use only in tests.</summary>
-    public static void ResetIdCounter() => _nextId = 0;
 }

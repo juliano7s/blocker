@@ -32,6 +32,7 @@ public static class ExplosionSystem
 
             var ray = new Ray
             {
+                Id = state.NextRayId(),
                 Type = rayType,
                 PlayerId = block.PlayerId,
                 Origin = block.Pos,

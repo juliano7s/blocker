@@ -17,6 +17,19 @@ public class GameState
     public List<VisualEvent> VisualEvents { get; } = [];
     public int TickNumber { get; private set; }
 
+    private int _nextBlockId = 1;
+    private int _nextNestId = 1;
+    private int _nextTowerId = 1;
+    private int _nextFormationId = 1;
+    private int _nextRayId = 1;
+    private int _nextPushWaveId = 1;
+
+    public int NextNestId() => _nextNestId++;
+    public int NextTowerId() => _nextTowerId++;
+    public int NextFormationId() => _nextFormationId++;
+    public int NextRayId() => _nextRayId++;
+    public int NextPushWaveId() => _nextPushWaveId++;
+
     // O(1) block lookup by ID — maintained by AddBlock/RemoveBlock
     private readonly Dictionary<int, Block> _blockById = new();
 
@@ -64,6 +77,7 @@ public class GameState
     {
         var block = new Block
         {
+            Id = _nextBlockId++,
             Type = type,
             PlayerId = playerId,
             Pos = pos,

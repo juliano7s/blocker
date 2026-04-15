@@ -123,10 +123,13 @@ public static class FormationSystem
                 // Form Supply Formation
                 var formation = new Formation
                 {
+                    Id = state.NextFormationId(),
                     Type = FormationType.Supply,
                     PlayerId = wall.PlayerId,
                 };
-                formation.MemberIds.AddRange([wall.Id, neighbor1.Id, neighbor2.Id]);
+                var ids = new[] { wall.Id, neighbor1.Id, neighbor2.Id };
+                Array.Sort(ids);
+                formation.MemberIds.AddRange(ids);
 
                 wall.FormationId = formation.Id;
                 neighbor1.FormationId = formation.Id;

@@ -58,6 +58,7 @@ public static class PushSystem
 
             var wave = new PushWave
             {
+                Id = state.NextPushWaveId(),
                 PlayerId = block.PlayerId,
                 Origin = block.Pos,
                 Direction = dir,

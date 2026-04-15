@@ -48,6 +48,7 @@ public static class StunSystem
 
             var ray = new Ray
             {
+                Id = state.NextRayId(),
                 Type = RayType.Stun,
                 PlayerId = stunner.PlayerId,
                 Origin = origin,

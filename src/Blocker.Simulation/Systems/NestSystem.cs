@@ -283,12 +283,13 @@ public static class NestSystem
             var members = new List<Block> { m1, m2, m3, w1, w2 };
             var nest = new Nest
             {
+                Id = state.NextNestId(),
                 Type = nestType,
                 PlayerId = playerId,
                 Center = center,
                 MemberIds = { Capacity = members.Count }
             };
-            nest.MemberIds.AddRange(members.Select(b => b.Id));
+            nest.MemberIds.AddRange(members.Select(b => b.Id).OrderBy(id => id));
 
             foreach (var member in members)
                 member.FormationId = nest.Id;
@@ -321,12 +322,13 @@ public static class NestSystem
 
             var nest = new Nest
             {
+                Id = state.NextNestId(),
                 Type = NestType.Builder,
                 PlayerId = playerId,
                 Center = center,
                 MemberIds = { Capacity = members.Count }
             };
-            nest.MemberIds.AddRange(members.Select(b => b.Id));
+            nest.MemberIds.AddRange(members.Select(b => b.Id).OrderBy(id => id));
 
             foreach (var member in members)
                 member.FormationId = nest.Id;

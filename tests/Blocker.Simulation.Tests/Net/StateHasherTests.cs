@@ -9,7 +9,6 @@ public class StateHasherTests
 {
     private static GameState MakeState()
     {
-        Block.ResetIdCounter();
         var grid = new Grid(8, 8);
         var state = new GameState(grid);
         state.Players.Add(new Player { Id = 0, TeamId = 0 });
@@ -22,9 +21,7 @@ public class StateHasherTests
     [Fact]
     public void Same_State_Same_Hash()
     {
-        Block.ResetIdCounter();
         var a = MakeState();
-        Block.ResetIdCounter();
         var b = MakeState();
         Assert.Equal(StateHasher.Hash(a), StateHasher.Hash(b));
     }
@@ -32,9 +29,7 @@ public class StateHasherTests
     [Fact]
     public void Position_Change_Changes_Hash()
     {
-        Block.ResetIdCounter();
         var a = MakeState();
-        Block.ResetIdCounter();
         var b = MakeState();
         var block = b.Blocks[0];
         b.TryMoveBlock(block, new GridPos(2, 1));
@@ -44,7 +39,6 @@ public class StateHasherTests
     [Fact]
     public void Insertion_Order_Does_Not_Matter()
     {
-        Block.ResetIdCounter();
         var grid = new Grid(8, 8);
         var a = new GameState(grid);
         a.Players.Add(new Player { Id = 0, TeamId = 0 });
@@ -52,7 +46,6 @@ public class StateHasherTests
         a.AddBlock(BlockType.Builder, 0, new GridPos(1, 1));
         a.AddBlock(BlockType.Soldier, 1, new GridPos(4, 4));
 
-        Block.ResetIdCounter();
         var grid2 = new Grid(8, 8);
         var b = new GameState(grid2);
         b.Players.Add(new Player { Id = 1, TeamId = 1 });

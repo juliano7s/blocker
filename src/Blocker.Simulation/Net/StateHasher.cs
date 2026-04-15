@@ -48,6 +48,81 @@ public static class StateHasher
                 MixI32(ref h, b.MoveTarget.Value.Y);
             }
         }
+
+        // Nests — sorted by Id
+        var nestsSorted = state.Nests.OrderBy(n => n.Id).ToArray();
+        foreach (var n in nestsSorted)
+        {
+            MixI32(ref h, n.Id);
+            MixI32(ref h, n.PlayerId);
+            MixI32(ref h, (int)n.Type);
+            MixI32(ref h, n.Center.X);
+            MixI32(ref h, n.Center.Y);
+            MixI32(ref h, n.SpawnProgress);
+            MixI32(ref h, n.TeardownTimer);
+            MixI32(ref h, n.IsPaused ? 1 : 0);
+        }
+
+        // Towers — sorted by Id
+        var towersSorted = state.Towers.OrderBy(t => t.Id).ToArray();
+        foreach (var t in towersSorted)
+        {
+            MixI32(ref h, t.Id);
+            MixI32(ref h, t.PlayerId);
+            MixI32(ref h, (int)t.Type);
+            MixI32(ref h, t.CenterId);
+            MixI32(ref h, t.FireTimer);
+            MixI32(ref h, t.SweepIndex);
+            MixI32(ref h, t.IsFiring ? 1 : 0);
+            MixI32(ref h, t.TeardownTimer);
+            
+            // BuilderDirections — sort by Id
+            var armsSorted = t.BuilderDirections.Keys.OrderBy(k => k).ToArray();
+            MixI32(ref h, armsSorted.Length);
+            foreach (var armId in armsSorted)
+            {
+                MixI32(ref h, armId);
+                MixI32(ref h, (int)t.BuilderDirections[armId]);
+            }
+        }
+
+        // Formations — sorted by Id
+        var formationsSorted = state.Formations.OrderBy(f => f.Id).ToArray();
+        foreach (var f in formationsSorted)
+        {
+            MixI32(ref h, f.Id);
+            MixI32(ref h, f.PlayerId);
+            MixI32(ref h, (int)f.Type);
+            MixI32(ref h, f.TeardownTimer);
+        }
+
+        // Rays — sorted by Id
+        var raysSorted = state.Rays.OrderBy(r => r.Id).ToArray();
+        foreach (var r in raysSorted)
+        {
+            MixI32(ref h, r.Id);
+            MixI32(ref h, r.PlayerId);
+            MixI32(ref h, (int)r.Type);
+            MixI32(ref h, r.HeadPos.X);
+            MixI32(ref h, r.HeadPos.Y);
+            MixI32(ref h, r.Distance);
+            MixI32(ref h, r.TickCounter);
+            MixI32(ref h, r.IsExpired ? 1 : 0);
+        }
+
+        // PushWaves — sorted by Id
+        var wavesSorted = state.PushWaves.OrderBy(w => w.Id).ToArray();
+        foreach (var w in wavesSorted)
+        {
+            MixI32(ref h, w.Id);
+            MixI32(ref h, w.PlayerId);
+            MixI32(ref h, w.HeadPos.X);
+            MixI32(ref h, w.HeadPos.Y);
+            MixI32(ref h, w.Distance);
+            MixI32(ref h, w.TickCounter);
+            MixI32(ref h, w.IsExpired ? 1 : 0);
+        }
+
         return h;
     }
 

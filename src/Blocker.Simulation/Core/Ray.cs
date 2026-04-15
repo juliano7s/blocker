@@ -12,9 +12,7 @@ public enum RayType
 /// </summary>
 public class Ray
 {
-    private static int _nextId;
-
-    public int Id { get; } = Interlocked.Increment(ref _nextId);
+    public int Id { get; init; }
     public RayType Type { get; init; }
     public int PlayerId { get; init; }
     public GridPos Origin { get; init; }
@@ -43,7 +41,4 @@ public class Ray
 
     /// <summary>Remaining visual fade ticks after expiry.</summary>
     public int FadeTicks { get; set; }
-
-    /// <summary>Reset the ID counter. Use only in tests.</summary>
-    public static void ResetIdCounter() => _nextId = 0;
 }

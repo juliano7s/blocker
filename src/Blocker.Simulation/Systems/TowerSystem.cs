@@ -48,6 +48,7 @@ public static class TowerSystem
 
         var tower = new Tower
         {
+            Id = state.NextTowerId(),
             Type = towerType.Value,
             PlayerId = center.PlayerId,
             CenterId = center.Id,
@@ -167,7 +168,7 @@ public static class TowerSystem
     /// </summary>
     private static void TickStunTower(GameState state, Tower tower, Block center)
     {
-        var directions = tower.BuilderDirections.Values.Distinct().ToList();
+        var directions = tower.BuilderDirections.Values.Distinct().OrderBy(d => (int)d).ToList();
         if (directions.Count == 0) return;
 
         if (!tower.IsFiring)
@@ -205,7 +206,7 @@ public static class TowerSystem
     /// </summary>
     private static void TickSoldierTower(GameState state, Tower tower, Block center)
     {
-        var directions = tower.BuilderDirections.Values.Distinct().ToList();
+        var directions = tower.BuilderDirections.Values.Distinct().OrderBy(d => (int)d).ToList();
         if (directions.Count == 0) return;
         if (tower.FireTimer < tower.FireInterval) return;
 
@@ -244,6 +245,7 @@ public static class TowerSystem
 
             var ray = new Ray
             {
+                Id = state.NextRayId(),
                 Type = rayType,
                 PlayerId = center.PlayerId,
                 Origin = origin,

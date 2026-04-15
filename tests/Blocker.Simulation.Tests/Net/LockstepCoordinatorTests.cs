@@ -10,7 +10,6 @@ public class LockstepCoordinatorTests
 {
     private static GameState MakeTwoPlayerState()
     {
-        Block.ResetIdCounter();   // FIX C — ensures both states get identical block IDs
         var grid = new Grid(10, 10);
         var state = new GameState(grid);
         state.Players.Add(new Player { Id = 0, TeamId = 0 });

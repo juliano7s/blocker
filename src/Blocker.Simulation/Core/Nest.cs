@@ -13,9 +13,7 @@ public enum NestType
 /// </summary>
 public class Nest
 {
-    private static int _nextId;
-
-    public int Id { get; } = Interlocked.Increment(ref _nextId);
+    public int Id { get; init; }
     public NestType Type { get; set; }
     public int PlayerId { get; init; }
     public GridPos Center { get; init; }
@@ -64,7 +62,4 @@ public class Nest
         NestType.Stunner => Blocks.BlockType.Stunner,
         _ => Blocks.BlockType.Builder
     };
-
-    /// <summary>Reset the ID counter. Use only in tests.</summary>
-    public static void ResetIdCounter() => _nextId = 0;
 }

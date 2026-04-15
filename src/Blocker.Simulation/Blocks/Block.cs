@@ -5,9 +5,7 @@ namespace Blocker.Simulation.Blocks;
 
 public class Block
 {
-    private static int _nextId;
-
-    public int Id { get; } = Interlocked.Increment(ref _nextId);
+    public int Id { get; init; }
     public BlockType Type { get; set; }
     public int PlayerId { get; init; }
 
@@ -79,7 +77,4 @@ public class Block
     /// Set by WardenSystem each tick.
     /// </summary>
     public int EffectiveMoveInterval { get; set; }
-
-    /// <summary>Reset the ID counter. Use only in tests.</summary>
-    public static void ResetIdCounter() => _nextId = 0;
 }

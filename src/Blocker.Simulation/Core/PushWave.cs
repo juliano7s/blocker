@@ -6,9 +6,7 @@ namespace Blocker.Simulation.Core;
 /// </summary>
 public class PushWave
 {
-    private static int _nextId;
-
-    public int Id { get; } = Interlocked.Increment(ref _nextId);
+    public int Id { get; init; }
     public int PlayerId { get; init; }
     public GridPos Origin { get; init; }
     public Direction Direction { get; init; }
@@ -24,7 +22,4 @@ public class PushWave
 
     public bool IsExpired { get; set; }
     public int FadeTicks { get; set; }
-
-    /// <summary>Reset the ID counter. Use only in tests.</summary>
-    public static void ResetIdCounter() => _nextId = 0;
 }
