@@ -140,6 +140,7 @@ public partial class SpawnToggles : Control
             {
                 EmitSignal(SignalName.SpawnToggleChanged, (int)UnitTypes[index]);
                 AcceptEvent();
+                QueueRedraw();
             }
         }
     }
@@ -157,6 +158,7 @@ public partial class SpawnToggles : Control
             {
                 EmitSignal(SignalName.SpawnToggleChanged, (int)UnitTypes[index]);
                 GetViewport().SetInputAsHandled();
+                QueueRedraw();
             }
         }
     }

@@ -25,7 +25,7 @@ public static class SpriteFactory
     public static void Build(GameConfig config)
     {
         _cache.Clear();
-        var types = new[] { BlockType.Builder, BlockType.Soldier, BlockType.Stunner, BlockType.Wall, BlockType.Warden };
+        var types = new[] { BlockType.Builder, BlockType.Soldier, BlockType.Stunner, BlockType.Wall, BlockType.Warden, BlockType.Jumper };
 
         for (int playerId = 0; playerId < config.PlayerPalettes.Length; playerId++)
         {
@@ -98,6 +98,7 @@ public static class SpriteFactory
         BlockType.Stunner => palette.StunnerFill,
         BlockType.Wall => palette.WallFill,
         BlockType.Warden => palette.BuilderFill,
+        BlockType.Jumper => palette.SoldierFill,
         _ => palette.Base
     };
 
