@@ -135,7 +135,7 @@ public partial class GameManager : Node2D
 			else
 				_selectionManager.SelectBlockById(blockId);
 		};
-		_hudBar.CommandClicked += key => _selectionManager.IssueCommandByKey(key);
+		_hudBar.CommandClicked += action => _selectionManager.IssueCommand(action);
 		_hudBar.BlueprintClicked += type => _selectionManager.ToggleBlueprintMode(type);
 
 		// Set up floating spawn toggles (top-right of game area)

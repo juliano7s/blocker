@@ -1,3 +1,4 @@
+using Blocker.Game.Input;
 using Blocker.Simulation.Blocks;
 using Godot;
 
@@ -9,40 +10,39 @@ namespace Blocker.Game.Rendering;
 /// </summary>
 public partial class CommandCard : Control
 {
-    [Signal] public delegate void CommandClickedEventHandler(string commandKey);
-    [Signal] public delegate void BlueprintClickedEventHandler(int blueprintType);
+    [Signal] public delegate void CommandClickedEventHandler(CommandAction commandKey);
+    [Signal] public delegate void BlueprintClickedEventHandler(BlueprintMode.BlueprintType blueprintType);
 
     private IReadOnlyList<Block>? _selectedBlocks;
 
     // Hover state
-    private string? _hoveredCommandKey;
-    private int? _hoveredBlueprintType;
+    private CommandAction? _hoveredCommandKey;
+    private BlueprintMode.BlueprintType? _hoveredBlueprintType;
 
-    private record CommandDef(string Key, string Name, string Icon, string Hotkey, Func<Block, bool> Available, Func<Block, bool>? Conditional = null);
-    private record BlueprintDef(int Type, string Name, string Icon, string Hotkey);
+    private record CommandDef(CommandAction Key, string Name, string Icon, string Hotkey, Func<Block, bool> Available, Func<Block, bool>? Conditional = null);
+    private record BlueprintDef(BlueprintMode.BlueprintType Type, string Name, string Icon, string Hotkey);
 
     private static readonly CommandDef[] AllCommands =
     [
-        new("root", "Root", "⌾", "F", b => b.Type != BlockType.Wall && !b.IsFullyRooted && b.State != BlockState.Rooting),
-        new("uproot", "Uproot", "⊙", "F", b => b.IsFullyRooted || b.State == BlockState.Rooting),
-        new("wall", "Wall", "▣", "V", b => b.Type == BlockType.Builder && b.IsFullyRooted),
-        new("push", "Push", "↠", "G", b => b.Type == BlockType.Builder && b.IsFullyRooted && !b.IsInFormation),
-        new("explode", "Explode", "✸", "D", b => b.Type == BlockType.Soldier, b => b.IsFullyRooted),
-        new("stun", "Stun", "⚡", "S", b => b.Type == BlockType.Stunner && b.IsFullyRooted),
-        new("jump", "Jump", "⤴", "F", b => b.Type == BlockType.Jumper),
-        new("magnet", "Magnet", "🧲", "D", b => b.Type == BlockType.Warden && b.IsFullyRooted),
-        new("tower", "Tower", "🗼", "Z", b => b.Type == BlockType.Soldier || b.Type == BlockType.Stunner, b => b.IsFullyRooted && !b.IsInFormation),
+        new(CommandAction.Root, "Root", "⌾", "F", b => b.Type != BlockType.Wall && !b.IsFullyRooted && b.State != BlockState.Rooting),
+        new(CommandAction.Uproot, "Uproot", "⊙", "F", b => b.IsFullyRooted || b.State == BlockState.Rooting),
+        new(CommandAction.Wall, "Wall", "▣", "V", b => b.Type == BlockType.Builder && b.IsFullyRooted),
+        new(CommandAction.Push, "Push", "↠", "G", b => b.Type == BlockType.Builder && b.IsFullyRooted && !b.IsInFormation),
+        new(CommandAction.Explode, "Explode", "✸", "D", b => b.Type == BlockType.Soldier, b => b.IsFullyRooted),
+        new(CommandAction.Stun, "Stun", "⚡", "S", b => b.Type == BlockType.Stunner && b.IsFullyRooted),
+        new(CommandAction.Jump, "Jump", "⤴", "F", b => b.Type == BlockType.Jumper),
+        new(CommandAction.Magnet, "Magnet", "🧲", "D", b => b.Type == BlockType.Warden && b.IsFullyRooted),
+        new(CommandAction.Tower, "Tower", "🗼", "Z", b => b.Type == BlockType.Soldier || b.Type == BlockType.Stunner, b => b.IsFullyRooted && !b.IsInFormation),
     ];
 
-    // Blueprint types match BlueprintMode.BlueprintType enum (1-6)
     private static readonly BlueprintDef[] AllBlueprints =
     [
-        new(1, "Builder Nest", "🏠", "Q"),
-        new(2, "Soldier Nest", "⚔", "W"),
-        new(3, "Stunner Nest", "⚡", "E"),
-        new(4, "Supply", "📦", "R"),
-        new(5, "Stun Tower", "🗼", "T"),
-        new(6, "Soldier Tower", "🏰", "Y"),
+        new(BlueprintMode.BlueprintType.BuilderNest, "Builder Nest", "🏠", "Q"),
+        new(BlueprintMode.BlueprintType.SoldierNest, "Soldier Nest", "⚔", "W"),
+        new(BlueprintMode.BlueprintType.StunnerNest, "Stunner Nest", "⚡", "E"),
+        new(BlueprintMode.BlueprintType.Supply, "Supply", "📦", "R"),
+        new(BlueprintMode.BlueprintType.StunTower, "Stun Tower", "🗼", "T"),
+        new(BlueprintMode.BlueprintType.SoldierTower, "Soldier Tower", "🏰", "Y"),
     ];
 
     private const float ButtonSize = 38f;
@@ -248,19 +248,19 @@ public partial class CommandCard : Control
         else if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
         {
             // Check command buttons
-            string? cmdKey = GetCommandAt(mb.Position);
+            CommandAction? cmdKey = GetCommandAt(mb.Position);
             if (cmdKey != null)
             {
-                EmitSignal(SignalName.CommandClicked, cmdKey);
+                EmitSignal(SignalName.CommandClicked, Variant.From(cmdKey.Value));
                 AcceptEvent();
                 return;
             }
 
             // Check blueprint buttons
-            int? bpType = GetBlueprintAt(mb.Position);
+            BlueprintMode.BlueprintType? bpType = GetBlueprintAt(mb.Position);
             if (bpType != null)
             {
-                EmitSignal(SignalName.BlueprintClicked, bpType.Value);
+                EmitSignal(SignalName.BlueprintClicked, Variant.From(bpType.Value));
                 AcceptEvent();
             }
         }
@@ -268,8 +268,8 @@ public partial class CommandCard : Control
 
     private void UpdateHover(Vector2 pos)
     {
-        string? cmd = GetCommandAt(pos);
-        int? bp = cmd != null ? null : GetBlueprintAt(pos);
+        CommandAction? cmd = GetCommandAt(pos);
+        BlueprintMode.BlueprintType? bp = cmd != null ? null : GetBlueprintAt(pos);
 
         _hoveredCommandKey = cmd;
         _hoveredBlueprintType = bp;
@@ -280,7 +280,7 @@ public partial class CommandCard : Control
             : Control.CursorShape.Arrow;
     }
 
-    private string? GetCommandAt(Vector2 pos)
+    private CommandAction? GetCommandAt(Vector2 pos)
     {
         if (_selectedBlocks == null || _selectedBlocks.Count == 0)
             return null;
@@ -320,7 +320,7 @@ public partial class CommandCard : Control
         return null;
     }
 
-    private int? GetBlueprintAt(Vector2 pos)
+    private BlueprintMode.BlueprintType? GetBlueprintAt(Vector2 pos)
     {
         float startY = _blueprintSectionY + 20f; // After label
         float x = 10f;

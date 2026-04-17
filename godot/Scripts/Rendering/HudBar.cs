@@ -1,4 +1,5 @@
 using Blocker.Game.Config;
+using Blocker.Game.Input;
 using Blocker.Simulation.Blocks;
 using Blocker.Simulation.Core;
 using Godot;
@@ -19,8 +20,8 @@ public partial class HudBar : CanvasLayer
     [Signal] public delegate void MinimapCameraJumpEventHandler(Vector2 worldPos);
     [Signal] public delegate void ControlGroupClickedEventHandler(int groupIndex, bool ctrlHeld);
     [Signal] public delegate void UnitClickedEventHandler(int blockId, bool shiftHeld);
-    [Signal] public delegate void CommandClickedEventHandler(string commandKey);
-    [Signal] public delegate void BlueprintClickedEventHandler(int blueprintType);
+    [Signal] public delegate void CommandClickedEventHandler(CommandAction commandKey);
+    [Signal] public delegate void BlueprintClickedEventHandler(BlueprintMode.BlueprintType blueprintType);
 
     public override void _Ready()
     {
@@ -60,8 +61,8 @@ public partial class HudBar : CanvasLayer
 
         _commandCard = new CommandCard();
         _commandCard.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-        _commandCard.CommandClicked += key => EmitSignal(SignalName.CommandClicked, key);
-        _commandCard.BlueprintClicked += type => EmitSignal(SignalName.BlueprintClicked, type);
+        _commandCard.CommandClicked += key => EmitSignal(SignalName.CommandClicked, Variant.From(key));
+        _commandCard.BlueprintClicked += type => EmitSignal(SignalName.BlueprintClicked, Variant.From(type));
         cmdAnchor.AddChild(_commandCard);
 
         // === Info panel (bottom-right, left of command card, shorter) ===
