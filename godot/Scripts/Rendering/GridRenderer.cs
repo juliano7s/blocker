@@ -21,10 +21,27 @@ public partial class GridRenderer : Node2D
 	private float _tickInterval = 1f / 12f; // Updated by GameManager
 	private GlowLayer? _glowLayer;
 
+	// Shader-based grid background
+	private ColorRect _bgRect = null!;
+	private ShaderMaterial _bgMaterial = null!;
+	private ImageTexture? _mapDataTexture;
+
 	public override void _Ready()
 	{
 		_glowLayer = new GlowLayer { Name = "GlowLayer" };
 		AddChild(_glowLayer);
+
+		// Initialize background shader
+		var shader = GD.Load<Shader>("res://Assets/Shaders/grid_background.gdshader");
+		_bgMaterial = new ShaderMaterial { Shader = shader };
+		_bgRect = new ColorRect
+		{
+			Material = _bgMaterial,
+			Color = Colors.Black, // Fallback if shader fails
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			ZIndex = -10, // Ensure it's behind everything
+		};
+		AddChild(_bgRect);
 	}
 
 	public void SetTickInterval(float interval) => _tickInterval = interval;
@@ -32,6 +49,7 @@ public partial class GridRenderer : Node2D
 	{
 		_config = config;
 		SpriteFactory.Build(config);
+		UpdateGridShader();
 	}
 
 	// Per-block visual positions in world coords — driven at constant speed toward actual pos
@@ -64,7 +82,8 @@ public partial class GridRenderer : Node2D
 	// Selected block IDs — set each frame by GameManager
 	private HashSet<int> _selectedIds = [];
 
-	// SelectionBorderColor now comes from _config.SelectionBorderColor
+	// Track last processed tick to avoid processing events multiple times per tick
+	private int _lastProcessedTick = -1;
 
 	public void SetSelectedIds(IReadOnlyList<Blocker.Simulation.Blocks.Block> selected)
 	{
@@ -79,6 +98,10 @@ public partial class GridRenderer : Node2D
 	public void SetGameState(GameState state)
 	{
 		_gameState = state;
+		_lastProcessedTick = -1; // Reset when state changes
+
+		// Update background shader
+		UpdateGridShader();
 
 		// Clean up stale warden ZoC rects from previous game state
 		foreach (var (_, rect) in _wardenZocRects)
@@ -88,59 +111,116 @@ public partial class GridRenderer : Node2D
 		QueueRedraw();
 	}
 
+	private void UpdateGridShader()
+	{
+		if (_gameState == null || _bgMaterial == null) return;
+
+		var grid = _gameState.Grid;
+		int width = grid.Width;
+		int height = grid.Height;
+
+		// Create data texture
+		var image = Image.CreateEmpty(width, height, false, Image.Format.R8);
+		for (int y = 0; y < height; y++)
+		{
+			for (int x = 0; x < width; x++)
+			{
+				var cell = grid[x, y];
+
+				// Ground: 0: Normal, 1: Boot, 2: Overload, 3: Proto
+				int groundVal = (int)cell.Ground;
+
+				// Terrain: 0: None, 1: Terrain, 2: Breakable, 3: Fragile
+				int terrainVal = (int)cell.Terrain;
+
+				// Combine into R8: lower 4 bits ground, upper 4 bits terrain
+				int rawVal = (groundVal & 0x0F) | ((terrainVal & 0x0F) << 4);
+				image.SetPixel(x, y, new Color(rawVal / 255f, 0, 0, 1.0f));
+			}
+		}
+
+		_mapDataTexture = ImageTexture.CreateFromImage(image);
+		_bgMaterial.SetShaderParameter("map_data", _mapDataTexture);
+		_bgMaterial.SetShaderParameter("grid_size", new Vector2I(width, height));
+		_bgMaterial.SetShaderParameter("cell_size", CellSize);
+		_bgMaterial.SetShaderParameter("grid_padding", GridPadding);
+		_bgMaterial.SetShaderParameter("grid_line_width", GridLineWidth);
+
+		_bgMaterial.SetShaderParameter("normal_color", _config.NormalGroundColor);
+		_bgMaterial.SetShaderParameter("boot_color", _config.BootGroundColor);
+		_bgMaterial.SetShaderParameter("overload_color", _config.OverloadGroundColor);
+		_bgMaterial.SetShaderParameter("proto_color", _config.ProtoGroundColor);
+		_bgMaterial.SetShaderParameter("grid_line_color", _config.GridLineColor);
+
+		_bgMaterial.SetShaderParameter("terrain_color", _config.TerrainGroundColor);
+		_bgMaterial.SetShaderParameter("breakable_color", _config.BreakableWallGroundColor);
+		_bgMaterial.SetShaderParameter("fragile_color", _config.FragileWallGroundColor);
+
+		// Size the ColorRect to cover grid + padding
+		float totalWidth = width * CellSize + GridPadding * 2.0f;
+		float totalHeight = height * CellSize + GridPadding * 2.0f;
+		_bgRect.Size = new Vector2(totalWidth, totalHeight);
+		_bgRect.Position = Vector2.Zero; // GridRenderer origin is at (0,0), which is top-left of padding
+	}
+
 	public override void _Process(double delta)
 	{
 		if (_gameState != null)
 		{
-			// Consume visual events for death effects and jumper ghost trails
 			float now = (float)Time.GetTicksMsec() / 1000f;
-			foreach (var evt in _gameState.VisualEvents)
-			{
-				// Capture dying blocks for heat-up animation
-				if (evt.Type == VisualEventType.BlockDied && evt.BlockId.HasValue && !_dyingBlocks.ContainsKey(evt.BlockId.Value))
-				{
-					var dyingColor = evt.PlayerId.HasValue ? _config.GetPalette(evt.PlayerId.Value).Base : Colors.White;
-					var dyingWorldPos = _visualPositions.TryGetValue(evt.BlockId.Value, out var dvp)
-						? dvp : GridToWorld(evt.Position);
-					_dyingBlocks[evt.BlockId.Value] = new DyingBlockData(dyingWorldPos, evt.Position, dyingColor, now);
-				}
 
-				// Jumper ghost trails from moves and jumps
-			if (evt.Type == VisualEventType.BlockMoved && evt.BlockId.HasValue)
+			// Consume visual events once per tick
+			if (_gameState.TickNumber != _lastProcessedTick)
 			{
-				var movedBlock = _gameState.GetBlock(evt.BlockId.Value);
-				if (movedBlock is { Type: BlockType.Jumper })
+				_lastProcessedTick = _gameState.TickNumber;
+				foreach (var evt in _gameState.VisualEvents)
 				{
-					var ghostPos = _visualPositions.TryGetValue(movedBlock.Id, out var gvp)
-						? gvp : GridToWorld(movedBlock.PrevPos);
-					var ghostColor = GetPlayerColor(movedBlock.PlayerId);
-					_ghostTrails.Add(new GhostTrail(ghostPos, ghostColor, now, false));
-				}
-			}
-			if (evt.Type == VisualEventType.JumpExecuted && evt.BlockId.HasValue)
-			{
-				var jumper = _gameState.GetBlock(evt.BlockId.Value);
-				if (jumper != null)
-				{
-					// Snap visual position to landing — jumps are instant, no interpolation
-					var landingWorld = GridToWorld(jumper.Pos);
-					_visualPositions[jumper.Id] = landingWorld;
-
-					var jumpColor = GetPlayerColor(jumper.PlayerId);
-					// Add blur ghosts along the jump path
-					var dir = evt.Direction!.Value;
-					var range = evt.Range ?? 1;
-					var offset = dir.ToOffset();
-					// Reconstruct start position from landing + direction (PrevPos is
-					// already overwritten by GameState step 11 at this point)
-					var pos = jumper.Pos - new GridPos(offset.X * range, offset.Y * range);
-					for (int i = 0; i < range; i++)
+					// Capture dying blocks for heat-up animation
+					if (evt.Type == VisualEventType.BlockDied && evt.BlockId.HasValue && !_dyingBlocks.ContainsKey(evt.BlockId.Value))
 					{
-						pos = pos + offset;
-						_ghostTrails.Add(new GhostTrail(GridToWorld(pos), jumpColor, now, true));
+						var dyingColor = evt.PlayerId.HasValue ? _config.GetPalette(evt.PlayerId.Value).Base : Colors.White;
+						var dyingWorldPos = _visualPositions.TryGetValue(evt.BlockId.Value, out var dvp)
+							? dvp : GridToWorld(evt.Position);
+						_dyingBlocks[evt.BlockId.Value] = new DyingBlockData(dyingWorldPos, evt.Position, dyingColor, now);
+					}
+
+					// Jumper ghost trails from moves and jumps
+					if (evt.Type == VisualEventType.BlockMoved && evt.BlockId.HasValue)
+					{
+						var movedBlock = _gameState.GetBlock(evt.BlockId.Value);
+						if (movedBlock is { Type: BlockType.Jumper })
+						{
+							var ghostPos = _visualPositions.TryGetValue(movedBlock.Id, out var gvp)
+								? gvp : GridToWorld(movedBlock.PrevPos);
+							var ghostColor = GetPlayerColor(movedBlock.PlayerId);
+							_ghostTrails.Add(new GhostTrail(ghostPos, ghostColor, now, false));
+						}
+					}
+					if (evt.Type == VisualEventType.JumpExecuted && evt.BlockId.HasValue)
+					{
+						var jumper = _gameState.GetBlock(evt.BlockId.Value);
+						if (jumper != null)
+						{
+							// Snap visual position to landing — jumps are instant, no interpolation
+							var landingWorld = GridToWorld(jumper.Pos);
+							_visualPositions[jumper.Id] = landingWorld;
+
+							var jumpColor = GetPlayerColor(jumper.PlayerId);
+							// Add blur ghosts along the jump path
+							var dir = evt.Direction!.Value;
+							var range = evt.Range ?? 1;
+							var offset = dir.ToOffset();
+							// Reconstruct start position from landing + direction (PrevPos is
+							// already overwritten by GameState step 11 at this point)
+							var pos = jumper.Pos - new GridPos(offset.X * range, offset.Y * range);
+							for (int i = 0; i < range; i++)
+							{
+								pos = pos + offset;
+								_ghostTrails.Add(new GhostTrail(GridToWorld(pos), jumpColor, now, true));
+							}
+						}
 					}
 				}
-			}
 			}
 
 			// Single pass: smooth visual positions + idle spin angles + build live ID set
@@ -259,18 +339,16 @@ public partial class GridRenderer : Node2D
 		QueueRedraw();
 	}
 
-	/// <summary>
-	/// Computes the visible cell range from the current canvas transform.
-	/// Returns (minX, minY, maxX, maxY) clamped to grid bounds.
-	/// </summary>
-	private (int minX, int minY, int maxX, int maxY) GetVisibleCellRange()
+	public override void _Draw()
 	{
-		var grid = _gameState!.Grid;
+		if (_gameState == null) return;
+		_glowLayer?.BeginFrame();
+
+		var grid = _gameState.Grid;
+		// Viewport cull using current canvas transform
 		var xform = GetCanvasTransform();
 		var invXform = xform.AffineInverse();
 		var vpSize = GetViewportRect().Size;
-
-		// Transform viewport corners to world space
 		var topLeft = invXform * Vector2.Zero;
 		var bottomRight = invXform * vpSize;
 
@@ -280,54 +358,18 @@ public partial class GridRenderer : Node2D
 		int maxX = Mathf.Min(grid.Width - 1, (int)Mathf.Ceil((bottomRight.X - GridPadding) / CellSize) + 1);
 		int maxY = Mathf.Min(grid.Height - 1, (int)Mathf.Ceil((bottomRight.Y - GridPadding) / CellSize) + 1);
 
-		return (minX, minY, maxX, maxY);
-	}
-
-	public override void _Draw()
-	{
-		if (_gameState == null) return;
-		_glowLayer?.BeginFrame();
-
-		var grid = _gameState.Grid;
-		var (minX, minY, maxX, maxY) = GetVisibleCellRange();
-		// Draw padding border around grid
-		var gridBounds = new Rect2(GridPadding, GridPadding, grid.Width * CellSize, grid.Height * CellSize);
-		var paddedBounds = gridBounds.Grow(GridPadding);
-		DrawRect(paddedBounds, _config.NormalGroundColor with { A = 0.5f });
-		DrawRect(gridBounds.GrowIndividual(-0.5f, -0.5f, -0.5f, -0.5f), _config.GridLineColor with { A = 0.3f }, false, 1f);
-
-		// Draw cell backgrounds — only visible cells
+		// Draw terrain walls — viewport culled
 		for (int y = minY; y <= maxY; y++)
 		{
 			for (int x = minX; x <= maxX; x++)
 			{
 				var cell = grid[x, y];
-				var rect = new Rect2(x * CellSize + GridPadding, y * CellSize + GridPadding, CellSize, CellSize);
-				DrawRect(rect, _config.GetGroundColor(cell.Ground));
-
-				// Draw terrain walls as inset blocks (after background, before grid lines)
 				if (cell.Terrain != TerrainType.None)
+				{
+					var rect = new Rect2(x * CellSize + GridPadding, y * CellSize + GridPadding, CellSize, CellSize);
 					DrawTerrainWallBlock(rect, cell.Terrain);
+				}
 			}
-		}
-
-		// Draw grid lines — only visible range, scale width by 1/zoom so lines are always 1 screen pixel
-		float screenPixelWidth = GridLineWidth / GetCanvasTransform().X.X;
-		float gridTop = minY * CellSize + GridPadding;
-		float gridBottom = (maxY + 1) * CellSize + GridPadding;
-		for (int x = minX; x <= maxX + 1; x++)
-		{
-			var from = new Vector2(x * CellSize + GridPadding, gridTop);
-			var to = new Vector2(x * CellSize + GridPadding, gridBottom);
-			DrawLine(from, to, _config.GridLineColor, screenPixelWidth, false);
-		}
-		float gridLeft = minX * CellSize + GridPadding;
-		float gridRight = (maxX + 1) * CellSize + GridPadding;
-		for (int y = minY; y <= maxY + 1; y++)
-		{
-			var from = new Vector2(gridLeft, y * CellSize + GridPadding);
-			var to = new Vector2(gridRight, y * CellSize + GridPadding);
-			DrawLine(from, to, _config.GridLineColor, screenPixelWidth, false);
 		}
 
 		// Draw blocks — viewport cull using visible cell range with extra margin

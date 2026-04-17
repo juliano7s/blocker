@@ -31,7 +31,15 @@ public partial class PostProcessingManager : CanvasLayer
 	private GameState? _gameState;
 	private GridRenderer? _gridRenderer;
 
-	public void SetGameState(GameState state) => _gameState = state;
+	// Track last processed tick to avoid processing events multiple times per tick
+	private int _lastProcessedTick = -1;
+
+	public void SetGameState(GameState state)
+	{
+		_gameState = state;
+		_lastProcessedTick = -1; // Reset when state changes
+	}
+
 	public void SetGridRenderer(GridRenderer renderer) => _gridRenderer = renderer;
 
 	public override void _Ready()
@@ -77,7 +85,11 @@ public partial class PostProcessingManager : CanvasLayer
 		// Process distortion sources from visual events
 		if (_gameState != null && _gridRenderer != null && EnableScreenDistortion)
 		{
-			ConsumeVisualEvents();
+			if (_gameState.TickNumber != _lastProcessedTick)
+			{
+				_lastProcessedTick = _gameState.TickNumber;
+				ConsumeVisualEvents();
+			}
 			UpdateDistortionSources((float)delta);
 		}
 	}
