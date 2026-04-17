@@ -6,24 +6,32 @@ namespace Blocker.Game;
 
 /// <summary>
 /// Drives the simulation at a fixed tick rate from Godot's _Process loop.
-/// Collects commands from SelectionManager and passes them to Tick().
+/// Collects commands from SelectionManager and passes them to the pure C# SimulationTicker.
 /// </summary>
 public partial class TickRunner : Node
 {
     [Export] public int TickRate = 12;
+    private const int MaxAdvancePerFrame = 5;
 
-    private GameState? _gameState;
+    private SimulationTicker? _ticker;
     private SelectionManager? _selectionManager;
-    private double _accumulator;
 
-    public double TickInterval => 1.0 / TickRate;
-
-    public float InterpolationFactor =>
-        TickInterval > 0 ? Mathf.Clamp((float)(_accumulator / TickInterval), 0f, 1f) : 1f;
+    public double TickInterval => _ticker?.TickInterval ?? 1.0 / TickRate;
+    public float InterpolationFactor => _ticker?.InterpolationFactor ?? 1f;
 
     public void SetGameState(GameState state)
     {
-        _gameState = state;
+        _ticker = new SimulationTicker(
+            state,
+            TickRate,
+            MaxAdvancePerFrame,
+            tryAdvance: (_) =>
+            {
+                var commands = _selectionManager?.FlushCommands();
+                state.Tick(commands);
+                return true; // Single-player never stalls
+            }
+        );
     }
 
     public void SetSelectionManager(SelectionManager sm)
@@ -33,14 +41,6 @@ public partial class TickRunner : Node
 
     public override void _Process(double delta)
     {
-        if (_gameState == null) return;
-
-        _accumulator += delta;
-        while (_accumulator >= TickInterval)
-        {
-            var commands = _selectionManager?.FlushCommands();
-            _gameState.Tick(commands);
-            _accumulator -= TickInterval;
-        }
+        _ticker?.ProcessFrame(delta);
     }
 }

@@ -38,10 +38,6 @@ public static class PushSystem
     /// </summary>
     public static void Tick(GameState state)
     {
-        // Step 1: Clear push flags
-        foreach (var block in state.Blocks)
-            block.WasPushedThisTick = false;
-
         // Step 7: Fire new waves
         foreach (var block in state.Blocks)
         {

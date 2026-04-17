@@ -37,6 +37,7 @@ public class Block
     public bool IsPushing { get; set; }
     public Direction? PushDirection { get; set; }
     public bool WasPushedThisTick { get; set; }
+    public bool WasJumpedThisTick { get; set; }
 
     // Jumper state
     public bool HasCombo { get; set; }        // Can jump again immediately after killing

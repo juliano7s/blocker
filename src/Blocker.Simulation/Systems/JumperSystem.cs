@@ -89,6 +89,7 @@ public static class JumperSystem
 
             jumper.PrevPos = jumper.Pos;
             jumper.Pos = landingPos;
+            jumper.WasJumpedThisTick = true;
             state.Grid[landingPos].BlockId = jumper.Id;
 
             state.VisualEvents.Add(new VisualEvent(

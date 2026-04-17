@@ -431,12 +431,23 @@ public class GameState
     }
 
     /// <summary>
+    /// Explicitly clear visual events. Should be called by the renderer once per frame
+    /// to ensure events accumulated across multiple ticks are processed together.
+    /// </summary>
+    public void ClearVisualEvents() => VisualEvents.Clear();
+
+    /// <summary>
     /// Advance simulation by one tick.
     /// Follows tick resolution order from game bible Section 14.
     /// </summary>
     public void Tick(List<Command>? commands = null)
     {
-        VisualEvents.Clear();
+        // Step 1: Clear push and jump flags from previous tick
+        foreach (var block in Blocks)
+        {
+            block.WasPushedThisTick = false;
+            block.WasJumpedThisTick = false;
+        }
 
         // Step 2: Formations — root/uproot progress, nest detection, supply formations
         RootingSystem.Tick(this);
@@ -470,9 +481,12 @@ public class GameState
         // Step 10: Warden ZoC — update effective move intervals
         WardenSystem.UpdateZoC(this);
 
-        // Step 11: Snap prevPos for interpolation
+        // Step 11: Snap prevPos for interpolation (except pushed or jumped blocks)
         foreach (var block in Blocks)
-            block.PrevPos = block.Pos;
+        {
+            if (!block.WasPushedThisTick && !block.WasJumpedThisTick)
+                block.PrevPos = block.Pos;
+        }
 
         // Step 12: Movement — per-type intervals (uses EffectiveMoveInterval for ZoC slow)
         foreach (var block in Blocks)
@@ -548,8 +562,9 @@ public class GameState
 
         // Step 14: Spawning — nest timers and unit production
         NestSystem.TickSpawning(this);
-        // Step 15: Death effects — TODO
 
+        // Step 15: Death effects — Handled by Godot layer (VisualEvents -> EffectManager)
+        
         // Step 16: Elimination check
         EliminationSystem.Tick(this);
 
