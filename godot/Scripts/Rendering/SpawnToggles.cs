@@ -1,83 +1,144 @@
 using Blocker.Simulation.Blocks;
+using Blocker.Simulation.Core;
 using Godot;
 
 namespace Blocker.Game.Rendering;
 
 /// <summary>
-/// Floating panel with toggle buttons for global spawn control per unit type.
-/// Positioned at top-right of game area, below top bar.
+/// Horizontal row of spawn-toggle buttons centered in the top bar.
+/// One button per spawnable unit type. Reads toggle state from GameState.
 /// </summary>
 public partial class SpawnToggles : Control
 {
-    [Signal] public delegate void SpawnToggleChangedEventHandler(int unitType, bool enabled);
+    [Signal] public delegate void SpawnToggleChangedEventHandler(int unitType);
 
-    private readonly bool[] _spawnEnabled = [true, true, true]; // Builder, Soldier, Stunner
-    private static readonly BlockType[] ToggleTypes = [BlockType.Builder, BlockType.Soldier, BlockType.Stunner];
-    private static readonly Color[] ToggleColors =
+    private GameState? _gameState;
+    private int _controllingPlayer;
+    private int _hoveredIndex = -1;
+
+    public const float ButtonSize = 30f;
+    public const float ButtonGap = 8f;
+    public const int UnitCount = 5;
+    public const float TotalWidth = UnitCount * ButtonSize + (UnitCount - 1) * ButtonGap;
+
+    private static readonly BlockType[] UnitTypes =
+        [BlockType.Builder, BlockType.Soldier, BlockType.Stunner, BlockType.Warden, BlockType.Jumper];
+
+    private static readonly Color[] GlowColors =
     [
-        new(0.231f, 0.510f, 0.965f), // #3b82f6 Builder blue
-        new(0.133f, 0.773f, 0.369f), // #22c55e Soldier green
-        new(0.659f, 0.333f, 0.969f), // #a855f7 Stunner purple
+        new(0.231f, 0.510f, 0.965f), // Builder  #3b82f6
+        new(0.133f, 0.773f, 0.369f), // Soldier  #22c55e
+        new(0.659f, 0.333f, 0.969f), // Stunner  #a855f7
+        new(0.231f, 0.510f, 0.965f), // Warden   same as Builder
+        new(0.133f, 0.773f, 0.369f), // Jumper   same as Soldier
     ];
-    private static readonly string[] Hotkeys = ["1", "2", "3"];
 
-    private const float ButtonSize = 28f;
-    private const float ButtonGap = 6f;
-    private const float Padding = 8f;
-    private const float PanelWidth = ButtonSize + Padding * 2;
-    private const float PanelHeight = ButtonSize * 3 + ButtonGap * 2 + Padding * 2;
+    private static readonly Key[] HotkeyKeys =
+        [Key.Q, Key.W, Key.E, Key.A, Key.S];
+
+    private static readonly string[] HotkeyLabels =
+        ["Alt+Q", "Alt+W", "Alt+E", "Alt+A", "Alt+S"];
+
+    private static readonly string[] UnitNames =
+        ["Builder", "Soldier", "Stunner", "Warden", "Jumper"];
+
+    public void SetGameState(GameState state) => _gameState = state;
+    public void SetControllingPlayer(int playerId) => _controllingPlayer = playerId;
 
     public override void _Ready()
     {
-        CustomMinimumSize = new Vector2(PanelWidth, PanelHeight);
+        CustomMinimumSize = new Vector2(TotalWidth, ButtonSize);
         Size = CustomMinimumSize;
         MouseFilter = MouseFilterEnum.Stop;
     }
 
+    public override void _Notification(int what)
+    {
+        if (what == NotificationMouseExit)
+        {
+            _hoveredIndex = -1;
+            MouseDefaultCursorShape = CursorShape.Arrow;
+            QueueRedraw();
+        }
+    }
+
     public override void _Draw()
     {
-        var rect = new Rect2(Vector2.Zero, Size);
-
-        // Panel background
-        DrawRect(rect, HudStyles.PanelBgBottom);
-        DrawRect(rect, HudStyles.PanelBorder, false, HudStyles.PanelBorderWidth);
-
-        // Shadow effect
-        var shadowRect = new Rect2(rect.Position + new Vector2(2, 2), rect.Size);
-        DrawRect(shadowRect, new Color(0, 0, 0, 0.3f));
-        DrawRect(rect, HudStyles.PanelBgBottom);
-        DrawRect(rect, HudStyles.PanelBorder, false, HudStyles.PanelBorderWidth);
-
         var font = ThemeDB.FallbackFont;
 
-        // Draw toggle buttons
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < UnitCount; i++)
         {
-            float y = Padding + i * (ButtonSize + ButtonGap);
-            var btnRect = new Rect2(Padding, y, ButtonSize, ButtonSize);
+            var btnRect = GetButtonRect(i);
+            bool enabled = IsEnabled(i);
+            bool hovered = i == _hoveredIndex;
+            var glowColor = GlowColors[i];
 
-            var color = ToggleColors[i];
-            if (!_spawnEnabled[i])
-                color = color with { A = 0.35f };
+            // Button background
+            DrawRect(btnRect, new Color(0f, 0f, 0f, hovered ? 0.35f : 0.2f));
 
-            DrawRect(btnRect, color);
+            // Sprite
+            var sprite = SpriteFactory.GetSprite(UnitTypes[i], _controllingPlayer);
+            if (sprite != null)
+            {
+                float spriteInset = (ButtonSize - 22f) / 2f;
+                var spriteRect = new Rect2(
+                    btnRect.Position + new Vector2(spriteInset, spriteInset),
+                    new Vector2(22f, 22f));
+                DrawTextureRect(sprite, spriteRect, false,
+                    enabled ? Colors.White : new Color(1f, 1f, 1f, 0.28f));
+            }
 
-            // Hotkey in corner
-            string hotkey = Hotkeys[i];
-            var hotkeyPos = new Vector2(btnRect.End.X - 8, btnRect.End.Y - 3);
-            DrawString(font, hotkeyPos, hotkey, HorizontalAlignment.Right, -1,
-                HudStyles.FontSizeHotkey, new Color(1, 1, 1, 0.6f));
+            // Glow ring when enabled
+            if (enabled)
+            {
+                DrawRect(btnRect, glowColor, false, 2f);
+                // Outer soft glow
+                var outerRect = btnRect.Grow(1.5f);
+                DrawRect(outerRect, glowColor with { A = 0.25f }, false, 1f);
+            }
+
+            // Hover brightness overlay
+            if (hovered)
+                DrawRect(btnRect, new Color(1f, 1f, 1f, 0.08f));
+        }
+
+        // Tooltip for hovered button
+        if (_hoveredIndex >= 0)
+        {
+            var btnRect = GetButtonRect(_hoveredIndex);
+            string tipText = $"{HotkeyLabels[_hoveredIndex]} — {UnitNames[_hoveredIndex]}";
+            var tipSize = font.GetStringSize(tipText, HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall);
+            float tipPad = 5f;
+            float tipW = tipSize.X + tipPad * 2;
+            float tipH = tipSize.Y + tipPad * 2;
+            float tipX = btnRect.GetCenter().X - tipW / 2f;
+            float tipY = btnRect.Position.Y - tipH - 4f;
+            var tipRect = new Rect2(tipX, tipY, tipW, tipH);
+            DrawRect(tipRect, new Color(0.05f, 0.07f, 0.10f, 0.92f));
+            DrawRect(tipRect, HudStyles.PanelBorder, false, 1f);
+            DrawString(font, new Vector2(tipX + tipPad, tipY + tipPad + tipSize.Y - 2f),
+                tipText, HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall, HudStyles.TextPrimary);
         }
     }
 
     public override void _GuiInput(InputEvent @event)
     {
-        if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
+        if (@event is InputEventMouseMotion mm)
+        {
+            int newHover = GetButtonIndexAt(mm.Position);
+            if (newHover != _hoveredIndex)
+            {
+                _hoveredIndex = newHover;
+                MouseDefaultCursorShape = newHover >= 0 ? CursorShape.PointingHand : CursorShape.Arrow;
+                QueueRedraw();
+            }
+        }
+        else if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
         {
             int index = GetButtonIndexAt(mb.Position);
             if (index >= 0)
             {
-                ToggleSpawn(index);
+                EmitSignal(SignalName.SpawnToggleChanged, (int)UnitTypes[index]);
                 AcceptEvent();
             }
         }
@@ -85,51 +146,38 @@ public partial class SpawnToggles : Control
 
     public override void _UnhandledKeyInput(InputEvent @event)
     {
-        if (@event is InputEventKey key && key.Pressed && !key.Echo)
+        if (@event is InputEventKey key && key.Pressed && !key.Echo && key.AltPressed)
         {
-            int index = key.Keycode switch
+            int index = -1;
+            for (int i = 0; i < HotkeyKeys.Length; i++)
             {
-                Key.Key1 => 0,
-                Key.Key2 => 1,
-                Key.Key3 => 2,
-                _ => -1
-            };
+                if (key.Keycode == HotkeyKeys[i]) { index = i; break; }
+            }
             if (index >= 0)
             {
-                ToggleSpawn(index);
+                EmitSignal(SignalName.SpawnToggleChanged, (int)UnitTypes[index]);
                 GetViewport().SetInputAsHandled();
             }
         }
     }
 
+    private bool IsEnabled(int index)
+    {
+        if (_gameState == null) return true;
+        var player = _gameState.Players.Find(p => p.Id == _controllingPlayer);
+        return player == null || !player.SpawnDisabled.Contains(UnitTypes[index]);
+    }
+
+    private static Rect2 GetButtonRect(int index)
+    {
+        float x = index * (ButtonSize + ButtonGap);
+        return new Rect2(x, 0, ButtonSize, ButtonSize);
+    }
+
     private int GetButtonIndexAt(Vector2 pos)
     {
-        for (int i = 0; i < 3; i++)
-        {
-            float y = Padding + i * (ButtonSize + ButtonGap);
-            var btnRect = new Rect2(Padding, y, ButtonSize, ButtonSize);
-            if (btnRect.HasPoint(pos))
-                return i;
-        }
+        for (int i = 0; i < UnitCount; i++)
+            if (GetButtonRect(i).HasPoint(pos)) return i;
         return -1;
-    }
-
-    private void ToggleSpawn(int index)
-    {
-        _spawnEnabled[index] = !_spawnEnabled[index];
-        EmitSignal(SignalName.SpawnToggleChanged, (int)ToggleTypes[index], _spawnEnabled[index]);
-        QueueRedraw();
-    }
-
-    public bool IsSpawnEnabled(BlockType type)
-    {
-        int index = type switch
-        {
-            BlockType.Builder => 0,
-            BlockType.Soldier => 1,
-            BlockType.Stunner => 2,
-            _ => -1
-        };
-        return index >= 0 && _spawnEnabled[index];
     }
 }
