@@ -1,3 +1,4 @@
+using Blocker.Simulation.Blocks;
 using Blocker.Simulation.Core;
 
 namespace Blocker.Simulation.Commands;
@@ -15,6 +16,7 @@ public enum CommandType
     Jump,         // Jumper jumps in cardinal direction (F key + direction)
     AttackMove,   // Move toward target, engage enemies en route (A key + click)
     Surrender,    // Player-level: marks the issuing player as eliminated. BlockIds is empty.
+    ToggleSpawn,  // Player-level: toggle spawn for a unit type. UnitType field required.
 }
 
 public record Command(
@@ -23,7 +25,8 @@ public record Command(
     List<int> BlockIds,
     GridPos? TargetPos = null,
     Direction? Direction = null,
-    bool Queue = false  // Shift+action: append to queue instead of clearing
+    bool Queue = false,  // Shift+action: append to queue instead of clearing
+    BlockType? UnitType = null   // used by ToggleSpawn
 );
 
 /// <summary>
