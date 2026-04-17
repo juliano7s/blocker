@@ -77,6 +77,13 @@ public static class NestSystem
                     continue;
                 }
 
+                // Check spawn toggle — skip unit but reset progress for retry next cycle
+                if (player != null && player.SpawnDisabled.Contains(spawnType))
+                {
+                    nest.SpawnProgress = 0;
+                    continue;
+                }
+
                 // Spawn the unit (AddBlock handles HP for soldier/jumper)
                 var spawned = state.AddBlock(spawnType, nest.PlayerId, spawnPos.Value);
 

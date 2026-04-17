@@ -459,4 +459,60 @@ public class NestTests
         Assert.Single(state.Nests);
         Assert.False(state.Nests[0].IsTearingDown);
     }
+
+    [Fact]
+    public void ToggleSpawn_Disabled_SuppressesUnitSpawn()
+    {
+        var state = CreateState();
+        var center = new GridPos(5, 5);
+        SetGroundType(state, center, GroundType.Boot);
+
+        AddRootedBlock(state, BlockType.Builder, 0, new GridPos(5, 4));
+        AddRootedBlock(state, BlockType.Builder, 0, new GridPos(6, 5));
+        AddRootedBlock(state, BlockType.Builder, 0, new GridPos(5, 6));
+        NestSystem.DetectNests(state);
+        Assert.Single(state.Nests);
+
+        // Disable Builder spawning for player 0
+        state.Players[0].SpawnDisabled.Add(BlockType.Builder);
+
+        // Advance to spawn threshold
+        var nest = state.Nests[0];
+        var ground = state.Grid[center].Ground;
+        int spawnTicks = nest.GetSpawnTicks(ground);
+        nest.SpawnProgress = spawnTicks - 1;
+        NestSystem.TickSpawning(state);
+
+        // No unit should have been spawned — only the 3 formation members exist
+        Assert.DoesNotContain(state.Blocks, b => b.Type == BlockType.Builder && b.FormationId == null);
+        // Progress reset for retry
+        Assert.Equal(0, nest.SpawnProgress);
+    }
+
+    [Fact]
+    public void ToggleSpawn_ReEnabled_AllowsSpawnAgain()
+    {
+        var state = CreateState();
+        var center = new GridPos(5, 5);
+        SetGroundType(state, center, GroundType.Boot);
+
+        AddRootedBlock(state, BlockType.Builder, 0, new GridPos(5, 4));
+        AddRootedBlock(state, BlockType.Builder, 0, new GridPos(6, 5));
+        AddRootedBlock(state, BlockType.Builder, 0, new GridPos(5, 6));
+        NestSystem.DetectNests(state);
+
+        var nest = state.Nests[0];
+        var ground = state.Grid[center].Ground;
+        int spawnTicks = nest.GetSpawnTicks(ground);
+
+        // Disable then re-enable
+        state.Players[0].SpawnDisabled.Add(BlockType.Builder);
+        state.Players[0].SpawnDisabled.Remove(BlockType.Builder);
+
+        int blocksBefore = state.Blocks.Count;
+        nest.SpawnProgress = spawnTicks - 1;
+        NestSystem.TickSpawning(state);
+
+        Assert.True(state.Blocks.Count > blocksBefore);
+    }
 }
