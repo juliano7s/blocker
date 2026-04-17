@@ -159,6 +159,20 @@ public class GameState
                 continue;
             }
 
+            if (cmd.Type == CommandType.ToggleSpawn)
+            {
+                if (cmd.UnitType is { } unitType)
+                {
+                    var player = Players.FirstOrDefault(p => p.Id == cmd.PlayerId);
+                    if (player != null && !player.IsEliminated)
+                    {
+                        if (!player.SpawnDisabled.Remove(unitType))
+                            player.SpawnDisabled.Add(unitType);
+                    }
+                }
+                continue;
+            }
+
             foreach (var blockId in cmd.BlockIds)
             {
                 var block = GetBlock(blockId);
