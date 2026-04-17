@@ -68,19 +68,19 @@ public static class NestSystem
                     continue;
                 }
 
+                // Check spawn toggle before spatial work — skip and reset for retry next cycle
+                if (player != null && player.SpawnDisabled.Contains(spawnType))
+                {
+                    nest.SpawnProgress = 0;
+                    continue;
+                }
+
                 // Find spawn cell: center first, then BFS outward up to 3 cells
                 var spawnPos = FindSpawnCell(state, nest.Center);
                 if (!spawnPos.HasValue)
                 {
                     // Congested — hold and retry
                     nest.SpawnProgress = spawnTicks;
-                    continue;
-                }
-
-                // Check spawn toggle — skip unit but reset progress for retry next cycle
-                if (player != null && player.SpawnDisabled.Contains(spawnType))
-                {
-                    nest.SpawnProgress = 0;
                     continue;
                 }
 
