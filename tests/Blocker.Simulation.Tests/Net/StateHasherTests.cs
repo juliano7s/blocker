@@ -63,4 +63,27 @@ public class StateHasherTests
         var hash = StateHasher.Hash(state);
         Assert.NotEqual(0u, hash);
     }
+
+    [Fact]
+    public void SpawnDisabled_Change_Changes_Hash()
+    {
+        var a = MakeState();
+        var b = MakeState();
+
+        b.Players[0].SpawnDisabled.Add(BlockType.Soldier);
+
+        Assert.NotEqual(StateHasher.Hash(a), StateHasher.Hash(b));
+    }
+
+    [Fact]
+    public void SpawnDisabled_Same_Content_Same_Hash()
+    {
+        var a = MakeState();
+        var b = MakeState();
+
+        a.Players[0].SpawnDisabled.Add(BlockType.Builder);
+        b.Players[0].SpawnDisabled.Add(BlockType.Builder);
+
+        Assert.Equal(StateHasher.Hash(a), StateHasher.Hash(b));
+    }
 }

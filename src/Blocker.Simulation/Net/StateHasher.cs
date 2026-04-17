@@ -26,6 +26,12 @@ public static class StateHasher
             MixI32(ref h, p.Id);
             MixI32(ref h, p.TeamId);
             MixI32(ref h, p.IsEliminated ? 1 : 0);
+
+            // SpawnDisabled — sorted for determinism (HashSet iteration order is not guaranteed)
+            var disabledSorted = p.SpawnDisabled.Select(t => (int)t).OrderBy(t => t).ToArray();
+            MixI32(ref h, disabledSorted.Length);
+            foreach (var t in disabledSorted)
+                MixI32(ref h, t);
         }
 
         // Blocks — sorted by Id
