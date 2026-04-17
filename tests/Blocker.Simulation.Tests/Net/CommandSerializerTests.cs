@@ -1,3 +1,4 @@
+using Blocker.Simulation.Blocks;
 using Blocker.Simulation.Commands;
 using Blocker.Simulation.Core;
 using Blocker.Simulation.Net;
@@ -69,5 +70,41 @@ public class CommandSerializerTests
         var (tick, playerId) = CommandSerializer.PeekTickAndPlayer(bytes);
         Assert.Equal(1234, tick);
         Assert.Equal(3, playerId);
+    }
+
+    [Fact]
+    public void ToggleSpawn_UnitType_Roundtrips()
+    {
+        var input = new TickCommands(
+            PlayerId: 0,
+            Tick: 10,
+            Commands: new[]
+            {
+                new Command(0, CommandType.ToggleSpawn, new List<int>(),
+                    UnitType: BlockType.Soldier),
+                new Command(0, CommandType.ToggleSpawn, new List<int>(),
+                    UnitType: BlockType.Jumper),
+            });
+
+        var bytes = CommandSerializer.Serialize(input);
+        var output = CommandSerializer.Deserialize(bytes);
+
+        Assert.Equal(2, output.Commands.Count);
+        Assert.Equal(BlockType.Soldier, output.Commands[0].UnitType);
+        Assert.Equal(BlockType.Jumper,  output.Commands[1].UnitType);
+    }
+
+    [Fact]
+    public void Commands_Without_UnitType_Deserialize_As_Null()
+    {
+        var input = new TickCommands(
+            PlayerId: 0,
+            Tick: 1,
+            Commands: new[] { new Command(0, CommandType.Move, new List<int> { 1 }, TargetPos: new GridPos(2, 3)) });
+
+        var bytes = CommandSerializer.Serialize(input);
+        var output = CommandSerializer.Deserialize(bytes);
+
+        Assert.Null(output.Commands[0].UnitType);
     }
 }
