@@ -118,7 +118,7 @@ public partial class GameManager : Node2D
 		AddChild(_hud);
 		_hud.SetGameState(gameState);
 		_hud.SetConfig(Config);
-		_hud.SetControllingPlayer(0);
+		_hud.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_hud.SetSurrenderHandler(() => _selectionManager.SubmitSurrender());
 		_hud.SpawnToggleChanged += unitType =>
 			_selectionManager.SubmitToggleSpawn((Blocker.Simulation.Blocks.BlockType)unitType);
