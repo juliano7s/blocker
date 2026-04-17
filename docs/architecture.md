@@ -145,6 +145,7 @@ src/Blocker.Simulation/
 │   ├── Cell.cs               — Ground type + block ref
 │   ├── Block.cs              — All block state
 │   ├── Player.cs             — Player + team info
+│   ├── SimulationTicker.cs   — Orchestrator for accumulator math & timing
 │   └── Constants.cs          — All game constants (Section 18)
 ├── Blocks/
 │   ├── BlockType.cs          — Enum: Builder, Wall, Soldier, Stunner, Warden, Jumper
@@ -192,28 +193,21 @@ src/Blocker.Simulation/
 
 ### 3.1 Tick Runner
 
-Godot drives ticks from `_Process()`:
+Godot drives ticks from `_Process()`, delegating the core accumulator and timing logic to `SimulationTicker` in the pure C# layer to ensure untethered testability and lockstep consistency.
 
 ```csharp
 public partial class TickRunner : Node
 {
-    private double _accumulator;
-    private double _tickInterval;  // 1.0 / tickRate
+    private SimulationTicker? _ticker;
 
     public override void _Process(double delta)
     {
-        _accumulator += delta;
-        while (_accumulator >= _tickInterval)
-        {
-            var commands = _inputTranslator.FlushCommands();
-            _gameState.Tick(commands);
-            _accumulator -= _tickInterval;
-        }
+        _ticker?.ProcessFrame(delta);
     }
 }
 ```
 
-For networked play, the tick only fires when all players' commands for that tick have arrived.
+For networked play, `MultiplayerTickRunner` relies on `LockstepCoordinator` where the tick only fires when all players' commands for that tick have arrived. Both runners share the same underlying `SimulationTicker` logic to guarantee deterministic execution and frame-level guards (like accumulator drift capping).
 
 ### 3.2 Rendering
 
@@ -294,7 +288,12 @@ godot/
 │   │   ├── EffectManager.cs         — Consumes VisualEvents, spawns effects
 │   │   └── PostProcessing.cs        — Bloom, kill flash
 │   ├── Input/
-│   │   ├── SelectionManager.cs      — Click, drag, control groups
+│   │   ├── SelectionManager.cs      — Click, drag, modes (partial class)
+│   │   ├── SelectionManager.Input.cs— Translates events to actions
+│   │   ├── SelectionManager.Commands.cs — Builds and emits Commands
+│   │   ├── SelectionManager.Drawing.cs  — Draws gizmos, previews, paths
+│   │   ├── SelectionState.cs        — Pure C# selection & control group state
+│   │   ├── CommandAction.cs         — Enum for UI command mappings
 │   │   ├── CameraController.cs      — Edge scroll, zoom, arrow keys
 │   │   └── CursorManager.cs         — OS-level cursor confinement
 │   ├── UI/
