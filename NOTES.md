@@ -1,4 +1,173 @@
 
+# 2026-04-16
+
+Here is my proposed plan to improve the robustness of the Relay Server (Item 6):
+
+  1. Lagging Client Detection (Stall Prevention)
+  Problem: In lockstep networking, if one client lags severely or stops sending data, the entire simulation
+  stalls for everyone else waiting for their input.
+  Solution:
+   * Add a HighestSeenTick property to the Connection class to track how far each individual client has
+     progressed.
+   * Update the StartReaper background task (which currently only cleans up idle rooms every minute) to run
+     more frequently (e.g., every 5 seconds).
+   * During this check, if any client in a Playing room falls too far behind the room's overall HighestSeenTick
+     (e.g., > 60 ticks, which is 5 seconds of simulation time), forcibly close their WebSocket. The existing
+     disconnect logic will then broadcast a PlayerLeft message, allowing the remaining players to continue the
+     game without stalling.
+
+  2. Dead Connection Detection
+  Problem: If a client's internet connection drops silently (half-open TCP connection), the server might not
+  realize they are gone for 15+ minutes, stalling the room the entire time.
+  Solution:
+   * Leverage the existing LastMessageAt property on the Connection object.
+   * In the frequent StartReaper check, automatically disconnect any client that hasn't sent a message in the
+     last 10–15 seconds. This guarantees dead connections are dropped quickly, freeing up the lockstep
+     simulation.
+
+  3. Hardened Packet Parsing
+  Problem: While some message handlers use try-catch to swallow errors, Varint parsing and other byte
+  manipulation might still cause IndexOutOfRangeException if a client sends maliciously small or malformed
+  packets.
+  Solution:
+   * Audit the parsing logic in RelayServer.cs (specifically HandleCreateRoom, HandleJoinRoom, and
+     HandleUpdateRoom) to ensure strict boundary checks are performed before accessing the payload spans.
+   * Explicitly disconnect clients that send malformed payloads (protocol violation) rather than just dropping
+     the packet, as this usually indicates a tampered client or severe desync.
+
+
+# 2026.04.15
+
+## From Gemini 3.1 Pro
+
+Based on an analysis of the repository structure and core files, here is a comprehensive review of the "Blocker" project in its current state.
+
+### 1. Architecture
+
+The project has a robust, well-defined architecture tailored for a deterministic multiplayer game. It employs a strict 3-layer separation:
+
+*   **Simulation Layer (`src/Blocker.Simulation`)**: This is the core engine of the game. It's written in pure C# without any dependencies on the Godot engine. This isolation is excellent because it guarantees that the core game logic can execute deterministically across different platforms, which is an absolute requirement for the lockstep networking model. It handles the deterministic tick system, state management (`GameState.cs`), and game rules via distinct systems (Combat, Nests, Towers, etc.).
+*   **Networking Layer (`src/Blocker.Relay`)**: A dedicated C# application serving as a relay server to facilitate multiplayer. It manages rooms, connections, and routes the deterministic commands between clients.
+*   **Presentation/Client Layer (`godot/`)**: The Godot project acts strictly as a "dumb" client. It handles rendering, audio, and user input. It takes the state from the Simulation layer, interpolates it for smooth visuals, and translates user actions into `Commands` that are sent back to the simulation. The use of `VisualEvents` to bridge simulation state changes to the rendering layer is a strong, decoupled pattern.
+
+**Assessment:** Highly commendable architectural foundation. The separation of concerns between simulation and presentation is textbook for this genre.
+
+### 2. Code
+
+The codebase is organized cleanly into C# projects and Godot specific assets.
+
+*   **Modularity**: The simulation logic is modularized into distinct `Systems` (e.g., `CombatSystem.cs`), which makes it easier to maintain and test individual game rules.
+*   **Testing**: There is a dedicated test suite (`tests/Blocker.Simulation.Tests`) covering core mechanics (Combat, Pathfinding, Eliminating, etc.). This is crucial for a deterministic simulation where regressions are deadly.
+*   **Central Hub**: `GameState.cs` acts as the central hub, processing commands and running the tick loop.
+*   **Potential Bottlenecks**: In the Godot layer, classes like `SelectionManager.cs` tend to become massive (handling selection logic, command building, UI state, and raw input).
+
+**Assessment:** The code structure is professional. The pure C# simulation allows for fast, headless testing which is a massive productivity boost.
+
+### 3. Design & Tooling
+
+*   **Custom Tooling**: The project includes custom tooling, such as a Map Editor built directly into the Godot project (`godot/Scripts/Editor/MapEditorScene.cs`), and a python script for converting maps (`scripts/convert_map.py`). This shows maturity in the development pipeline.
+*   **Visuals & Shaders**: A rich set of custom shaders (`godot/Assets/Shaders/` including bloom, film grain, screen distortion) indicates a strong focus on "game feel" and visual polish.
+*   **Documentation**: The `docs/` folder contains comprehensive design documents (`architecture.md`, `game-bible.md`, and numerous spec/plan documents for the HUD, map system, multiplayer, etc.). This is exceptionally good practice and helps align the team.
+
+**Assessment:** The project is treated like a serious production, not just a prototype, evidenced by the custom editor, shader work, and extensive design documentation.
+
+---
+
+### Potential Improvements & Recommendations
+
+Here are the key areas for potential improvement moving forward:
+
+1.  **Refactor Godot Input/Selection Handling**:
+    *   **Issue**: Input and selection managers (like `SelectionManager.cs` or equivalent classes handling input) often become "god objects" in RTS-style games.
+    *   **Recommendation**: Break these down into smaller, focused components: `InputState` (tracks raw mouse/keyboard), `SelectionLogic` (handles what is currently highlighted/selected), and a `CommandBuilder` (translates selections + clicks into deterministic simulation commands).
+
+2.  **Relay Server Robustness (`Blocker.Relay`)**:
+    *   **Issue**: Lockstep networking is highly sensitive to latency and packet loss.
+    *   **Recommendation**: Ensure the Relay server has robust error handling for late, duplicate, or malformed packets. Implement mechanisms to prevent whole-room stalls if a single client lags behind (e.g., dynamic turn lengths or strict timeout disconnects).
+
+3.  **Simulation Tick Integrity (`GameState.Tick`)**:
+    *   **Issue**: Determinism relies on the *exact* execution order of systems.
+    *   **Recommendation**: Audit the `GameState.Tick` method. Ensure that system execution order strictly follows the specifications in the `game-bible.md`. Add unit tests that verify the execution order doesn't inadvertently change.
+
+4.  **Complex Interaction Testing (`Blocker.Simulation.Tests`)**:
+    *   **Issue**: While individual systems have tests (e.g., `PushTests`, `StunTests`), bugs often hide in the intersections.
+    *   **Recommendation**: Expand the integration tests to cover complex system interactions. For example, test what happens when a push wave intersects with a stun ray on the exact same tick.
+
+5.  **Godot to C# Type Safety**:
+    *   **Issue**: Passing data between Godot nodes and the C# simulation can sometimes rely on weak typing or string names if not careful.
+    *   **Recommendation**: Ensure that the bridge between the Godot layer and the Simulation layer is heavily typed, perhaps using Source Generators or strict interfaces to avoid runtime reflection costs and bugs.
+
+
+## From Auto Gemini 3
+✦ Based on my review of the codebase, project documentation, and simulation logic, here is an assessment of the
+  current state of Blocker.
+
+  1. Architectural Assessment
+  The project's architecture is exceptionally strong and well-disciplined.
+
+   * Clean Layer Separation: The decoupling between Blocker.Simulation (pure C#) and Blocker.Game (Godot) is a
+     textbook example of high-quality engine-agnostic design. By keeping the simulation in a separate assembly using
+     only primitive types and grid-based logic, the project ensures perfect determinism, which is essential for the
+     planned lockstep networking.
+   * Visual Events Pattern: The use of VisualEvents to bridge the simulation and rendering layers is excellent.
+     Instead of Godot scripts "watching" simulation state changes, the simulation emits what happened (e.g.,
+     BlockDied), allowing the rendering layer to react with one-off effects (tendrils, explosions) without polluting
+     the core logic.
+   * Deterministic Loop: Using a fixed-tick simulation (TickRunner.cs) ensures that game logic runs consistently
+     regardless of the user's frame rate.
+
+  2. Code Quality & Implementation
+  The code is idiomatic, performant, and highly modular.
+
+   * Modular Systems: Mechanics like TowerSystem, StunSystem, and NestSystem are implemented as static systems
+     operating on a GameState. This functional approach minimizes state-related bugs and makes the code very easy to
+     test.
+   * Robust Testing: The test suite (tests/Blocker.Simulation.Tests) is comprehensive. Having dedicated tests for
+     complex edge cases (e.g., EliminationTests, PathfindingTests) gives high confidence in the simulation's
+     integrity.
+   * Grid Logic: The use of GridPos and custom direction types ensures that movement and spatial queries are
+     integer-based, avoiding the floating-point drift that often plagues multiplayer games.
+
+  3. Design & Configuration
+   * Data-Driven Balance: The bridge between GameConfig.cs (Godot Resource) and SimulationConfig.cs is well-handled.
+     It allows designers to tweak balance in the Godot inspector while the simulation remains unaware of Godot's
+     existence.
+   * Rich Visual Feedback: Despite the grid-based nature, the system supports complex visual states like "heat-up"
+     death animations and "chevron-shaped" rays, showing a high level of polish.
+
+  4. Potential Improvements & Risks
+
+  Rendering Efficiency (Scalability)
+   * Risk: GridRenderer.Blocks.cs currently draws cell backgrounds and grid lines using a nested loop and DrawRect
+     calls.
+   * Improvement: On very large maps (e.g., 150x150), this can lead to thousands of draw calls per frame. Consider
+     using a custom shader on a single large ColorRect to draw the grid background and lines, or leveraging Godot's
+     TileMap for the terrain layer to take advantage of internal batching.
+
+  Input & Selection Manager Bloat
+   * Risk: SelectionManager.cs has become a "God Class" that handles mouse input, drag selection, control groups,
+     blueprint placement, and command queuing.
+   * Improvement: Consider splitting this into specialized components: InputHandler (raw events), SelectionState
+     (active IDs), and BlueprintController.
+
+  Visual Event Memory
+   * Risk: GameState.VisualEvents is a list that grows as events happen.
+   * Improvement: Ensure these are cleared strictly every tick (or "consumed" by the renderer) to prevent a memory
+     leak in long-running games. (Currently, the simulation appears to clear them, but a Queue<T> or a
+     double-buffered approach might be safer for multi-threaded scenarios).
+
+  Network Latency Handling
+   * Risk: The current architecture is perfect for lockstep, but lockstep is notoriously sensitive to latency (the
+     "input delay" feel).
+   * Improvement: As the project matures, consider implementing a prediction/rollback layer for the local player's
+     movement to mask latency, though this is significantly more complex in a grid-based deterministic simulation.
+
+  Summary
+  The project is in an excellent technical state. The foundations are solid enough to support a commercial-grade
+  deterministic multiplayer RTS. The primary focus moving forward should be on maintaining this decoupling while
+  optimizing the rendering layer for larger maps.
+
+
 # 2026.04.13
 
 Prompt:

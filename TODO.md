@@ -33,12 +33,12 @@
  - Walls can be turned into gates, gates "lower" and allow units to pass. Player controls the lowering
 
 ## Current Issues
+ - moving blocks are passing through opponent's blast rays.
  - a stunned unit should have it's abilities paused while stunned. stunned units in formations should disable that formation (no spawn; no ray shooting) while stunned
  - stun ray should penetrate units - it currently doesn't; it should stop only at walls (and kill the first encountered wall)
  - pathfinding: units are preferring to go in a large L path instead of "diagonally" (zigzagging)
 
 # Hud
- - The whole bottom bar is a bit too large. We can probably split the minimap to one side and make the info panel and the command card to the right
  - Commands should be clickable, all buttons should have a hover highlight and mouse pointer if they are enabled
  - multiple selected units should show the unit icons, right now they are just different colors
  - blueprints have generic icons, they should a miniature version of the formation
