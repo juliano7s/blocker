@@ -91,6 +91,9 @@ public partial class SelectionManager : Node2D
 	public void SubmitSurrender() =>
 		EmitCommand(new Command(ControllingPlayer, CommandType.Surrender, new List<int>()));
 
+	public void SubmitToggleSpawn(BlockType unitType) =>
+		EmitCommand(new Command(ControllingPlayer, CommandType.ToggleSpawn, new List<int>(), UnitType: unitType));
+
 	public void SetGameState(GameState state) => _gameState = state;
 	public void SetConfig(GameConfig config) => _config = config;
 

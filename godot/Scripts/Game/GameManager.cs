@@ -25,7 +25,6 @@ public partial class GameManager : Node2D
 	private TickRunner _tickRunner = null!;
 	private HudOverlay _hud = null!;
 	private HudBar _hudBar = null!;
-	private SpawnToggles _spawnToggles = null!;
 	private PostProcessingManager _postProcessing = null!;
 	private EffectManager _effectManager = null!;
 	private AudioManager _audioManager = null!;
@@ -121,6 +120,8 @@ public partial class GameManager : Node2D
 		_hud.SetConfig(Config);
 		_hud.SetControllingPlayer(0);
 		_hud.SetSurrenderHandler(() => _selectionManager.SubmitSurrender());
+		_hud.SpawnToggleChanged += unitType =>
+			_selectionManager.SubmitToggleSpawn((Blocker.Simulation.Blocks.BlockType)unitType);
 
 		// Set up bottom HUD bar with minimap
 		_hudBar = new HudBar();
@@ -137,19 +138,6 @@ public partial class GameManager : Node2D
 		};
 		_hudBar.CommandClicked += action => _selectionManager.IssueCommand(action);
 		_hudBar.BlueprintClicked += type => _selectionManager.ToggleBlueprintMode(type);
-
-		// Set up floating spawn toggles (top-right of game area)
-		_spawnToggles = new SpawnToggles();
-		var togglesLayer = new CanvasLayer { Layer = 10 };
-		AddChild(togglesLayer);
-		var togglesAnchor = new Control();
-		togglesAnchor.SetAnchorsPreset(Control.LayoutPreset.TopRight);
-		togglesAnchor.OffsetLeft = -70;
-		togglesAnchor.OffsetTop = HudStyles.TopBarHeight + 20;
-		togglesAnchor.OffsetRight = -20;
-		togglesAnchor.OffsetBottom = HudStyles.TopBarHeight + 130;
-		togglesLayer.AddChild(togglesAnchor);
-		togglesAnchor.AddChild(_spawnToggles);
 
 		// Tell camera about HUD coverage so it offsets the visible area
 		_camera.SetHudInsets(HudStyles.TopBarHeight, HudStyles.MinimapSize + HudStyles.BottomPanelMargin);

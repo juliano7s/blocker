@@ -16,6 +16,7 @@ public partial class HudOverlay : CanvasLayer
     private int _controllingPlayer;
     private static readonly Color DividerColor = new(0.176f, 0.216f, 0.282f); // #2d3748
 
+    private SpawnToggles _spawnToggles = null!;
     private Control? _drawControl;
     private Button? _menuBtn;
     private PopupMenu? _menuPopup;
@@ -24,6 +25,8 @@ public partial class HudOverlay : CanvasLayer
     private bool _showDebugFps = false;
 
     public void SetShowDebugFps(bool show) => _showDebugFps = show;
+
+    [Signal] public delegate void SpawnToggleChangedEventHandler(int unitType);
 
     public override void _Ready()
     {
@@ -56,6 +59,19 @@ public partial class HudOverlay : CanvasLayer
         _menuPopup.AddItem("Exit to Menu", 1);
         _menuPopup.IdPressed += OnMenuItemSelected;
         AddChild(_menuPopup);
+
+        // Spawn toggle buttons — centered in top bar
+        _spawnToggles = new SpawnToggles();
+        _spawnToggles.AnchorLeft = 0.5f;
+        _spawnToggles.AnchorRight = 0.5f;
+        _spawnToggles.AnchorTop = 0f;
+        _spawnToggles.AnchorBottom = 0f;
+        _spawnToggles.OffsetLeft = -SpawnToggles.TotalWidth / 2f;
+        _spawnToggles.OffsetRight = SpawnToggles.TotalWidth / 2f;
+        _spawnToggles.OffsetTop = (HudStyles.TopBarHeight - SpawnToggles.ButtonSize) / 2f;
+        _spawnToggles.OffsetBottom = _spawnToggles.OffsetTop + SpawnToggles.ButtonSize;
+        _spawnToggles.SpawnToggleChanged += type => EmitSignal(SignalName.SpawnToggleChanged, type);
+        AddChild(_spawnToggles);
     }
 
     /// <summary>
@@ -90,9 +106,17 @@ public partial class HudOverlay : CanvasLayer
         }
     }
 
-    public void SetGameState(GameState state) => _gameState = state;
+    public void SetGameState(GameState state)
+    {
+        _gameState = state;
+        _spawnToggles?.SetGameState(state);
+    }
     public void SetConfig(GameConfig config) => _config = config;
-    public void SetControllingPlayer(int playerId) => _controllingPlayer = playerId;
+    public void SetControllingPlayer(int playerId)
+    {
+        _controllingPlayer = playerId;
+        _spawnToggles?.SetControllingPlayer(playerId);
+    }
 
     public GameState? GetGameState() => _gameState;
     public int GetControllingPlayer() => _controllingPlayer;
