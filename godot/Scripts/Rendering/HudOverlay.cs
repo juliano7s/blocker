@@ -111,7 +111,11 @@ public partial class HudOverlay : CanvasLayer
         _gameState = state;
         _spawnToggles?.SetGameState(state);
     }
-    public void SetConfig(GameConfig config) => _config = config;
+    public void SetConfig(GameConfig config)
+    {
+        _config = config;
+        _spawnToggles?.SetConfig(config);
+    }
     public void SetControllingPlayer(int playerId)
     {
         _controllingPlayer = playerId;

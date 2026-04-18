@@ -138,7 +138,7 @@ public partial class SelectionManager
                 case Key.V:
                     IssueCommandToSelected(CommandType.ConvertToWall, shiftHeld);
                     break;
-                case Key.S when !key.IsCommandOrControlPressed():
+                case Key.S when !key.IsCommandOrControlPressed() && !key.AltPressed:
                     IssueDirectionalCommand(CommandType.FireStunRay, shiftHeld);
                     break;
                 case Key.D when !key.IsCommandOrControlPressed():
@@ -153,7 +153,7 @@ public partial class SelectionManager
                 case Key.G:
                     IssueDirectionalCommand(CommandType.TogglePush, shiftHeld);
                     break;
-                case Key.A when !key.IsCommandOrControlPressed():
+                case Key.A when !key.IsCommandOrControlPressed() && !key.AltPressed:
                     if (_state.SelectedBlocks.Count > 0)
                     {
                         _attackMoveMode = true;
@@ -202,7 +202,7 @@ public partial class SelectionManager
                     _state.Clear();
                     GD.Print($"Switched to Player {ControllingPlayer}");
                     break;
-                case Key.Q:
+                case Key.Q when !key.AltPressed:
                     if (_state.SelectedBlocks.Count > 0)
                     {
                         _blueprint.Toggle(BlueprintMode.BlueprintType.BuilderNest);
@@ -212,7 +212,7 @@ public partial class SelectionManager
                             : "Blueprint deactivated");
                     }
                     break;
-                case Key.W:
+                case Key.W when !key.AltPressed:
                     if (_state.SelectedBlocks.Count > 0)
                     {
                         _blueprint.Toggle(BlueprintMode.BlueprintType.SoldierNest);
@@ -222,7 +222,7 @@ public partial class SelectionManager
                             : "Blueprint deactivated");
                     }
                     break;
-                case Key.E:
+                case Key.E when !key.AltPressed:
                     if (_state.SelectedBlocks.Count > 0)
                     {
                         _blueprint.Toggle(BlueprintMode.BlueprintType.StunnerNest);

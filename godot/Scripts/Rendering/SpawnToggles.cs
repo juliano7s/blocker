@@ -1,3 +1,4 @@
+using Blocker.Game.Config;
 using Blocker.Simulation.Blocks;
 using Blocker.Simulation.Core;
 using Godot;
@@ -6,15 +7,18 @@ namespace Blocker.Game.Rendering;
 
 /// <summary>
 /// Horizontal row of spawn-toggle buttons centered in the top bar.
-/// One button per spawnable unit type. Reads toggle state from GameState.
+/// One button per spawnable unit type. Reads toggle state from local optimistic state
+/// (synced from GameState on init/player-change; updated immediately on click/hotkey).
 /// </summary>
 public partial class SpawnToggles : Control
 {
     [Signal] public delegate void SpawnToggleChangedEventHandler(int unitType);
 
     private GameState? _gameState;
+    private GameConfig? _config;
     private int _controllingPlayer;
     private int _hoveredIndex = -1;
+    private readonly HashSet<BlockType> _localDisabled = new();
 
     public const float ButtonSize = 30f;
     public const float ButtonGap = 8f;
@@ -23,15 +27,6 @@ public partial class SpawnToggles : Control
 
     private static readonly BlockType[] UnitTypes =
         [BlockType.Builder, BlockType.Soldier, BlockType.Stunner, BlockType.Warden, BlockType.Jumper];
-
-    private static readonly Color[] GlowColors =
-    [
-        new(0.231f, 0.510f, 0.965f), // Builder  #3b82f6
-        new(0.133f, 0.773f, 0.369f), // Soldier  #22c55e
-        new(0.659f, 0.333f, 0.969f), // Stunner  #a855f7
-        new(0.231f, 0.510f, 0.965f), // Warden   same as Builder
-        new(0.133f, 0.773f, 0.369f), // Jumper   same as Soldier
-    ];
 
     private static readonly Key[] HotkeyKeys =
         [Key.Q, Key.W, Key.E, Key.A, Key.S];
@@ -42,8 +37,55 @@ public partial class SpawnToggles : Control
     private static readonly string[] UnitNames =
         ["Builder", "Soldier", "Stunner", "Warden", "Jumper"];
 
-    public void SetGameState(GameState state) => _gameState = state;
-    public void SetControllingPlayer(int playerId) => _controllingPlayer = playerId;
+    public void SetGameState(GameState state)
+    {
+        _gameState = state;
+        SyncLocalFromState();
+    }
+
+    public void SetConfig(GameConfig config)
+    {
+        _config = config;
+        QueueRedraw();
+    }
+
+    public void SetControllingPlayer(int playerId)
+    {
+        _controllingPlayer = playerId;
+        SyncLocalFromState();
+        QueueRedraw();
+    }
+
+    private void SyncLocalFromState()
+    {
+        _localDisabled.Clear();
+        if (_gameState == null) return;
+        var player = _gameState.Players.Find(p => p.Id == _controllingPlayer);
+        if (player != null)
+            foreach (var t in player.SpawnDisabled)
+                _localDisabled.Add(t);
+    }
+
+    private void ToggleLocal(int index)
+    {
+        var t = UnitTypes[index];
+        if (!_localDisabled.Remove(t))
+            _localDisabled.Add(t);
+        QueueRedraw();
+    }
+
+    // Glow color sourced from player palette — same colors the in-game sprites use.
+    private Color GetGlowColor(int index)
+    {
+        if (_config == null) return HudStyles.PanelBorder;
+        var palette = _config.GetPalette(_controllingPlayer);
+        return UnitTypes[index] switch
+        {
+            BlockType.Stunner => palette.StunnerFill,
+            BlockType.Soldier or BlockType.Jumper => palette.SoldierFill,
+            _ => palette.BuilderFill
+        };
+    }
 
     public override void _Ready()
     {
@@ -62,6 +104,26 @@ public partial class SpawnToggles : Control
         }
     }
 
+    // _Input fires before _UnhandledInput so this intercepts Alt+key before SelectionManager sees it.
+    // PhysicalKeycode avoids Windows Alt-key remapping that changes Keycode when modifier is held.
+    public override void _Input(InputEvent @event)
+    {
+        if (@event is InputEventKey key && key.Pressed && !key.Echo && key.AltPressed)
+        {
+            int index = -1;
+            for (int i = 0; i < HotkeyKeys.Length; i++)
+            {
+                if (key.PhysicalKeycode == HotkeyKeys[i]) { index = i; break; }
+            }
+            if (index >= 0)
+            {
+                ToggleLocal(index);
+                EmitSignal(SignalName.SpawnToggleChanged, (int)UnitTypes[index]);
+                GetViewport().SetInputAsHandled();
+            }
+        }
+    }
+
     public override void _Draw()
     {
         var font = ThemeDB.FallbackFont;
@@ -71,12 +133,10 @@ public partial class SpawnToggles : Control
             var btnRect = GetButtonRect(i);
             bool enabled = IsEnabled(i);
             bool hovered = i == _hoveredIndex;
-            var glowColor = GlowColors[i];
+            var glowColor = GetGlowColor(i);
 
-            // Button background
             DrawRect(btnRect, new Color(0f, 0f, 0f, hovered ? 0.35f : 0.2f));
 
-            // Sprite
             var sprite = SpriteFactory.GetSprite(UnitTypes[i], _controllingPlayer);
             if (sprite != null)
             {
@@ -88,21 +148,16 @@ public partial class SpawnToggles : Control
                     enabled ? Colors.White : new Color(1f, 1f, 1f, 0.28f));
             }
 
-            // Glow ring when enabled
             if (enabled)
             {
                 DrawRect(btnRect, glowColor, false, 2f);
-                // Outer soft glow
-                var outerRect = btnRect.Grow(1.5f);
-                DrawRect(outerRect, glowColor with { A = 0.25f }, false, 1f);
+                DrawRect(btnRect.Grow(1.5f), glowColor with { A = 0.25f }, false, 1f);
             }
 
-            // Hover brightness overlay
             if (hovered)
                 DrawRect(btnRect, new Color(1f, 1f, 1f, 0.08f));
         }
 
-        // Tooltip for hovered button
         if (_hoveredIndex >= 0)
         {
             var btnRect = GetButtonRect(_hoveredIndex);
@@ -138,37 +193,14 @@ public partial class SpawnToggles : Control
             int index = GetButtonIndexAt(mb.Position);
             if (index >= 0)
             {
+                ToggleLocal(index);
                 EmitSignal(SignalName.SpawnToggleChanged, (int)UnitTypes[index]);
                 AcceptEvent();
-                QueueRedraw();
             }
         }
     }
 
-    public override void _UnhandledKeyInput(InputEvent @event)
-    {
-        if (@event is InputEventKey key && key.Pressed && !key.Echo && key.AltPressed)
-        {
-            int index = -1;
-            for (int i = 0; i < HotkeyKeys.Length; i++)
-            {
-                if (key.Keycode == HotkeyKeys[i]) { index = i; break; }
-            }
-            if (index >= 0)
-            {
-                EmitSignal(SignalName.SpawnToggleChanged, (int)UnitTypes[index]);
-                GetViewport().SetInputAsHandled();
-                QueueRedraw();
-            }
-        }
-    }
-
-    private bool IsEnabled(int index)
-    {
-        if (_gameState == null) return true;
-        var player = _gameState.Players.Find(p => p.Id == _controllingPlayer);
-        return player == null || !player.SpawnDisabled.Contains(UnitTypes[index]);
-    }
+    private bool IsEnabled(int index) => !_localDisabled.Contains(UnitTypes[index]);
 
     private static Rect2 GetButtonRect(int index)
     {
