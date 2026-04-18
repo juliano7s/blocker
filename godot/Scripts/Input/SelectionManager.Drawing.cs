@@ -1,4 +1,5 @@
 using Blocker.Game.Rendering;
+using Blocker.Simulation.Blocks;
 using Blocker.Simulation.Core;
 using Godot;
 
@@ -16,14 +17,15 @@ public partial class SelectionManager
             var pos = _hoveredCell.Value;
             if (_blueprint.IsActive)
             {
-                // Draw blueprint hover preview (all cells)
+                // Draw blueprint hover preview (unit sprites, translucent)
                 var cells = _blueprint.GetCells();
                 foreach (var cell in cells)
                 {
                     var cellPos = new GridPos(pos.X + cell.Offset.X, pos.Y + cell.Offset.Y);
                     var rect = CellRect(cellPos);
+                    var bt = RoleToBlockType(cell.Role);
+                    BlockIconPainter.Draw(this, bt, ControllingPlayer, rect, _config, enabled: true, alpha: 0.5f);
                     var roleColor = GetBlueprintRoleColor(cell.Role);
-                    DrawRect(rect, roleColor with { A = 0.4f });
                     DrawRect(rect, roleColor with { A = 0.8f }, false, 2f);
                 }
             }
@@ -50,13 +52,13 @@ public partial class SelectionManager
         {
             var ghostCells = BlueprintMode.GetCells(ghost.Type, ghost.Rotation);
             float age = now - ghost.PlacedAt;
-            float fadeAlpha = Mathf.Clamp(1f - age / 15f, 0.1f, 0.3f);
+            float fadeAlpha = Mathf.Clamp(1f - age / 15f, 0.15f, 0.45f);
             foreach (var cell in ghostCells)
             {
                 var cellPos = new GridPos(ghost.Position.X + cell.Offset.X, ghost.Position.Y + cell.Offset.Y);
                 var rect = CellRect(cellPos);
-                var roleColor = GetBlueprintRoleColor(cell.Role);
-                DrawRect(rect, roleColor with { A = fadeAlpha });
+                var bt = RoleToBlockType(cell.Role);
+                BlockIconPainter.Draw(this, bt, ControllingPlayer, rect, _config, enabled: true, alpha: fadeAlpha);
             }
         }
 
@@ -113,6 +115,15 @@ public partial class SelectionManager
             DrawRect(dragRect, DragRectBorderColor, false, 1f);
         }
     }
+
+    private static BlockType RoleToBlockType(string role) => role switch
+    {
+        "builder" => BlockType.Builder,
+        "soldier" => BlockType.Soldier,
+        "stunner" => BlockType.Stunner,
+        "wall" => BlockType.Wall,
+        _ => BlockType.Builder,
+    };
 
     private Color GetBlueprintRoleColor(string role)
     {

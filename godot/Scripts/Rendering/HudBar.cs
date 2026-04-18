@@ -89,7 +89,10 @@ public partial class HudBar : CanvasLayer
     {
         _minimap.SetConfig(config);
         _selectionPanel.SetConfig(config);
+        _commandCard.SetConfig(config);
     }
+
+    public void SetControllingPlayer(int playerId) => _commandCard.SetControllingPlayer(playerId);
 
     public void SetCameraView(Vector2 worldPos, Vector2 viewSize)
     {

@@ -107,10 +107,10 @@ public partial class GameConfig : Resource
 
     [ExportGroup("Grid Colors")]
     [Export] public Color GridLineColor { get; set; } = new(0.12f, 0.13f, 0.22f, 0.35f);
-    [Export] public Color NormalGroundColor { get; set; } = new(0.05f, 0.06f, 0.12f);
-    [Export] public Color BootGroundColor { get; set; } = new(0.06f, 0.14f, 0.08f);
-    [Export] public Color OverloadGroundColor { get; set; } = new(0.12f, 0.06f, 0.18f);
-    [Export] public Color ProtoGroundColor { get; set; } = new(0.07f, 0.08f, 0.14f);
+    [Export] public Color NormalGroundColor { get; set; } = new(0.039f, 0.039f, 0.102f);   // #0a0a1a
+    [Export] public Color BootGroundColor { get; set; } = new(0.161f, 0.267f, 0.161f);     // #294429
+    [Export] public Color OverloadGroundColor { get; set; } = new(0.169f, 0.055f, 0.306f); // #2b0e4e
+    [Export] public Color ProtoGroundColor { get; set; } = new(0.102f, 0.102f, 0.134f);    // #2a2a2a @ 0.5 over bg #0a0a1a
     [Export] public Color TerrainGroundColor { get; set; } = new(0.18f, 0.18f, 0.20f);
     [Export] public Color BreakableWallGroundColor { get; set; } = new(0.22f, 0.20f, 0.18f);
     [Export] public Color FragileWallGroundColor { get; set; } = new(0.18f, 0.16f, 0.14f);

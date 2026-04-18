@@ -1,3 +1,4 @@
+using Blocker.Game.Config;
 using Blocker.Game.Input;
 using Blocker.Simulation.Blocks;
 using Godot;
@@ -14,6 +15,11 @@ public partial class CommandCard : Control
     [Signal] public delegate void BlueprintClickedEventHandler(BlueprintMode.BlueprintType blueprintType);
 
     private IReadOnlyList<Block>? _selectedBlocks;
+    private GameConfig? _config;
+    private int _controllingPlayer;
+
+    public void SetConfig(GameConfig config) => _config = config;
+    public void SetControllingPlayer(int playerId) => _controllingPlayer = playerId;
 
     // Hover state
     private CommandAction? _hoveredCommandKey;
@@ -44,6 +50,87 @@ public partial class CommandCard : Control
         new(BlueprintMode.BlueprintType.StunTower, "Stun Tower", "🗼", "T"),
         new(BlueprintMode.BlueprintType.SoldierTower, "Soldier Tower", "🏰", "Y"),
     ];
+
+    private static readonly Dictionary<BlueprintMode.BlueprintType, Texture2D?> _blueprintSprites = new();
+    private static readonly Dictionary<(BlueprintMode.BlueprintType, int), ImageTexture?> _tintCache = new();
+    private static bool _spritesLoaded;
+
+    private static Texture2D? GetBlueprintSprite(BlueprintMode.BlueprintType type, GameConfig? config, int playerId)
+    {
+        if (!_spritesLoaded)
+        {
+            _spritesLoaded = true;
+            foreach (BlueprintMode.BlueprintType bt in System.Enum.GetValues<BlueprintMode.BlueprintType>())
+            {
+                var path = $"res://Assets/Sprites/{ToKebab(bt.ToString())}-blueprint.png";
+                _blueprintSprites[bt] = ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
+            }
+        }
+
+        if (config == null)
+        {
+            _blueprintSprites.TryGetValue(type, out var raw);
+            return raw;
+        }
+
+        var key = (type, playerId);
+        if (_tintCache.TryGetValue(key, out var cached)) return cached;
+
+        if (!_blueprintSprites.TryGetValue(type, out var src) || src == null)
+        {
+            _tintCache[key] = null;
+            return null;
+        }
+
+        var tinted = BakeTinted(src, config.GetPalette(playerId).Base);
+        _tintCache[key] = tinted;
+        return tinted;
+    }
+
+    /// <summary>
+    /// Bake a team-tinted version: tint factor = (1 - saturation), so grayscale pixels
+    /// fully take the team color while saturated colored pixels are preserved.
+    /// </summary>
+    private static ImageTexture BakeTinted(Texture2D src, Color tint)
+    {
+        var img = src.GetImage();
+        if (img == null) return ImageTexture.CreateFromImage(Image.CreateEmpty(1, 1, false, Image.Format.Rgba8));
+        if (img.IsCompressed()) img.Decompress();
+        if (img.GetFormat() != Image.Format.Rgba8) img.Convert(Image.Format.Rgba8);
+
+        int w = img.GetWidth(), h = img.GetHeight();
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                var p = img.GetPixel(x, y);
+                if (p.A <= 0f) continue;
+
+                float maxC = Mathf.Max(p.R, Mathf.Max(p.G, p.B));
+                float minC = Mathf.Min(p.R, Mathf.Min(p.G, p.B));
+                float sat = maxC > 0.0001f ? (maxC - minC) / maxC : 0f;
+                float t = 1f - sat;
+
+                float r = Mathf.Lerp(p.R, p.R * tint.R, t);
+                float g = Mathf.Lerp(p.G, p.G * tint.G, t);
+                float b = Mathf.Lerp(p.B, p.B * tint.B, t);
+                img.SetPixel(x, y, new Color(r, g, b, p.A));
+            }
+        }
+        return ImageTexture.CreateFromImage(img);
+    }
+
+    private static string ToKebab(string pascal)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < pascal.Length; i++)
+        {
+            char c = pascal[i];
+            if (i > 0 && char.IsUpper(c)) sb.Append('-');
+            sb.Append(char.ToLowerInvariant(c));
+        }
+        return sb.ToString();
+    }
 
     private const float ButtonSize = 38f;
     private const float ButtonGap = 4f;
@@ -183,14 +270,24 @@ public partial class CommandCard : Control
                 DrawRect(btnRect, HudStyles.PanelBorder, false, 1f);
             }
 
-            // Icon
-            var iconColor = hovered ? HudStyles.TextPrimary : HudStyles.TextSecondary;
-            var iconSize = font.GetStringSize(bp.Icon, HorizontalAlignment.Left, -1, 16);
-            DrawString(font, new Vector2(x + (ButtonSize - iconSize.X) / 2, y + 24), bp.Icon,
-                HorizontalAlignment.Left, -1, 16, iconColor);
+            // Icon: sprite if available, otherwise emoji fallback
+            var sprite = GetBlueprintSprite(bp.Type, _config, _controllingPlayer);
+            if (sprite != null)
+            {
+                float inset = 4f;
+                var spriteRect = new Rect2(x + inset, y + inset, ButtonSize - inset * 2, ButtonSize - inset * 2);
+                var tint = hovered ? Colors.White : new Color(1f, 1f, 1f, 0.85f);
+                DrawTextureRect(sprite, spriteRect, false, tint);
+            }
+            else
+            {
+                var iconColor = hovered ? HudStyles.TextPrimary : HudStyles.TextSecondary;
+                var iconSize = font.GetStringSize(bp.Icon, HorizontalAlignment.Left, -1, 16);
+                DrawString(font, new Vector2(x + (ButtonSize - iconSize.X) / 2, y + 24), bp.Icon,
+                    HorizontalAlignment.Left, -1, 16, iconColor);
+            }
 
             // Hotkey
-            var hotkeyColor = hovered ? HudStyles.TextSecondary : HudStyles.TextDim;
             DrawString(font, new Vector2(btnRect.End.X - 10, btnRect.End.Y - 4), bp.Hotkey,
                 HorizontalAlignment.Right, -1, HudStyles.FontSizeHotkey, HudStyles.TextDim);
 

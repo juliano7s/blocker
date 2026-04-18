@@ -18,8 +18,9 @@ public partial class SelectionPanel : Control
 
     private const float ControlGroupHeight = 26f;
     private const float ControlGroupWidth = 40f;
-    private const float UnitIconSize = 14f;
+    private const float UnitIconSize = 16f;
     private const float UnitIconGap = 4f;
+    private const float SingleUnitSpriteSize = 44f;
 
     public void SetSelection(IReadOnlyList<Block>? blocks) => _selectedBlocks = blocks;
     public void SetControlGroups(IReadOnlyDictionary<int, IReadOnlyList<int>>? groups) => _controlGroups = groups;
@@ -109,10 +110,17 @@ public partial class SelectionPanel : Control
     {
         var block = _selectedBlocks![0];
 
-        DrawString(font, new Vector2(10, y + 16), block.Type.ToString().ToUpper(),
+        // Unit sprite on left
+        var spriteRect = new Rect2(10, y, SingleUnitSpriteSize, SingleUnitSpriteSize);
+        BlockIconPainter.Draw(this, block.Type, block.PlayerId, spriteRect, _config, enabled: true);
+
+        float textX = 10 + SingleUnitSpriteSize + 10;
+        float textY = y;
+
+        DrawString(font, new Vector2(textX, textY + 16), block.Type.ToString().ToUpper(),
             HorizontalAlignment.Left, -1, HudStyles.FontSizeNormal, HudStyles.TextPrimary);
 
-        y += 24f;
+        textY += 22f;
 
         // Stats
         string speedText = block.Type switch
@@ -125,25 +133,24 @@ public partial class SelectionPanel : Control
             BlockType.Wall => "Immobile",
             _ => ""
         };
-        DrawString(font, new Vector2(10, y + 16), speedText,
+        DrawString(font, new Vector2(textX, textY + 14), speedText,
             HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall, HudStyles.TextSecondary);
 
-        y += 20f;
-
-        // HP for Soldier/Jumper
+        // HP for Soldier/Jumper — below sprite
+        float belowY = y + SingleUnitSpriteSize + 4f;
         if (block.Type == BlockType.Soldier || block.Type == BlockType.Jumper)
         {
             string hpText = $"HP: {block.Hp}";
-            DrawString(font, new Vector2(10, y + 16), hpText,
+            DrawString(font, new Vector2(10, belowY + 14), hpText,
                 HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall, HudStyles.TextSecondary);
-            y += 20f;
+            belowY += 18f;
         }
 
         // Root progress
         if (block.State == BlockState.Rooting || block.IsFullyRooted)
         {
             string rootText = block.IsFullyRooted ? "Rooted" : $"Rooting: {block.RootProgress * 100 / 36:F0}%";
-            DrawString(font, new Vector2(10, y + 16), rootText,
+            DrawString(font, new Vector2(10, belowY + 14), rootText,
                 HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall, HudStyles.TextSecondary);
         }
     }
@@ -179,69 +186,10 @@ public partial class SelectionPanel : Control
             }
 
             var iconRect = new Rect2(x, y, UnitIconSize, UnitIconSize);
-            DrawMiniBlock(block, iconRect);
+            BlockIconPainter.Draw(this, block.Type, block.PlayerId, iconRect, _config, enabled: true);
 
             x += UnitIconSize + UnitIconGap;
         }
-    }
-
-    /// <summary>Draw a miniaturized block with type-specific body using player palette.</summary>
-    private void DrawMiniBlock(Block block, Rect2 rect)
-    {
-        var palette = _config.GetPalette(block.PlayerId);
-        var baseColor = palette.Base;
-
-        switch (block.Type)
-        {
-            case BlockType.Wall:
-                DrawRect(rect, palette.WallFill);
-                // Bevel lines
-                DrawLine(rect.Position, new Vector2(rect.End.X, rect.Position.Y), palette.WallHighlight, 1f);
-                DrawLine(rect.Position, new Vector2(rect.Position.X, rect.End.Y), palette.WallHighlight, 1f);
-                break;
-
-            case BlockType.Builder:
-                DrawRect(rect, baseColor);
-                // Small direction triangle
-                var center = rect.GetCenter();
-                DrawPolygon(new Vector2[] { center with { Y = rect.Position.Y + 2 }, new(rect.End.X - 3, rect.End.Y - 2), new(rect.Position.X + 3, rect.End.Y - 2) }, new Color[] { baseColor.Lightened(0.3f), baseColor.Lightened(0.3f), baseColor.Lightened(0.3f) });
-                break;
-
-            case BlockType.Soldier:
-                DrawRect(rect, palette.SoldierFill);
-                // X cross for swords
-                DrawLine(rect.Position + Vector2.One * 2, rect.End - Vector2.One * 2, palette.SoldierFill.Lightened(0.3f), 1f);
-                DrawLine(new Vector2(rect.End.X - 2, rect.Position.Y + 2), new Vector2(rect.Position.X + 2, rect.End.Y - 2), palette.SoldierFill.Lightened(0.3f), 1f);
-                break;
-
-            case BlockType.Stunner:
-                DrawRect(rect, palette.StunnerFill);
-                DrawLine(rect.Position, new Vector2(rect.End.X, rect.Position.Y), palette.StunnerBevelLight, 1f);
-                DrawLine(rect.Position, new Vector2(rect.Position.X, rect.End.Y), palette.StunnerBevelLight, 1f);
-                break;
-
-            case BlockType.Warden:
-                DrawRect(rect, palette.BuilderFill);
-                // Small diamond in center
-                var c = rect.GetCenter();
-                var hs = UnitIconSize * 0.25f;
-                DrawPolygon(new Vector2[] { new(c.X, c.Y - hs), new(c.X + hs, c.Y), new(c.X, c.Y + hs), new(c.X - hs, c.Y) }, new Color[] { palette.BuilderGradientLight, palette.BuilderGradientLight, palette.BuilderGradientLight, palette.BuilderGradientLight });
-                break;
-
-            case BlockType.Jumper:
-                DrawRect(rect, baseColor);
-                // Arrow up indicator
-                var jc = rect.GetCenter();
-                DrawPolygon(new Vector2[] { new(jc.X, rect.Position.Y + 2), new(rect.End.X - 3, jc.Y + 1), new(rect.Position.X + 3, jc.Y + 1) }, new Color[] { baseColor.Lightened(0.4f), baseColor.Lightened(0.4f), baseColor.Lightened(0.4f) });
-                break;
-
-            default:
-                DrawRect(rect, baseColor);
-                break;
-        }
-
-        // Thin border
-        DrawRect(rect, baseColor.Lightened(0.2f), false, 1f);
     }
 
     public override void _GuiInput(InputEvent @event)

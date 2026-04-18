@@ -138,6 +138,7 @@ public partial class GameManager : Node2D
 		};
 		_hudBar.CommandClicked += action => _selectionManager.IssueCommand(action);
 		_hudBar.BlueprintClicked += type => _selectionManager.ToggleBlueprintMode(type);
+		_hudBar.SetControllingPlayer(_selectionManager.ControllingPlayer);
 
 		// Tell camera about HUD coverage so it offsets the visible area
 		_camera.SetHudInsets(HudStyles.TopBarHeight, HudStyles.MinimapSize + HudStyles.BottomPanelMargin);
@@ -176,6 +177,7 @@ public partial class GameManager : Node2D
 	{
 		// Keep HUD, effects, and audio in sync with controlling player
 		_hud.SetControllingPlayer(_selectionManager.ControllingPlayer);
+		_hudBar.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_effectManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_audioManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
 

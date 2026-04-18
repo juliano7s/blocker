@@ -117,7 +117,7 @@ public partial class GridRenderer : Node2D
         if (progress < 0.02f) return;
 
         float inset = BlockInset;
-        float maxGridLen = CellSize * 0.6f; // max reach along grid line after the diagonal
+        float maxGridLen = CellSize * 0.4f; // max reach along grid line after the diagonal
         float totalReach = inset * Mathf.Sqrt2 + maxGridLen; // diagonal + grid portion
         float tendrilLen = totalReach * progress;
 
@@ -168,7 +168,7 @@ public partial class GridRenderer : Node2D
             float d1 = t1 * currentLen;
 
             // Small gap between segments
-            float gap = (d1 - d0) * 0.15f;
+            float gap = (d1 - d0) * 0.2f;
             d1 -= gap;
 
             if (d1 <= d0) continue;
@@ -181,7 +181,7 @@ public partial class GridRenderer : Node2D
             float width = Mathf.Lerp(maxWidth, minWidth, t0);
             float alpha = Mathf.Lerp(0.6f, 0.08f, t0);
 
-            DrawLine(p0, p1, color with { A = alpha * 0.3f }, width + 2f, true);
+            DrawLine(p0, p1, color.Darkened(0.2f) with { A = alpha * 0.3f }, width + 2f, true);
             DrawLine(p0, p1, color with { A = alpha }, width, true);
         }
     }
