@@ -137,16 +137,11 @@ public partial class SpawnToggles : Control
 
             DrawRect(btnRect, new Color(0f, 0f, 0f, hovered ? 0.35f : 0.2f));
 
-            var sprite = SpriteFactory.GetSprite(UnitTypes[i], _controllingPlayer);
-            if (sprite != null)
-            {
-                float spriteInset = (ButtonSize - 22f) / 2f;
-                var spriteRect = new Rect2(
-                    btnRect.Position + new Vector2(spriteInset, spriteInset),
-                    new Vector2(22f, 22f));
-                DrawTextureRect(sprite, spriteRect, false,
-                    enabled ? Colors.White : new Color(1f, 1f, 1f, 0.28f));
-            }
+            float spriteInset = (ButtonSize - 22f) / 2f;
+            var iconRect = new Rect2(
+                btnRect.Position + new Vector2(spriteInset, spriteInset),
+                new Vector2(22f, 22f));
+            BlockIconPainter.Draw(this, UnitTypes[i], _controllingPlayer, iconRect, _config, enabled);
 
             if (enabled)
             {
