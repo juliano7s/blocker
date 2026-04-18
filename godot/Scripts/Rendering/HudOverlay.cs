@@ -42,7 +42,7 @@ public partial class HudOverlay : CanvasLayer
         // Menu button (right side)
         _menuBtn = new Button
         {
-            Text = "☰ Menu",
+            Text = "☰",
             MouseFilter = Control.MouseFilterEnum.Stop,
         };
         _menuBtn.SetAnchorsPreset(Control.LayoutPreset.TopRight);

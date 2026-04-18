@@ -32,15 +32,7 @@ No ✕ overlay — dimming alone is sufficient. Avoids confusion with the Soldie
 
 ### Hotkey Labels
 
-Small corner label on each button showing the key letter (no `Alt` shown — space is tight):
-
-| Unit | Hotkey | Label |
-|------|--------|-------|
-| Builder | Alt+Q | `Q` |
-| Soldier | Alt+W | `W` |
-| Stunner | Alt+E | `E` |
-| Warden  | Alt+A | `A` |
-| Jumper  | Alt+S | `S` |
+No corner label on the button. On hover, a tooltip appears above the button showing the full shortcut and unit name, e.g. `Alt+Q — Toggle Builder Spawn`.
 
 ### Interactivity
 
