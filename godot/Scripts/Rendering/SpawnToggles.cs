@@ -74,17 +74,10 @@ public partial class SpawnToggles : Control
         QueueRedraw();
     }
 
-    // Glow color sourced from player palette — same colors the in-game sprites use.
-    private Color GetGlowColor(int index)
+    private Color GetGlowColor()
     {
         if (_config == null) return HudStyles.PanelBorder;
-        var palette = _config.GetPalette(_controllingPlayer);
-        return UnitTypes[index] switch
-        {
-            BlockType.Stunner => palette.StunnerFill,
-            BlockType.Soldier or BlockType.Jumper => palette.SoldierFill,
-            _ => palette.BuilderFill
-        };
+        return _config.GetPalette(_controllingPlayer).Base;
     }
 
     public override void _Ready()
@@ -133,7 +126,7 @@ public partial class SpawnToggles : Control
             var btnRect = GetButtonRect(i);
             bool enabled = IsEnabled(i);
             bool hovered = i == _hoveredIndex;
-            var glowColor = GetGlowColor(i);
+            var glowColor = GetGlowColor();
 
             DrawRect(btnRect, new Color(0f, 0f, 0f, hovered ? 0.35f : 0.2f));
 
