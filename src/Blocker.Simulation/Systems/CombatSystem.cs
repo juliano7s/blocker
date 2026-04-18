@@ -42,6 +42,7 @@ public static class CombatSystem
                     {
                         var neighbor = state.GetBlockAt(block.Pos + offset);
                         if (neighbor != null && neighbor.Type == BlockType.Soldier
+                            && !neighbor.IsStunned
                             && IsEnemy(state, block, neighbor) && !neighbor.IsMobile
                             && !toKill.Contains(neighbor.Id))
                         {
@@ -58,6 +59,7 @@ public static class CombatSystem
                             var pos = block.Pos + offset;
                             var neighbor = state.GetBlockAt(pos);
                             if (neighbor != null && neighbor.Type == BlockType.Soldier
+                                && !neighbor.IsStunned
                                 && IsEnemy(state, block, neighbor) && !neighbor.IsMobile)
                             {
                                 soldierHpLoss.TryGetValue(neighbor.Id, out int loss);
@@ -95,6 +97,7 @@ public static class CombatSystem
         {
             if (block.Type != BlockType.Soldier) continue;
             if (!block.IsMobile) continue;
+            if (block.IsStunned) continue; // Stunned soldiers can't attack
             if (toKill.Contains(block.Id)) continue;
 
             foreach (var offset in GridPos.OrthogonalOffsets)
@@ -103,6 +106,7 @@ public static class CombatSystem
                 var neighbor = state.GetBlockAt(neighborPos);
                 if (neighbor == null) continue;
                 if (neighbor.Type != BlockType.Soldier) continue;
+                if (neighbor.IsStunned) continue;
                 if (!state.AreEnemies(block, neighbor)) continue;
                 if (toKill.Contains(neighbor.Id)) continue;
 
@@ -156,7 +160,8 @@ public static class CombatSystem
 
             if (IsEnemy(state, target, neighbor))
             {
-                if (neighbor.Type == BlockType.Soldier)
+                // Stunned soldiers can't attack.
+                if (neighbor.Type == BlockType.Soldier && !neighbor.IsStunned)
                     orthoEnemySoldiers++;
             }
             else
@@ -174,7 +179,7 @@ public static class CombatSystem
         {
             var neighbor = state.GetBlockAt(target.Pos + offset);
             if (neighbor == null) continue;
-            if (IsEnemy(state, target, neighbor) && neighbor.Type == BlockType.Soldier)
+            if (IsEnemy(state, target, neighbor) && neighbor.Type == BlockType.Soldier && !neighbor.IsStunned)
                 diagEnemySoldiers++;
         }
 
@@ -250,7 +255,9 @@ public static class CombatSystem
         foreach (var offset in offsets)
         {
             var neighbor = state.GetBlockAt(target.Pos + offset);
-            if (neighbor != null && neighbor.Type == BlockType.Soldier && IsEnemy(state, target, neighbor))
+            if (neighbor != null && neighbor.Type == BlockType.Soldier
+                && !neighbor.IsStunned
+                && IsEnemy(state, target, neighbor))
                 count++;
         }
         return count;
@@ -263,14 +270,16 @@ public static class CombatSystem
         {
             var pos = target.Pos + offset;
             var neighbor = state.GetBlockAt(pos);
-            if (neighbor != null && neighbor.Type == BlockType.Soldier && IsEnemy(state, target, neighbor))
+            if (neighbor != null && neighbor.Type == BlockType.Soldier
+                && !neighbor.IsStunned
+                && IsEnemy(state, target, neighbor))
                 yield return pos;
         }
     }
 
     /// <summary>
     /// Neutral obstacle combat (Section 5.3).
-    /// Fragile walls destroyed by 2+ adjacent soldiers (any player).
+    /// Fragile walls destroyed by 2+ adjacent (non-stunned) soldiers (any player).
     /// </summary>
     private static void ResolvNeutralObstacles(GameState state, HashSet<int> toKill)
     {
@@ -286,12 +295,16 @@ public static class CombatSystem
                 foreach (var offset in GridPos.AllOffsets)
                 {
                     var neighbor = state.GetBlockAt(pos + offset);
-                    if (neighbor != null && neighbor.Type == BlockType.Soldier)
+                    if (neighbor != null && neighbor.Type == BlockType.Soldier && !neighbor.IsStunned)
                         adjacentSoldiers++;
                 }
 
                 if (adjacentSoldiers >= Constants.FragileWallSoldierThreshold)
-                    cell.Ground = GroundType.Normal;
+                {
+                    cell.Terrain = TerrainType.None;
+                    state.VisualEvents.Add(new VisualEvent(
+                        VisualEventType.WallDestroyed, pos, null));
+                }
             }
         }
     }

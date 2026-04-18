@@ -9,6 +9,8 @@ public enum VisualEventType
     BlockRooted,
     BlockUprooted,
     WallConverted,
+    WallDamaged,
+    WallDestroyed,
     StunRayFired,
     StunRayHit,
     BlastRayFired,

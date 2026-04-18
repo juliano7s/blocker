@@ -67,7 +67,16 @@ public static class PathfindingSystem
                 {
                     _cameFrom[neighbor] = current;
                     _gScore[neighbor] = tentativeG;
-                    int fScore = tentativeG + Heuristic(neighbor, target);
+                    // Cross-product tiebreaker: prefer cells near the straight line
+                    // from `from` to `target`. Without this, A* + Manhattan produces
+                    // ugly L-shapes; with it, paths hug the diagonal and zigzag.
+                    // Multiplier keeps tiebreak strictly below any 1-cell g/h delta.
+                    int dx1 = neighbor.X - target.X;
+                    int dy1 = neighbor.Y - target.Y;
+                    int dx2 = from.X - target.X;
+                    int dy2 = from.Y - target.Y;
+                    int cross = Math.Abs(dx1 * dy2 - dx2 * dy1);
+                    int fScore = (tentativeG + Heuristic(neighbor, target)) * 1000 + cross;
                     _openSet.Enqueue(neighbor, fScore);
                 }
             }

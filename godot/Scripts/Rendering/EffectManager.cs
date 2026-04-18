@@ -223,6 +223,22 @@ public partial class EffectManager : Node2D
                     contProb: 0.66f, branchProb: 0.34f));
                 break;
 
+            // Wall damaged (breakable -> fragile): short gray spark
+            case VisualEventType.WallDamaged:
+                AddEffect(EffectFactory.LightningBurst(this, pos,
+                    new Color(0.75f, 0.70f, 0.65f),
+                    maxSegs: 10, duration: 350f, trail: 0.2f,
+                    contProb: 0.55f, branchProb: 0.3f));
+                break;
+
+            // Wall destroyed (fragile -> gone): bigger dusty burst
+            case VisualEventType.WallDestroyed:
+                AddEffect(EffectFactory.LightningBurst(this, pos,
+                    new Color(0.85f, 0.80f, 0.70f),
+                    maxSegs: 18, duration: 500f, trail: 0.3f,
+                    contProb: 0.7f, branchProb: 0.4f));
+                break;
+
             // Formation formed: Clockwise spiral, ~40 segs, 1800ms
             case VisualEventType.BuilderNestFormed:
             case VisualEventType.SoldierNestFormed:

@@ -157,6 +157,8 @@ public partial class AudioManager : Node
             VisualEventType.BlockRooted => Config.RootComplete,
             VisualEventType.BlockUprooted => Config.UprootComplete,
             VisualEventType.WallConverted => Config.WallConvert,
+            VisualEventType.WallDamaged => Config.WallConvert,
+            VisualEventType.WallDestroyed => Config.WallConvert,
             VisualEventType.BlockDied => Config.Death,
 
             // Formations formed

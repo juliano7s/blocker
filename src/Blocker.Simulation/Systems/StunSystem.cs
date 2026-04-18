@@ -89,23 +89,36 @@ public static class StunSystem
                 continue;
             }
 
-            ray.TickCounter++;
-            if (ray.TickCounter < ray.AdvanceInterval) continue;
-            ray.TickCounter = 0;
-
-            // Check what's at the current head position
+            // Check what's at the current head position EVERY tick (not just advance ticks).
+            // Otherwise mobile blocks can pass through a stationary ray head between advances.
             if (TryHitAt(state, ray))
             {
                 ray.IsExpired = true;
                 continue;
             }
 
-            // Check if blocked by terrain/impassable
-            if (!state.Grid.InBounds(ray.HeadPos) || !state.Grid[ray.HeadPos].IsPassable)
+            // If the ray's current head is sitting on a wall (e.g. fired directly into
+            // an adjacent wall), damage it and expire.
+            var headCell = state.Grid[ray.HeadPos];
+            if (!headCell.IsPassable)
             {
+                if (headCell.HitWall())
+                {
+                    state.VisualEvents.Add(new VisualEvent(
+                        VisualEventType.WallDamaged, ray.HeadPos, ray.PlayerId));
+                    if (headCell.Terrain == TerrainType.None)
+                    {
+                        state.VisualEvents.Add(new VisualEvent(
+                            VisualEventType.WallDestroyed, ray.HeadPos, ray.PlayerId));
+                    }
+                }
                 ray.IsExpired = true;
                 continue;
             }
+
+            ray.TickCounter++;
+            if (ray.TickCounter < ray.AdvanceInterval) continue;
+            ray.TickCounter = 0;
 
             // Advance
             var nextPos = ray.HeadPos + ray.Direction.ToOffset();
@@ -117,7 +130,35 @@ public static class StunSystem
                 continue;
             }
 
+            // If the next cell is blocked by terrain/wall, damage breakable/fragile
+            // walls and expire the ray there.
+            var nextCell = state.Grid[nextPos];
+            if (!nextCell.IsPassable)
+            {
+                if (nextCell.HitWall())
+                {
+                    state.VisualEvents.Add(new VisualEvent(
+                        VisualEventType.WallDamaged, nextPos, ray.PlayerId));
+                    if (nextCell.Terrain == TerrainType.None)
+                    {
+                        state.VisualEvents.Add(new VisualEvent(
+                            VisualEventType.WallDestroyed, nextPos, ray.PlayerId));
+                    }
+                }
+                ray.HeadPos = nextPos;
+                ray.IsExpired = true;
+                continue;
+            }
+
             ray.HeadPos = nextPos;
+
+            // Check hit at the new head immediately so a mobile victim standing at
+            // the advance destination is caught on the same tick.
+            if (TryHitAt(state, ray))
+            {
+                ray.IsExpired = true;
+                continue;
+            }
         }
 
         // Remove fully faded rays

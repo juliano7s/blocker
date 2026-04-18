@@ -113,6 +113,17 @@ public static class TowerSystem
 
             if (tower.IsTearingDown) continue; // Don't fire during teardown
 
+            // If the center or any arm builder is stunned, the formation is disabled:
+            // no firing, timers don't advance.
+            if (center.IsStunned) continue;
+            bool anyArmStunned = false;
+            foreach (var (builderId, _) in tower.BuilderDirections)
+            {
+                var b = state.GetBlock(builderId);
+                if (b != null && b.IsStunned) { anyArmStunned = true; break; }
+            }
+            if (anyArmStunned) continue;
+
             // Fire logic
             tower.FireTimer++;
 

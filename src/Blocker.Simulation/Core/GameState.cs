@@ -213,9 +213,16 @@ public class GameState
             }
         }
 
-        // Process queued commands for blocks that are idle
-        foreach (var block in Blocks)
+        // Process queued commands for blocks that are idle.
+        // Snapshot IDs: TryExecuteCommand may mutate Blocks (e.g. Jump kills
+        // enemies, SelfDestruct removes the actor), which would invalidate a
+        // direct foreach.
+        var blockIds = new List<int>(Blocks.Count);
+        foreach (var b in Blocks) blockIds.Add(b.Id);
+        foreach (var id in blockIds)
         {
+            var block = GetBlock(id);
+            if (block == null) continue;
             if (block.CommandQueue.Count == 0) continue;
             if (!IsBlockIdle(block)) continue;
 
@@ -282,8 +289,11 @@ public class GameState
                 break;
 
             case CommandType.Jump:
-                if (cmd.Direction.HasValue)
-                    JumperSystem.Jump(this, block, cmd.Direction.Value, CellDistance(block.Pos, cmd.Direction.Value, cmd.TargetPos));
+                {
+                    var (dir, dist) = ResolveJumpDirAndRange(block.Pos, cmd.Direction, cmd.TargetPos);
+                    if (dir.HasValue)
+                        JumperSystem.Jump(this, block, dir.Value, dist);
+                }
                 break;
         }
     }
@@ -345,8 +355,11 @@ public class GameState
 
             case CommandType.Jump:
                 if (block.IsOnCooldown && !block.HasCombo) return false;
-                if (cmd.Direction.HasValue)
-                    return JumperSystem.Jump(this, block, cmd.Direction.Value, CellDistance(block.Pos, cmd.Direction.Value, cmd.TargetPos));
+                {
+                    var (dir, dist) = ResolveJumpDirAndRange(block.Pos, cmd.Direction, cmd.TargetPos);
+                    if (dir.HasValue)
+                        return JumperSystem.Jump(this, block, dir.Value, dist);
+                }
                 return true;
 
             default:
@@ -442,6 +455,27 @@ public class GameState
         return offset.X != 0
             ? Math.Abs(target.Value.X - from.X)
             : Math.Abs(target.Value.Y - from.Y);
+    }
+
+    /// <summary>
+    /// Resolve (direction, range) for a Jump command at execution time.
+    /// If a TargetPos is provided, the direction is re-derived from the block's
+    /// CURRENT position toward the target — this is critical for queued jumps
+    /// where the jumper may have moved (or been pushed) after the click, which
+    /// would otherwise leave the stored direction pointing away from the target.
+    /// If the jumper is already at the target, no direction is returned.
+    /// </summary>
+    private static (Direction? dir, int? range) ResolveJumpDirAndRange(
+        GridPos from, Direction? storedDir, GridPos? target)
+    {
+        if (target.HasValue)
+        {
+            if (target.Value == from) return (null, null);
+            var dir = DirectionFromDelta(from, target.Value);
+            return (dir, CellDistance(from, dir, target));
+        }
+        if (storedDir.HasValue) return (storedDir, null);
+        return (null, null);
     }
 
     /// <summary>
