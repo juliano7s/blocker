@@ -68,10 +68,10 @@ public static class NestSystem
                     continue;
                 }
 
-                // Check spawn toggle before spatial work — skip and reset for retry next cycle
+                // Toggle off — hold at threshold so it spawns immediately when re-enabled
                 if (player != null && player.SpawnDisabled.Contains(spawnType))
                 {
-                    nest.SpawnProgress = 0;
+                    nest.SpawnProgress = spawnTicks;
                     continue;
                 }
 

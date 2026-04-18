@@ -485,8 +485,8 @@ public class NestTests
 
         // No unit should have been spawned — only the 3 formation members exist
         Assert.DoesNotContain(state.Blocks, b => b.Type == BlockType.Builder && b.FormationId == null);
-        // Progress reset for retry
-        Assert.Equal(0, nest.SpawnProgress);
+        // Progress held at threshold so it spawns immediately when re-enabled
+        Assert.Equal(spawnTicks, nest.SpawnProgress);
     }
 
     [Fact]
