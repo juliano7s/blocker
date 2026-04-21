@@ -898,6 +898,7 @@ public partial class MapEditorScene : Node2D
         int ox = _selRect.Position.X, oy = _selRect.Position.Y;
         int dox = _selOffset.X, doy = _selOffset.Y;
         var grid = _editorState.Grid;
+        var recordedBefore = new HashSet<(int, int)>();
 
         // Record & clear source
         for (int row = 0; row < h; row++)
@@ -908,6 +909,7 @@ public partial class MapEditorScene : Node2D
                 var sb = _editorState.GetBlockAt(sp);
                 action.Before.Add(new CellSnapshot(sp.X, sp.Y, sc.Ground, sc.Terrain,
                     sb?.Type, sb != null ? (int?)sb.PlayerId : null));
+                recordedBefore.Add((sp.X, sp.Y));
                 if (sb != null) _editorState.RemoveBlock(sb);
                 sc.Ground = GroundType.Normal;
                 sc.Terrain = TerrainType.None;
@@ -922,8 +924,9 @@ public partial class MapEditorScene : Node2D
                 if (!grid.InBounds(dp)) continue;
                 var dc = grid[dp.X, dp.Y];
                 var db = _editorState.GetBlockAt(dp);
-                action.Before.Add(new CellSnapshot(dp.X, dp.Y, dc.Ground, dc.Terrain,
-                    db?.Type, db != null ? (int?)db.PlayerId : null));
+                if (!recordedBefore.Contains((dp.X, dp.Y)))
+                    action.Before.Add(new CellSnapshot(dp.X, dp.Y, dc.Ground, dc.Terrain,
+                        db?.Type, db != null ? (int?)db.PlayerId : null));
                 if (db != null) _editorState.RemoveBlock(db);
                 dc.Ground = _selGround![col, row];
                 dc.Terrain = _selTerrain![col, row];
@@ -1092,6 +1095,8 @@ public partial class MapEditorScene : Node2D
         _selGround = null;
         _selTerrain = null;
         _selBlocks = null;
+        _selRect = default;
+        _selOffset = Vector2I.Zero;
         _selOverlay.Phase = SelectPhase.Idle;
         _selOverlay.QueueRedraw();
     }
