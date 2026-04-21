@@ -59,6 +59,17 @@ public partial class MapEditorScene : Node2D
 	private readonly List<Vector2I> _linePreviewPoints = [];
 	private LinePreviewOverlay _lineOverlay = null!;
 
+	// Selection tool state
+	private SelectPhase _selPhase = SelectPhase.Idle;
+	private Rect2I _selRect;
+	private GridPos _selDrawStart;
+	private GridPos _selMoveStart;
+	private Vector2I _selOffset;
+	private GroundType[,]? _selGround;
+	private TerrainType[,]? _selTerrain;
+	private (BlockType type, int slot, bool rooted)[,]? _selBlocks;
+	private SelectionOverlay _selOverlay = null!;
+
 	// Middle-mouse pan state
 	private bool _isPanning;
 	private Vector2 _panStart;
@@ -136,6 +147,14 @@ public partial class MapEditorScene : Node2D
 			GridPadding = GridRenderer.GridPadding
 		};
 		AddChild(_lineOverlay);
+
+		_selOverlay = new SelectionOverlay
+		{
+			Name = "SelectionOverlay",
+			CellSize = GridRenderer.CellSize,
+			GridPadding = GridRenderer.GridPadding
+		};
+		AddChild(_selOverlay);
 
 		// Add minimap to UI layer (bottom-left corner)
 		_minimap = new MinimapPanel
@@ -240,6 +259,15 @@ public partial class MapEditorScene : Node2D
 			return;
 		}
 
+		// Delete key: clear selection
+		if (@event is InputEventKey keyDel && keyDel.Pressed && !keyDel.Echo
+			&& (keyDel.Keycode == Key.Delete || keyDel.Keycode == Key.Backspace))
+		{
+			DeleteSelection();
+			GetViewport().SetInputAsHandled();
+			return;
+		}
+
 		// Tool mode keyboard shortcuts
 		if (@event is InputEventKey key2 && key2.Pressed && !key2.Echo && !key2.CtrlPressed)
 		{
@@ -280,6 +308,26 @@ public partial class MapEditorScene : Node2D
 					_zoomIndex--;
 					_camera.Zoom = Vector2.One * ZoomLevels[_zoomIndex];
 					ClampCamera();
+					GetViewport().SetInputAsHandled();
+					return;
+				}
+			}
+
+			// Select tool intercept
+			if (_currentMode == EditorMode.Select)
+			{
+				if (@event is InputEventMouseButton smb && smb.ButtonIndex == MouseButton.Left)
+				{
+					if (smb.Pressed)
+					{
+						var gp = GetGridPos(smb.GlobalPosition);
+						SelectMouseDown(gp);
+					}
+					else
+					{
+						var gp = GetGridPos(smb.GlobalPosition);
+						SelectMouseUp(gp);
+					}
 					GetViewport().SetInputAsHandled();
 					return;
 				}
@@ -352,6 +400,17 @@ public partial class MapEditorScene : Node2D
 				{
 					EndDrag();
 				}
+				GetViewport().SetInputAsHandled();
+				return;
+			}
+		}
+
+		// Mouse motion for select tool
+		if (@event is InputEventMouseMotion smm && _currentMode == EditorMode.Select)
+		{
+			if (_selPhase == SelectPhase.Drawing || _selPhase == SelectPhase.Moving)
+			{
+				SelectMouseMove(GetGridPos(smm.GlobalPosition));
 				GetViewport().SetInputAsHandled();
 				return;
 			}
@@ -743,6 +802,180 @@ public partial class MapEditorScene : Node2D
         _camera.Position = new Vector2(clampX, clampY);
     }
 
+    // --- Selection tool helpers ---
+
+    private Rect2I NormalizeSelRect(GridPos a, GridPos b)
+    {
+        int x = System.Math.Max(0, System.Math.Min(a.X, b.X));
+        int y = System.Math.Max(0, System.Math.Min(a.Y, b.Y));
+        int x2 = System.Math.Min(_mapWidth - 1, System.Math.Max(a.X, b.X));
+        int y2 = System.Math.Min(_mapHeight - 1, System.Math.Max(a.Y, b.Y));
+        return new Rect2I(x, y, x2 - x + 1, y2 - y + 1);
+    }
+
+    private bool InsideSelRect(GridPos gp) =>
+        _selPhase != SelectPhase.Idle
+        && gp.X >= _selRect.Position.X && gp.X < _selRect.Position.X + _selRect.Size.X
+        && gp.Y >= _selRect.Position.Y && gp.Y < _selRect.Position.Y + _selRect.Size.Y;
+
+    private void SelectMouseDown(GridPos gp)
+    {
+        if (_selPhase == SelectPhase.Ready && InsideSelRect(gp))
+        {
+            _selPhase = SelectPhase.Moving;
+            _selMoveStart = gp;
+            _selOffset = Vector2I.Zero;
+        }
+        else
+        {
+            if (_selPhase == SelectPhase.Ready) CancelSelection();
+            _selPhase = SelectPhase.Drawing;
+            _selDrawStart = gp;
+            _selRect = NormalizeSelRect(gp, gp);
+            _selGround = null; _selTerrain = null; _selBlocks = null;
+            _selOffset = Vector2I.Zero;
+            UpdateSelOverlay();
+        }
+    }
+
+    private void SelectMouseMove(GridPos gp)
+    {
+        if (_selPhase == SelectPhase.Drawing)
+        {
+            _selRect = NormalizeSelRect(_selDrawStart, gp);
+            UpdateSelOverlay();
+        }
+        else if (_selPhase == SelectPhase.Moving)
+        {
+            _selOffset = new Vector2I(gp.X - _selMoveStart.X, gp.Y - _selMoveStart.Y);
+            UpdateSelOverlay();
+        }
+    }
+
+    private void SelectMouseUp(GridPos gp)
+    {
+        if (_selPhase == SelectPhase.Drawing)
+        {
+            _selRect = NormalizeSelRect(_selDrawStart, gp);
+            CaptureSelection();
+            _selPhase = SelectPhase.Ready;
+            UpdateSelOverlay();
+        }
+        else if (_selPhase == SelectPhase.Moving)
+        {
+            if (_selOffset != Vector2I.Zero) CommitSelection();
+            else { _selPhase = SelectPhase.Ready; UpdateSelOverlay(); }
+        }
+    }
+
+    private void CaptureSelection()
+    {
+        int w = _selRect.Size.X, h = _selRect.Size.Y;
+        int ox = _selRect.Position.X, oy = _selRect.Position.Y;
+        _selGround = new GroundType[w, h];
+        _selTerrain = new TerrainType[w, h];
+        _selBlocks = new (BlockType, int, bool)[w, h];
+        var grid = _editorState.Grid;
+        for (int dy = 0; dy < h; dy++)
+            for (int dx = 0; dx < w; dx++)
+            {
+                var cell = grid[ox + dx, oy + dy];
+                var blk = _editorState.GetBlockAt(new GridPos(ox + dx, oy + dy));
+                _selGround[dx, dy] = cell.Ground;
+                _selTerrain[dx, dy] = cell.Terrain;
+                _selBlocks[dx, dy] = blk != null
+                    ? (blk.Type, blk.PlayerId, blk.IsFullyRooted && blk.Type != BlockType.Wall)
+                    : (BlockType.Builder, -1, false);
+            }
+    }
+
+    private void CommitSelection()
+    {
+        if (_selGround == null) { CancelSelection(); return; }
+
+        var action = new EditorAction();
+        int w = _selRect.Size.X, h = _selRect.Size.Y;
+        int ox = _selRect.Position.X, oy = _selRect.Position.Y;
+        int dox = _selOffset.X, doy = _selOffset.Y;
+        var grid = _editorState.Grid;
+
+        // Record & clear source
+        for (int row = 0; row < h; row++)
+            for (int col = 0; col < w; col++)
+            {
+                var sp = new GridPos(ox + col, oy + row);
+                var sc = grid[sp.X, sp.Y];
+                var sb = _editorState.GetBlockAt(sp);
+                action.Before.Add(new CellSnapshot(sp.X, sp.Y, sc.Ground, sc.Terrain,
+                    sb?.Type, sb != null ? (int?)sb.PlayerId : null));
+                if (sb != null) _editorState.RemoveBlock(sb);
+                sc.Ground = GroundType.Normal;
+                sc.Terrain = TerrainType.None;
+                action.After.Add(new CellSnapshot(sp.X, sp.Y, GroundType.Normal, TerrainType.None, null, null));
+            }
+
+        // Write destination
+        for (int row = 0; row < h; row++)
+            for (int col = 0; col < w; col++)
+            {
+                var dp = new GridPos(ox + col + dox, oy + row + doy);
+                if (!grid.InBounds(dp)) continue;
+                var dc = grid[dp.X, dp.Y];
+                var db = _editorState.GetBlockAt(dp);
+                action.Before.Add(new CellSnapshot(dp.X, dp.Y, dc.Ground, dc.Terrain,
+                    db?.Type, db != null ? (int?)db.PlayerId : null));
+                if (db != null) _editorState.RemoveBlock(db);
+                dc.Ground = _selGround![col, row];
+                dc.Terrain = _selTerrain![col, row];
+                var (btype, bslot, brooted) = _selBlocks![col, row];
+                if (bslot >= 0 && dc.Terrain == TerrainType.None)
+                {
+                    EnsurePlayerExists(bslot);
+                    var placed = _editorState.AddBlock(btype, bslot, dp);
+                    if (brooted && btype != BlockType.Wall)
+                    { placed.State = BlockState.Rooted; placed.RootProgress = Constants.RootTicks; }
+                }
+                var newb = _editorState.GetBlockAt(dp);
+                action.After.Add(new CellSnapshot(dp.X, dp.Y, dc.Ground, dc.Terrain,
+                    newb?.Type, newb != null ? (int?)newb.PlayerId : null));
+            }
+
+        _actionStack.Push(action);
+        CancelSelection();
+        RefreshRenderer();
+    }
+
+    private void DeleteSelection()
+    {
+        if (_selPhase != SelectPhase.Ready || _selGround == null) return;
+        var action = new EditorAction();
+        var grid = _editorState.Grid;
+        for (int row = 0; row < _selRect.Size.Y; row++)
+            for (int col = 0; col < _selRect.Size.X; col++)
+            {
+                var p = new GridPos(_selRect.Position.X + col, _selRect.Position.Y + row);
+                var c = grid[p.X, p.Y];
+                var b = _editorState.GetBlockAt(p);
+                action.Before.Add(new CellSnapshot(p.X, p.Y, c.Ground, c.Terrain,
+                    b?.Type, b != null ? (int?)b.PlayerId : null));
+                if (b != null) _editorState.RemoveBlock(b);
+                c.Ground = GroundType.Normal;
+                c.Terrain = TerrainType.None;
+                action.After.Add(new CellSnapshot(p.X, p.Y, GroundType.Normal, TerrainType.None, null, null));
+            }
+        _actionStack.Push(action);
+        CancelSelection();
+        RefreshRenderer();
+    }
+
+    private void UpdateSelOverlay()
+    {
+        _selOverlay.Phase = _selPhase;
+        _selOverlay.Rect = _selRect;
+        _selOverlay.Offset = _selOffset;
+        _selOverlay.QueueRedraw();
+    }
+
     // --- Map operations ---
 
     private void UpdateSymmetryMap(int slots)
@@ -853,7 +1086,15 @@ public partial class MapEditorScene : Node2D
         _lineOverlay.QueueRedraw();
     }
 
-    private void CancelSelection() { }
+    private void CancelSelection()
+    {
+        _selPhase = SelectPhase.Idle;
+        _selGround = null;
+        _selTerrain = null;
+        _selBlocks = null;
+        _selOverlay.Phase = SelectPhase.Idle;
+        _selOverlay.QueueRedraw();
+    }
 
     private void OnToolSelected(EditorTool tool) => _currentTool = tool;
     private void OnGroundSelected(GroundType ground)
