@@ -50,6 +50,8 @@ public partial class EditorToolbar : Control
     // Slot buttons
     private readonly List<Button> _slotButtons = [];
     private readonly List<UnitButton> _unitButtons = new();
+    private readonly List<GroundTileButton> _groundButtons = new();
+    private readonly List<TerrainTileButton> _terrainButtons = new();
     private int _activeSlot;
     private GameConfig? _config;
 
@@ -61,6 +63,8 @@ public partial class EditorToolbar : Control
             btn.Config = config;
             btn.QueueRedraw();
         }
+        foreach (var btn in _groundButtons)  { btn.Config = config; btn.QueueRedraw(); }
+        foreach (var btn in _terrainButtons) { btn.Config = config; btn.QueueRedraw(); }
     }
 
     public override void _Ready()
@@ -225,16 +229,52 @@ public partial class EditorToolbar : Control
 
         // Ground tools
         AddSectionLabel(vbox, "Ground");
-        AddToolButton(vbox, "Normal", () => { GroundSelected?.Invoke(GroundType.Normal); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
-        AddToolButton(vbox, "Boot", () => { GroundSelected?.Invoke(GroundType.Boot); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
-        AddToolButton(vbox, "Overload", () => { GroundSelected?.Invoke(GroundType.Overload); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
-        AddToolButton(vbox, "Proto", () => { GroundSelected?.Invoke(GroundType.Proto); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
+        var groundGrid = new GridContainer { Columns = 2 };
+        groundGrid.AddThemeConstantOverride("h_separation", 2);
+        groundGrid.AddThemeConstantOverride("v_separation", 2);
+        vbox.AddChild(groundGrid);
+
+        var groundTypes = new (GroundType Type, string Label)[]
+        {
+            (GroundType.Normal,   "Normal"),
+            (GroundType.Boot,     "Boot"),
+            (GroundType.Overload, "Overload"),
+            (GroundType.Proto,    "Proto"),
+        };
+        foreach (var (type, label) in groundTypes)
+        {
+            var t = type; var l = label;
+            AddGroundTileButton(groundGrid, type, label, () =>
+            {
+                GroundSelected?.Invoke(t);
+                ToolModeSelected?.Invoke(EditorMode.Paint);
+                HighlightToolMode(EditorMode.Paint);
+            });
+        }
 
         // Terrain tools
         AddSectionLabel(vbox, "Terrain");
-        AddToolButton(vbox, "Solid Wall", () => { TerrainSelected?.Invoke(TerrainType.Terrain); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
-        AddToolButton(vbox, "Breakable", () => { TerrainSelected?.Invoke(TerrainType.BreakableWall); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
-        AddToolButton(vbox, "Fragile", () => { TerrainSelected?.Invoke(TerrainType.FragileWall); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
+        var terrainGrid = new GridContainer { Columns = 2 };
+        terrainGrid.AddThemeConstantOverride("h_separation", 2);
+        terrainGrid.AddThemeConstantOverride("v_separation", 2);
+        vbox.AddChild(terrainGrid);
+
+        var terrainTypes = new (TerrainType Type, string Label)[]
+        {
+            (TerrainType.Terrain,       "Solid"),
+            (TerrainType.BreakableWall, "Breakable"),
+            (TerrainType.FragileWall,   "Fragile"),
+        };
+        foreach (var (type, label) in terrainTypes)
+        {
+            var t = type; var l = label;
+            AddTerrainTileButton(terrainGrid, type, label, () =>
+            {
+                TerrainSelected?.Invoke(t);
+                ToolModeSelected?.Invoke(EditorMode.Paint);
+                HighlightToolMode(EditorMode.Paint);
+            });
+        }
 
         // Unit tools
         AddSectionLabel(vbox, "Uprooted Units");
@@ -488,6 +528,48 @@ public partial class EditorToolbar : Control
         return btn;
     }
 
+    private GroundTileButton AddGroundTileButton(GridContainer parent, GroundType type, string label, Action onPressed)
+    {
+        var btn = new GroundTileButton
+        {
+            GroundType = type,
+            Config = _config,
+            TileLabel = label,
+            TooltipText = label,
+            CustomMinimumSize = new Vector2(36, 48),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill
+        };
+        btn.Pressed += () =>
+        {
+            SetActiveToolButton(btn);
+            onPressed();
+        };
+        parent.AddChild(btn);
+        _groundButtons.Add(btn);
+        return btn;
+    }
+
+    private TerrainTileButton AddTerrainTileButton(GridContainer parent, TerrainType type, string label, Action onPressed)
+    {
+        var btn = new TerrainTileButton
+        {
+            TerrainType = type,
+            Config = _config,
+            TileLabel = label,
+            TooltipText = label,
+            CustomMinimumSize = new Vector2(36, 48),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill
+        };
+        btn.Pressed += () =>
+        {
+            SetActiveToolButton(btn);
+            onPressed();
+        };
+        parent.AddChild(btn);
+        _terrainButtons.Add(btn);
+        return btn;
+    }
+
     private void AddToolButton(VBoxContainer parent, string text, Action onPressed)
     {
         var btn = new Button
@@ -540,6 +622,69 @@ public partial class EditorToolbar : Control
     {
         var sep = new VSeparator();
         parent.AddChild(sep);
+    }
+}
+
+public partial class GroundTileButton : Button
+{
+    public GroundType GroundType { get; set; }
+    public GameConfig? Config { get; set; }
+    public string TileLabel { get; set; } = "";
+
+    public override void _Draw()
+    {
+        if (Config == null) return;
+        var size = Size;
+        float iconSize = Mathf.Min(size.X - 4f, size.Y * 0.55f);
+        float iconX = (size.X - iconSize) / 2f;
+        float iconY = 3f;
+        var iconRect = new Rect2(iconX, iconY, iconSize, iconSize);
+
+        var color = Config.GetGroundColor(GroundType);
+        DrawRect(iconRect, color);
+        DrawRect(iconRect, color.Lightened(0.15f), false, 1f);
+
+        if (GetThemeFont("font") is Font font)
+        {
+            float fontSize = 9f;
+            var labelColor = new Color(0.55f, 0.6f, 0.7f);
+            DrawString(font, new Vector2(2f, size.Y - 3f), TileLabel,
+                HorizontalAlignment.Center, size.X - 4f, (int)fontSize, labelColor);
+        }
+    }
+}
+
+public partial class TerrainTileButton : Button
+{
+    public TerrainType TerrainType { get; set; }
+    public GameConfig? Config { get; set; }
+    public string TileLabel { get; set; } = "";
+
+    public override void _Draw()
+    {
+        if (Config == null) return;
+        var size = Size;
+        float iconSize = Mathf.Min(size.X - 4f, size.Y * 0.55f);
+        float iconX = (size.X - iconSize) / 2f;
+        float iconY = 3f;
+        var iconRect = new Rect2(iconX, iconY, iconSize, iconSize);
+
+        var color = TerrainType switch
+        {
+            TerrainType.BreakableWall => Config.BreakableWallGroundColor,
+            TerrainType.FragileWall   => Config.FragileWallGroundColor,
+            _                         => Config.TerrainGroundColor
+        };
+        DrawRect(iconRect, color);
+        DrawRect(iconRect, color.Lightened(0.2f), false, 1.5f);
+
+        if (GetThemeFont("font") is Font font)
+        {
+            float fontSize = 9f;
+            var labelColor = new Color(0.55f, 0.6f, 0.7f);
+            DrawString(font, new Vector2(2f, size.Y - 3f), TileLabel,
+                HorizontalAlignment.Center, size.X - 4f, (int)fontSize, labelColor);
+        }
     }
 }
 
