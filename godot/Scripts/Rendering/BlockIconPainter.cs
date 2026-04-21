@@ -14,11 +14,16 @@ public static class BlockIconPainter
     /// Draw a unit icon into rect. Applies a dim overlay when enabled=false.
     /// No-op if config is null (sprites not ready yet).
     /// </summary>
-    public static void Draw(CanvasItem canvas, BlockType type, int playerId, Rect2 rect, GameConfig? config, bool enabled, float alpha = 1f)
+    public static void Draw(CanvasItem canvas, BlockType type, int playerId, Rect2 rect, GameConfig? config, bool enabled, float alpha = 1f, bool isRooted = false)
     {
         if (config == null) return;
         var palette = config.GetPalette(playerId);
         var tint = new Color(1f, 1f, 1f, alpha);
+
+        if (isRooted && type != BlockType.Wall)
+        {
+            DrawDiagonalStripes(canvas, rect, 0.18f * alpha);
+        }
 
         switch (type)
         {
@@ -171,5 +176,29 @@ public static class BlockIconPainter
             center + new Vector2(0, halfSize),
             center + new Vector2(-halfSize, 0)
         ];
+    }
+
+    private static void DrawDiagonalStripes(CanvasItem canvas, Rect2 rect, float alpha)
+    {
+        float stripeSpacing = 8f;
+        float stripeWidth = 3f;
+
+        var stripeColor = new Color(0.15f, 0.15f, 0.15f, alpha);
+        float w = rect.Size.X;
+        float h = rect.Size.Y;
+
+        for (float d = 0; d <= w + h; d += stripeSpacing)
+        {
+            float x0 = Mathf.Max(0, d - h);
+            float y0 = d - x0;
+            float x1 = Mathf.Min(w, d);
+            float y1 = d - x1;
+
+            if (x0 >= w || x1 <= 0 || y0 < 0 || y1 >= h) continue;
+
+            var p0 = rect.Position + new Vector2(x0, y0);
+            var p1 = rect.Position + new Vector2(x1, y1);
+            canvas.DrawLine(p0, p1, stripeColor, stripeWidth, true);
+        }
     }
 }

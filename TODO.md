@@ -9,6 +9,8 @@
 # Sounds
  - We need to review which sounds should play only for the players units. For example spawn sounds.
 
+# Gameplay
+ - Fog of war and shroud
 
 # Visuals
  - Blueprints:
@@ -33,10 +35,6 @@
  - Walls can be turned into gates, gates "lower" and allow units to pass. Player controls the lowering
 
 ## Current Issues
- - moving blocks are passing through opponent's blast rays.
- - a stunned unit should have it's abilities paused while stunned. stunned units in formations should disable that formation (no spawn; no ray shooting, warden zoc disabled) while stunned
- - stun ray should penetrate units - it currently doesn't; it should stop only at walls (and kill the first encountered wall)
- - pathfinding: units are preferring to go in a large L path instead of "diagonally" (zigzagging)
 
 # Hud
  - 1-9 -> control groups
