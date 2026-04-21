@@ -1146,7 +1146,7 @@ public partial class MapEditorScene : Node2D
         int halfH = _mapHeight / 2;
         for (int y = 0; y < halfH; y++)
             for (int x = 0; x < _mapWidth; x++)
-                CopyCellMirrored(x, y, _mapWidth - 1 - x, _mapHeight - 1 - y, action);
+                CopyCellMirrored(x, y, x, _mapHeight - 1 - y, action);
         if (action.Before.Count > 0) _actionStack.Push(action);
         RefreshRenderer();
     }
@@ -1157,7 +1157,7 @@ public partial class MapEditorScene : Node2D
         int halfH = _mapHeight / 2;
         for (int y = _mapHeight - 1; y >= (_mapHeight + 1) / 2; y--)
             for (int x = 0; x < _mapWidth; x++)
-                CopyCellMirrored(x, y, _mapWidth - 1 - x, _mapHeight - 1 - y, action);
+                CopyCellMirrored(x, y, x, _mapHeight - 1 - y, action);
         if (action.Before.Count > 0) _actionStack.Push(action);
         RefreshRenderer();
     }
