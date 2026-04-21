@@ -35,6 +35,7 @@ public partial class MapEditorScene : Node2D
 
 	// Current tool state
 	private EditorTool _currentTool = EditorTool.GroundPaint;
+	private EditorMode _currentMode = EditorMode.Paint;
 	private GroundType _currentGround = GroundType.Normal;
 	private TerrainType _currentTerrain = TerrainType.Terrain;
 	private BlockType _currentBlock = BlockType.Builder;
@@ -116,6 +117,7 @@ public partial class MapEditorScene : Node2D
 			UpdateSymmetryMap(count);
 		};
 		_toolbar.GuidesToggled += OnGuidesToggled;
+		_toolbar.ToolModeSelected += OnToolModeSelected;
 
 		// Guide overlay (draws on top of grid)
 		_guideOverlay = new GuideOverlay { Name = "GuideOverlay" };
@@ -210,6 +212,28 @@ public partial class MapEditorScene : Node2D
 			if (key.Keycode == Key.Z && key.CtrlPressed)
 			{
 				Undo();
+				GetViewport().SetInputAsHandled();
+				return;
+			}
+		}
+
+		// Tool mode keyboard shortcuts
+		if (@event is InputEventKey key2 && key2.Pressed && !key2.Echo && !key2.CtrlPressed)
+		{
+			EditorMode? newMode = key2.Keycode switch
+			{
+				Key.P => EditorMode.Paint,
+				Key.F => EditorMode.Fill,
+				Key.K => EditorMode.Pick,
+				Key.S => EditorMode.Select,
+				Key.L => EditorMode.Line,
+				Key.E => EditorMode.Erase,
+				_ => null
+			};
+			if (newMode.HasValue)
+			{
+				OnToolModeSelected(newMode.Value);
+				_toolbar.HighlightToolMode(newMode.Value);
 				GetViewport().SetInputAsHandled();
 				return;
 			}
@@ -572,6 +596,16 @@ public partial class MapEditorScene : Node2D
     }
 
     // --- Toolbar event handlers ---
+
+    private void OnToolModeSelected(EditorMode mode)
+    {
+        _currentMode = mode;
+        if (mode != EditorMode.Line) CancelLine();
+        if (mode != EditorMode.Select) CancelSelection();
+    }
+
+    private void CancelLine() { }
+    private void CancelSelection() { }
 
     private void OnToolSelected(EditorTool tool) => _currentTool = tool;
     private void OnGroundSelected(GroundType ground)

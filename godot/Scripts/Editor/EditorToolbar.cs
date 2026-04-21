@@ -1,6 +1,8 @@
 using Blocker.Simulation.Blocks;
 using Blocker.Simulation.Core;
 using Blocker.Game.Maps;
+using Blocker.Game.Rendering;
+using Blocker.Game.Config;
 using Godot;
 
 namespace Blocker.Game.Editor;
@@ -15,20 +17,24 @@ public partial class EditorToolbar : Control
     public event Action<EditorTool>? ToolSelected;
     public event Action<GroundType>? GroundSelected;
     public event Action<TerrainType>? TerrainSelected;
-    public event Action<BlockType>? BlockSelected;
+    public event Action<BlockType, bool>? BlockSelected;
     public event Action<int>? SlotSelected;
     public event Action<SymmetryMode>? SymmetryChanged;
     public event Action<int, int, int>? NewMapRequested; // width, height, slots
+    public event Action<int, int>? ResizeRequested; // width, height
+    public event Action? TestMapRequested;
     public event Action? SaveRequested;
     public event Action<string>? LoadRequested;
     public event Action? BackRequested;
     public event Action<string>? MapNameChanged;
     public event Action<int>? SlotCountChanged;
     public event Action<bool>? GuidesToggled;
+    public event Action<EditorMode>? ToolModeSelected;
 
     // Top bar controls
     private LineEdit _mapNameEdit = null!;
     private SpinBox _slotCountSpin = null!;
+    private List<Button> _toolModeButtons = new();
 
     // Sidebar state
     private Button? _activeToolButton;
@@ -43,7 +49,19 @@ public partial class EditorToolbar : Control
 
     // Slot buttons
     private readonly List<Button> _slotButtons = [];
+    private readonly List<UnitButton> _unitButtons = new();
     private int _activeSlot;
+    private GameConfig? _config;
+
+    public void SetConfig(GameConfig config)
+    {
+        _config = config;
+        foreach (var btn in _unitButtons)
+        {
+            btn.Config = config;
+            btn.QueueRedraw();
+        }
+    }
 
     public override void _Ready()
     {
@@ -93,6 +111,11 @@ public partial class EditorToolbar : Control
         newBtn.Pressed += ShowNewMapDialog;
         hbox.AddChild(newBtn);
 
+        // Resize button
+        var resizeBtn = MakeButton("Resize");
+        resizeBtn.Pressed += ShowResizeDialog;
+        hbox.AddChild(resizeBtn);
+
         // Save button
         var saveBtn = MakeButton("Save");
         saveBtn.Pressed += () => SaveRequested?.Invoke();
@@ -102,6 +125,45 @@ public partial class EditorToolbar : Control
         var loadBtn = MakeButton("Load");
         loadBtn.Pressed += ShowLoadDialog;
         hbox.AddChild(loadBtn);
+
+        // Test Map button
+        var testBtn = MakeButton("Test Map");
+        testBtn.Pressed += () => TestMapRequested?.Invoke();
+        hbox.AddChild(testBtn);
+
+        AddSeparator(hbox);
+
+        var toolModes = new (string Label, string Key, EditorMode Mode)[]
+        {
+            ("Paint", "P", EditorMode.Paint),
+            ("Fill",  "F", EditorMode.Fill),
+            ("Pick",  "K", EditorMode.Pick),
+            ("Select","S", EditorMode.Select),
+            ("Line",  "L", EditorMode.Line),
+            ("Erase", "E", EditorMode.Erase),
+        };
+
+        _toolModeButtons = new List<Button>();
+        foreach (var (label, key, mode) in toolModes)
+        {
+            var btn = new Button
+            {
+                Text = $"{label} [{key}]",
+                CustomMinimumSize = new Vector2(0, 30),
+                ToggleMode = true
+            };
+            var m = mode; // capture
+            btn.Pressed += () =>
+            {
+                SetActiveToolMode(m, btn);
+                ToolModeSelected?.Invoke(m);
+            };
+            hbox.AddChild(btn);
+            _toolModeButtons.Add(btn);
+        }
+        // Highlight Paint as default
+        if (_toolModeButtons.Count > 0)
+            SetActiveToolMode(EditorMode.Paint, _toolModeButtons[0]);
 
         AddSeparator(hbox);
 
@@ -163,29 +225,45 @@ public partial class EditorToolbar : Control
 
         // Ground tools
         AddSectionLabel(vbox, "Ground");
-        AddToolButton(vbox, "Normal", () => GroundSelected?.Invoke(GroundType.Normal));
-        AddToolButton(vbox, "Boot", () => GroundSelected?.Invoke(GroundType.Boot));
-        AddToolButton(vbox, "Overload", () => GroundSelected?.Invoke(GroundType.Overload));
-        AddToolButton(vbox, "Proto", () => GroundSelected?.Invoke(GroundType.Proto));
+        AddToolButton(vbox, "Normal", () => { GroundSelected?.Invoke(GroundType.Normal); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
+        AddToolButton(vbox, "Boot", () => { GroundSelected?.Invoke(GroundType.Boot); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
+        AddToolButton(vbox, "Overload", () => { GroundSelected?.Invoke(GroundType.Overload); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
+        AddToolButton(vbox, "Proto", () => { GroundSelected?.Invoke(GroundType.Proto); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
 
         // Terrain tools
         AddSectionLabel(vbox, "Terrain");
-        AddToolButton(vbox, "Solid Wall", () => TerrainSelected?.Invoke(TerrainType.Terrain));
-        AddToolButton(vbox, "Breakable", () => TerrainSelected?.Invoke(TerrainType.BreakableWall));
-        AddToolButton(vbox, "Fragile", () => TerrainSelected?.Invoke(TerrainType.FragileWall));
+        AddToolButton(vbox, "Solid Wall", () => { TerrainSelected?.Invoke(TerrainType.Terrain); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
+        AddToolButton(vbox, "Breakable", () => { TerrainSelected?.Invoke(TerrainType.BreakableWall); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
+        AddToolButton(vbox, "Fragile", () => { TerrainSelected?.Invoke(TerrainType.FragileWall); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
 
         // Unit tools
-        AddSectionLabel(vbox, "Units");
-        AddToolButton(vbox, "Builder", () => BlockSelected?.Invoke(BlockType.Builder));
-        AddToolButton(vbox, "Soldier", () => BlockSelected?.Invoke(BlockType.Soldier));
-        AddToolButton(vbox, "Stunner", () => BlockSelected?.Invoke(BlockType.Stunner));
-        AddToolButton(vbox, "Warden", () => BlockSelected?.Invoke(BlockType.Warden));
-        AddToolButton(vbox, "Jumper", () => BlockSelected?.Invoke(BlockType.Jumper));
-        AddToolButton(vbox, "Wall", () => BlockSelected?.Invoke(BlockType.Wall));
+        AddSectionLabel(vbox, "Uprooted Units");
+        var uprootedGrid = new GridContainer { Columns = 2 };
+        uprootedGrid.AddThemeConstantOverride("h_separation", 2);
+        uprootedGrid.AddThemeConstantOverride("v_separation", 2);
+        vbox.AddChild(uprootedGrid);
+
+        _unitButtons.Add(AddUnitToolButton(uprootedGrid, BlockType.Builder, "Builder", false));
+        _unitButtons.Add(AddUnitToolButton(uprootedGrid, BlockType.Soldier, "Soldier", false));
+        _unitButtons.Add(AddUnitToolButton(uprootedGrid, BlockType.Stunner, "Stunner", false));
+        _unitButtons.Add(AddUnitToolButton(uprootedGrid, BlockType.Warden, "Warden", false));
+        _unitButtons.Add(AddUnitToolButton(uprootedGrid, BlockType.Jumper, "Jumper", false));
+
+        AddSectionLabel(vbox, "Rooted Units");
+        var rootedGrid = new GridContainer { Columns = 2 };
+        rootedGrid.AddThemeConstantOverride("h_separation", 2);
+        rootedGrid.AddThemeConstantOverride("v_separation", 2);
+        vbox.AddChild(rootedGrid);
+
+        _unitButtons.Add(AddUnitToolButton(rootedGrid, BlockType.Builder, "Rooted Builder", true));
+        _unitButtons.Add(AddUnitToolButton(rootedGrid, BlockType.Soldier, "Rooted Soldier", true));
+        _unitButtons.Add(AddUnitToolButton(rootedGrid, BlockType.Stunner, "Rooted Stunner", true));
+        _unitButtons.Add(AddUnitToolButton(rootedGrid, BlockType.Warden, "Rooted Warden", true));
+        _unitButtons.Add(AddUnitToolButton(rootedGrid, BlockType.Wall, "Wall", true));
 
         // Eraser
         AddSectionLabel(vbox, "");
-        AddToolButton(vbox, "Eraser", () => ToolSelected?.Invoke(EditorTool.Eraser));
+        AddToolButton(vbox, "Eraser", () => { ToolSelected?.Invoke(EditorTool.Eraser); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
 
         // Slot selector
         AddSectionLabel(vbox, "Slot");
@@ -233,7 +311,25 @@ public partial class EditorToolbar : Control
         _activeSlot = slot;
         for (int i = 0; i < _slotButtons.Count; i++)
             _slotButtons[i].ButtonPressed = i == slot;
+        foreach (var unitBtn in _unitButtons)
+        {
+            unitBtn.Slot = slot;
+            unitBtn.QueueRedraw();
+        }
         SlotSelected?.Invoke(slot);
+    }
+
+    private void SetActiveToolMode(EditorMode mode, Button btn)
+    {
+        foreach (var b in _toolModeButtons)
+            b.ButtonPressed = b == btn;
+    }
+
+    public void HighlightToolMode(EditorMode mode)
+    {
+        int idx = (int)mode;
+        for (int i = 0; i < _toolModeButtons.Count; i++)
+            _toolModeButtons[i].ButtonPressed = i == idx;
     }
 
     private void EmitSymmetry()
@@ -268,6 +364,31 @@ public partial class EditorToolbar : Control
         dialog.Confirmed += () =>
         {
             NewMapRequested?.Invoke((int)widthSpin.Value, (int)heightSpin.Value, (int)slotsSpin.Value);
+            dialog.QueueFree();
+        };
+        dialog.Canceled += () => dialog.QueueFree();
+
+        AddChild(dialog);
+        dialog.PopupCentered();
+    }
+
+    private void ShowResizeDialog()
+    {
+        var dialog = new AcceptDialog { Title = "Resize Map", Size = new Vector2I(300, 150) };
+
+        var vbox = new VBoxContainer();
+        vbox.AddThemeConstantOverride("separation", 8);
+
+        var widthSpin = new SpinBox { MinValue = 10, MaxValue = 500, Value = 41, Step = 1, Prefix = "Width:" };
+        vbox.AddChild(widthSpin);
+
+        var heightSpin = new SpinBox { MinValue = 10, MaxValue = 500, Value = 25, Step = 1, Prefix = "Height:" };
+        vbox.AddChild(heightSpin);
+
+        dialog.AddChild(vbox);
+        dialog.Confirmed += () =>
+        {
+            ResizeRequested?.Invoke((int)widthSpin.Value, (int)heightSpin.Value);
             dialog.QueueFree();
         };
         dialog.Canceled += () => dialog.QueueFree();
@@ -331,6 +452,28 @@ public partial class EditorToolbar : Control
         };
     }
 
+    private UnitButton AddUnitToolButton(Container parent, BlockType type, string text, bool isRooted)
+    {
+        var btn = new UnitButton
+        {
+            TooltipText = text,
+            CustomMinimumSize = new Vector2(36, 36),
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            BlockType = type,
+            IsRooted = isRooted,
+            Slot = _activeSlot
+        };
+        btn.Pressed += () =>
+        {
+            SetActiveToolButton(btn);
+            BlockSelected?.Invoke(type, isRooted);
+            ToolModeSelected?.Invoke(EditorMode.Paint);
+            HighlightToolMode(EditorMode.Paint);
+        };
+        parent.AddChild(btn);
+        return btn;
+    }
+
     private void AddToolButton(VBoxContainer parent, string text, Action onPressed)
     {
         var btn = new Button
@@ -383,5 +526,24 @@ public partial class EditorToolbar : Control
     {
         var sep = new VSeparator();
         parent.AddChild(sep);
+    }
+}
+
+public partial class UnitButton : Button
+{
+    public BlockType BlockType { get; set; }
+    public int Slot { get; set; }
+    public GameConfig? Config { get; set; }
+    public bool IsRooted { get; set; }
+
+    public override void _Draw()
+    {
+        if (Config == null) return;
+        var size = Size;
+        float iconSize = 24f;
+        float paddingX = (size.X - iconSize) / 2f;
+        float paddingY = (size.Y - iconSize) / 2f;
+        var rect = new Rect2(paddingX, paddingY, iconSize, iconSize);
+        BlockIconPainter.Draw(this, BlockType, Slot, rect, Config, enabled: true, alpha: 1f, isRooted: IsRooted);
     }
 }
