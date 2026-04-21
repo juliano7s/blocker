@@ -53,6 +53,12 @@ public partial class MapEditorScene : Node2D
 	private EditorAction? _dragAction;
 	private readonly HashSet<(int, int)> _dragVisited = new();
 
+	// Line tool state
+	private bool _lineActive;
+	private GridPos _lineStart;
+	private readonly List<Vector2I> _linePreviewPoints = [];
+	private LinePreviewOverlay _lineOverlay = null!;
+
 	// Middle-mouse pan state
 	private bool _isPanning;
 	private Vector2 _panStart;
@@ -122,6 +128,14 @@ public partial class MapEditorScene : Node2D
 		// Guide overlay (draws on top of grid)
 		_guideOverlay = new GuideOverlay { Name = "GuideOverlay" };
 		AddChild(_guideOverlay);
+
+		_lineOverlay = new LinePreviewOverlay
+		{
+			Name = "LinePreviewOverlay",
+			CellSize = GridRenderer.CellSize,
+			GridPadding = GridRenderer.GridPadding
+		};
+		AddChild(_lineOverlay);
 
 		// Add minimap to UI layer (bottom-left corner)
 		_minimap = new MinimapPanel
@@ -217,6 +231,15 @@ public partial class MapEditorScene : Node2D
 			}
 		}
 
+		// Esc: cancel in-progress line or selection
+		if (@event is InputEventKey keyEsc && keyEsc.Pressed && !keyEsc.Echo && keyEsc.Keycode == Key.Escape)
+		{
+			CancelLine();
+			CancelSelection();
+			GetViewport().SetInputAsHandled();
+			return;
+		}
+
 		// Tool mode keyboard shortcuts
 		if (@event is InputEventKey key2 && key2.Pressed && !key2.Echo && !key2.CtrlPressed)
 		{
@@ -257,6 +280,29 @@ public partial class MapEditorScene : Node2D
 					_zoomIndex--;
 					_camera.Zoom = Vector2.One * ZoomLevels[_zoomIndex];
 					ClampCamera();
+					GetViewport().SetInputAsHandled();
+					return;
+				}
+			}
+
+			// Line tool intercept
+			if (_currentMode == EditorMode.Line)
+			{
+				if (@event is InputEventMouseButton lb && lb.ButtonIndex == MouseButton.Left)
+				{
+					if (lb.Pressed)
+					{
+						_lineActive = true;
+						_lineStart = GetGridPos(lb.GlobalPosition);
+						_linePreviewPoints.Clear();
+						_linePreviewPoints.Add(new Vector2I(_lineStart.X, _lineStart.Y));
+						_lineOverlay.Points = new List<Vector2I>(_linePreviewPoints);
+						_lineOverlay.QueueRedraw();
+					}
+					else if (_lineActive)
+					{
+						CommitLine(GetGridPos(lb.GlobalPosition));
+					}
 					GetViewport().SetInputAsHandled();
 					return;
 				}
@@ -311,6 +357,18 @@ public partial class MapEditorScene : Node2D
 			}
 		}
 
+		// Mouse motion for line preview
+		if (@event is InputEventMouseMotion lineMotion && _currentMode == EditorMode.Line && _lineActive)
+		{
+			var end = GetGridPos(lineMotion.GlobalPosition);
+			_linePreviewPoints.Clear();
+			_linePreviewPoints.AddRange(Bresenham(_lineStart.X, _lineStart.Y, end.X, end.Y));
+			_lineOverlay.Points = new List<Vector2I>(_linePreviewPoints);
+			_lineOverlay.QueueRedraw();
+			GetViewport().SetInputAsHandled();
+			return;
+		}
+
 		// Mouse motion for drag painting
 		if (@event is InputEventMouseMotion motion)
 		{
@@ -330,6 +388,23 @@ public partial class MapEditorScene : Node2D
 		int x = (int)Mathf.Floor((local.X - GridRenderer.GridPadding) / GridRenderer.CellSize);
 		int y = (int)Mathf.Floor((local.Y - GridRenderer.GridPadding) / GridRenderer.CellSize);
 		return new GridPos(x, y);
+	}
+
+	private static List<Vector2I> Bresenham(int x0, int y0, int x1, int y1)
+	{
+		var pts = new List<Vector2I>();
+		int dx = System.Math.Abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+		int dy = -System.Math.Abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+		int err = dx + dy;
+		while (true)
+		{
+			pts.Add(new Vector2I(x0, y0));
+			if (x0 == x1 && y0 == y1) break;
+			int e2 = 2 * err;
+			if (e2 >= dy) { err += dy; x0 += sx; }
+			if (e2 <= dx) { err += dx; y0 += sy; }
+		}
+		return pts;
 	}
 
 	private void StartDrag(bool isErase)
@@ -526,6 +601,71 @@ public partial class MapEditorScene : Node2D
         _editorState.Players.Add(new Player { Id = slotId, TeamId = slotId });
     }
 
+    private void ApplyCurrentTileToCell(GridPos pos)
+    {
+        var grid = _editorState.Grid;
+        if (!grid.InBounds(pos)) return;
+        var cell = grid[pos.X, pos.Y];
+        var existing = _editorState.GetBlockAt(pos);
+
+        switch (_currentTool)
+        {
+            case EditorTool.GroundPaint:
+                cell.Ground = _currentGround;
+                break;
+            case EditorTool.TerrainPaint:
+                if (existing != null) _editorState.RemoveBlock(existing);
+                cell.Terrain = _currentTerrain;
+                break;
+            case EditorTool.UnitPlace:
+                if (existing != null) _editorState.RemoveBlock(existing);
+                if (cell.Terrain != TerrainType.None) break;
+                EnsurePlayerExists(_currentSlot);
+                var placed = _editorState.AddBlock(_currentBlock, _currentSlot, pos);
+                if (_currentBlockRooted && placed.Type != BlockType.Wall)
+                {
+                    placed.State = BlockState.Rooted;
+                    placed.RootProgress = Constants.RootTicks;
+                }
+                break;
+            case EditorTool.Eraser:
+                cell.Ground = GroundType.Normal;
+                cell.Terrain = TerrainType.None;
+                if (existing != null) _editorState.RemoveBlock(existing);
+                break;
+        }
+    }
+
+    private void CommitLine(GridPos end)
+    {
+        var pts = Bresenham(_lineStart.X, _lineStart.Y, end.X, end.Y);
+        var action = new EditorAction();
+        var grid = _editorState.Grid;
+
+        foreach (var p in pts)
+        {
+            var pos = new GridPos(p.X, p.Y);
+            if (!grid.InBounds(pos)) continue;
+            var cell = grid[p.X, p.Y];
+            var existing = _editorState.GetBlockAt(pos);
+            action.Before.Add(new CellSnapshot(p.X, p.Y, cell.Ground, cell.Terrain,
+                existing?.Type, existing != null ? (int?)existing.PlayerId : null));
+
+            ApplyCurrentTileToCell(pos);
+
+            var newBlock = _editorState.GetBlockAt(pos);
+            action.After.Add(new CellSnapshot(p.X, p.Y, cell.Ground, cell.Terrain,
+                newBlock?.Type, newBlock != null ? (int?)newBlock.PlayerId : null));
+        }
+
+        if (action.Before.Count > 0) _actionStack.Push(action);
+        _lineActive = false;
+        _linePreviewPoints.Clear();
+        _lineOverlay.Points = [];
+        _lineOverlay.QueueRedraw();
+        RefreshRenderer();
+    }
+
     private void Undo()
     {
         var action = _actionStack.Undo();
@@ -705,7 +845,14 @@ public partial class MapEditorScene : Node2D
         if (mode != EditorMode.Select) CancelSelection();
     }
 
-    private void CancelLine() { }
+    private void CancelLine()
+    {
+        _lineActive = false;
+        _linePreviewPoints.Clear();
+        _lineOverlay.Points = [];
+        _lineOverlay.QueueRedraw();
+    }
+
     private void CancelSelection() { }
 
     private void OnToolSelected(EditorTool tool) => _currentTool = tool;
