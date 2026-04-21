@@ -38,6 +38,7 @@ public partial class MapEditorScene : Node2D
 	private GroundType _currentGround = GroundType.Normal;
 	private TerrainType _currentTerrain = TerrainType.Terrain;
 	private BlockType _currentBlock = BlockType.Builder;
+	private bool _currentBlockRooted = false;
 	private int _currentSlot = 0;
 
 	// Map metadata
@@ -93,7 +94,8 @@ public partial class MapEditorScene : Node2D
 
 		// Create toolbar
 		_toolbar = new EditorToolbar { Name = "EditorToolbar" };
-		_uiLayer.AddChild(_toolbar);
+		_uiLayer.AddChild(_toolbar);      // _Ready() fires here, creating _unitButtons
+		_toolbar.SetConfig(_config);      // now the list is populated
 
 		// Wire up toolbar events
 		_toolbar.ToolSelected += OnToolSelected;
@@ -103,11 +105,16 @@ public partial class MapEditorScene : Node2D
 		_toolbar.SlotSelected += OnSlotSelected;
 		_toolbar.SymmetryChanged += OnSymmetryChanged;
 		_toolbar.NewMapRequested += OnNewMapRequested;
+		_toolbar.ResizeRequested += OnResizeRequested;
+		_toolbar.TestMapRequested += OnTestMapRequested;
 		_toolbar.SaveRequested += OnSaveRequested;
 		_toolbar.LoadRequested += OnLoadRequested;
 		_toolbar.BackRequested += OnBackRequested;
 		_toolbar.MapNameChanged += name => _mapName = name;
-		_toolbar.SlotCountChanged += count => _slotCount = count;
+		_toolbar.SlotCountChanged += count => {
+			_slotCount = count;
+			UpdateSymmetryMap(count);
+		};
 		_toolbar.GuidesToggled += OnGuidesToggled;
 
 		// Guide overlay (draws on top of grid)
@@ -144,10 +151,44 @@ public partial class MapEditorScene : Node2D
 		if (Godot.Input.IsActionPressed("pan_left")) velocity.X -= 1;
 		if (Godot.Input.IsActionPressed("pan_right")) velocity.X += 1;
 
+		// Edge scrolling
+		var mousePos = GetViewport().GetMousePosition();
+		var viewportSize = GetViewportRect().Size;
+		float edgeMargin = 20f;
+
+		if (mousePos.X < edgeMargin) velocity.X -= 1;
+		if (mousePos.X > viewportSize.X - edgeMargin) velocity.X += 1;
+		if (mousePos.Y < edgeMargin) velocity.Y -= 1;
+		if (mousePos.Y > viewportSize.Y - edgeMargin) velocity.Y += 1;
+
 		if (velocity != Vector2.Zero)
 		{
 			_camera.Position += velocity.Normalized() * PanSpeed * dt / _camera.Zoom.X;
 			ClampCamera();
+		}
+
+		// Robust middle-mouse drag panning (fallback if UI eats mouse motion)
+		if (Godot.Input.IsMouseButtonPressed(MouseButton.Middle))
+		{
+			if (!_isPanning)
+			{
+				_isPanning = true;
+				_panStart = mousePos;
+			}
+			else
+			{
+				var rel = mousePos - _panStart;
+				if (rel != Vector2.Zero)
+				{
+					_camera.Position -= rel / _camera.Zoom.X;
+					ClampCamera();
+					_panStart = mousePos;
+				}
+			}
+		}
+		else
+		{
+			_isPanning = false;
 		}
 
 		// Update minimap camera view
@@ -197,22 +238,6 @@ public partial class MapEditorScene : Node2D
 				}
 			}
 
-			// Middle-mouse pan
-			if (mouseButton.ButtonIndex == MouseButton.Middle)
-			{
-				if (mouseButton.Pressed)
-				{
-					_isPanning = true;
-					_panStart = mouseButton.GlobalPosition;
-				}
-				else
-				{
-					_isPanning = false;
-				}
-				GetViewport().SetInputAsHandled();
-				return;
-			}
-
 			// Left-click: paint
 			if (mouseButton.ButtonIndex == MouseButton.Left)
 			{
@@ -248,17 +273,9 @@ public partial class MapEditorScene : Node2D
 			}
 		}
 
-		// Mouse motion for drag painting and middle-mouse pan
+		// Mouse motion for drag painting
 		if (@event is InputEventMouseMotion motion)
 		{
-			if (_isPanning)
-			{
-				_camera.Position -= motion.Relative / _camera.Zoom.X;
-				ClampCamera();
-				GetViewport().SetInputAsHandled();
-				return;
-			}
-
 			if (_isDragging)
 			{
 				bool isErasing = Godot.Input.IsMouseButtonPressed(MouseButton.Right);
@@ -345,7 +362,12 @@ public partial class MapEditorScene : Node2D
 						// Can't place on terrain
                         if (cell.Terrain != TerrainType.None) break;
                         EnsurePlayerExists(mirrorSlot);
-                        _editorState.AddBlock(_currentBlock, mirrorSlot, new GridPos(mx, my));
+                        var placedBlock = _editorState.AddBlock(_currentBlock, mirrorSlot, new GridPos(mx, my));
+                        if (_currentBlockRooted && placedBlock.Type != BlockType.Wall)
+                        {
+                            placedBlock.State = BlockState.Rooted;
+                            placedBlock.RootProgress = Constants.RootTicks;
+                        }
                         break;
 
                     case EditorTool.Eraser:
@@ -444,24 +466,38 @@ public partial class MapEditorScene : Node2D
         float marginX = effectiveViewW * 0.25f;
         float marginY = effectiveViewH * 0.25f;
 
-        float minX = effectiveViewW >= gridPixelW ? gridPixelW * 0.5f : effectiveViewW * 0.5f - marginX + GridRenderer.GridPadding;
-        float maxX = effectiveViewW >= gridPixelW ? gridPixelW * 0.5f : gridPixelW - effectiveViewW * 0.5f + marginX + GridRenderer.GridPadding;
-        float minY = effectiveViewH >= gridPixelH ? gridPixelH * 0.5f : effectiveViewH * 0.5f - marginY + GridRenderer.GridPadding;
-        float maxY = effectiveViewH >= gridPixelH ? gridPixelH * 0.5f : gridPixelH - effectiveViewH * 0.5f + marginY + GridRenderer.GridPadding;
+        float minX = effectiveViewW * 0.5f - marginX + GridRenderer.GridPadding;
+        float maxX = gridPixelW - effectiveViewW * 0.5f + marginX + GridRenderer.GridPadding;
+        float minY = effectiveViewH * 0.5f - marginY + GridRenderer.GridPadding;
+        float maxY = gridPixelH - effectiveViewH * 0.5f + marginY + GridRenderer.GridPadding;
 
-        _camera.Position = new Vector2(
-            Mathf.Clamp(_camera.Position.X, minX, maxX),
-            Mathf.Clamp(_camera.Position.Y, minY, maxY)
-        );
+        // If min > max (can happen when extremely zoomed out), Mathf.Clamp does something weird, so use Min/Max safely
+        float clampX = Mathf.Clamp(_camera.Position.X, Mathf.Min(minX, maxX), Mathf.Max(minX, maxX));
+        float clampY = Mathf.Clamp(_camera.Position.Y, Mathf.Min(minY, maxY), Mathf.Max(minY, maxY));
+
+        _camera.Position = new Vector2(clampX, clampY);
     }
 
     // --- Map operations ---
+
+    private void UpdateSymmetryMap(int slots)
+    {
+        _symmetry.SlotMirrorMap.Clear();
+        for (int i = 0; i < slots; i++)
+        {
+            if (i % 2 == 0)
+                _symmetry.SlotMirrorMap[i] = i + 1 < slots ? i + 1 : i;
+            else
+                _symmetry.SlotMirrorMap[i] = i - 1;
+        }
+    }
 
     private void CreateNewMap(int width, int height, int slots)
     {
         _mapWidth = width;
         _mapHeight = height;
         _slotCount = slots;
+        UpdateSymmetryMap(slots);
         _editorState = new GameState(new Grid(width, height));
         _actionStack.Clear();
 
@@ -501,6 +537,7 @@ public partial class MapEditorScene : Node2D
         _mapWidth = data.Width;
         _mapHeight = data.Height;
         _slotCount = data.SlotCount;
+        UpdateSymmetryMap(data.SlotCount);
 
         _editorState = new GameState(new Grid(data.Width, data.Height));
         _actionStack.Clear();
@@ -547,9 +584,10 @@ public partial class MapEditorScene : Node2D
         _currentTerrain = terrain;
         _currentTool = EditorTool.TerrainPaint;
     }
-    private void OnBlockSelected(BlockType block)
+    private void OnBlockSelected(BlockType block, bool isRooted)
     {
         _currentBlock = block;
+        _currentBlockRooted = isRooted;
         _currentTool = EditorTool.UnitPlace;
     }
     private void OnSlotSelected(int slot) => _currentSlot = slot;
@@ -564,6 +602,56 @@ public partial class MapEditorScene : Node2D
         CenterCamera();
         RefreshRenderer();
         RefreshGuides();
+    }
+
+    private void OnResizeRequested(int newWidth, int newHeight)
+    {
+        var newGrid = new Grid(newWidth, newHeight);
+        var oldGrid = _editorState.Grid;
+
+        for (int x = 0; x < System.Math.Min(newWidth, _mapWidth); x++)
+        {
+            for (int y = 0; y < System.Math.Min(newHeight, _mapHeight); y++)
+            {
+                newGrid[x, y].Ground = oldGrid[x, y].Ground;
+                newGrid[x, y].Terrain = oldGrid[x, y].Terrain;
+            }
+        }
+
+        var newBlocks = new System.Collections.Generic.List<Block>();
+        foreach (var b in _editorState.Blocks)
+        {
+            if (b.Pos.X < newWidth && b.Pos.Y < newHeight)
+            {
+                newBlocks.Add(b);
+            }
+        }
+
+        _mapWidth = newWidth;
+        _mapHeight = newHeight;
+        _editorState = new GameState(newGrid);
+        foreach (var b in newBlocks)
+            _editorState.Blocks.Add(b);
+
+        _actionStack.Clear();
+        CenterCamera();
+        RefreshRenderer();
+        RefreshGuides();
+    }
+
+    private void OnTestMapRequested()
+    {
+        var data = BuildMapData();
+        var assignments = new System.Collections.Generic.List<SlotAssignment>();
+        for (int i = 0; i < data.SlotCount; i++)
+            assignments.Add(new SlotAssignment(i, i)); // Assuming FFA for testing
+
+        // Store current state to return to map editor
+        Blocker.Game.UI.GameLaunchData.MapData = data;
+        Blocker.Game.UI.GameLaunchData.Assignments = assignments;
+        Blocker.Game.UI.GameLaunchData.ReturnToEditor = true;
+
+        GetTree().ChangeSceneToFile("res://Scenes/Main.tscn");
     }
 
     private void OnSaveRequested()
