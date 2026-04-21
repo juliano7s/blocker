@@ -274,6 +274,13 @@ public partial class MapEditorScene : Node2D
 						GetViewport().SetInputAsHandled();
 						return;
 					}
+					if (_currentMode == EditorMode.Pick)
+					{
+						if (_editorState.Grid.InBounds(gridPos))
+							PickTileAt(gridPos);
+						GetViewport().SetInputAsHandled();
+						return;
+					}
 					// existing path:
 					StartDrag(_currentMode == EditorMode.Erase);
 					ApplyToolAt(gridPos, _currentMode == EditorMode.Erase);
@@ -400,6 +407,33 @@ public partial class MapEditorScene : Node2D
 			_actionStack.Push(action);
 
 		RefreshRenderer();
+	}
+
+	private void PickTileAt(GridPos pos)
+	{
+		var cell = _editorState.Grid[pos.X, pos.Y];
+		var block = _editorState.GetBlockAt(pos);
+
+		if (block != null)
+		{
+			_currentBlock = block.Type;
+			_currentBlockRooted = block.IsFullyRooted && block.Type != BlockType.Wall;
+			_currentSlot = block.PlayerId;
+			_currentTool = EditorTool.UnitPlace;
+		}
+		else if (cell.Terrain != TerrainType.None)
+		{
+			_currentTerrain = cell.Terrain;
+			_currentTool = EditorTool.TerrainPaint;
+		}
+		else
+		{
+			_currentGround = cell.Ground;
+			_currentTool = EditorTool.GroundPaint;
+		}
+
+		_currentMode = EditorMode.Paint;
+		_toolbar.HighlightToolMode(EditorMode.Paint);
 	}
 
 	private void ApplyToolAt(GridPos pos, bool isErase)
