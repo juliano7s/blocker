@@ -275,7 +275,16 @@ public partial class GameManager : Node2D
 			_launchSession.Relay.Dispose();
 			MultiplayerLaunchData.Relay = null;
 		}
-		GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
+
+		if (Blocker.Game.UI.GameLaunchData.ReturnToEditor)
+		{
+			Blocker.Game.UI.GameLaunchData.ReturnToEditor = false;
+			GetTree().ChangeSceneToFile("res://Scenes/MapEditor.tscn");
+		}
+		else
+		{
+			GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
+		}
 	}
 
 	private void SubscribeMpRematchHandlers()

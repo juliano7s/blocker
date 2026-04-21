@@ -743,4 +743,5 @@ public static class GameLaunchData
 	public static MapData? MapData { get; set; }
 	public static List<SlotAssignment>? Assignments { get; set; }
 	public static Blocker.Game.Net.MultiplayerSessionState? MultiplayerSession { get; set; }
+	public static bool ReturnToEditor { get; set; }
 }

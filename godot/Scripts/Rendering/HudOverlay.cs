@@ -101,7 +101,15 @@ public partial class HudOverlay : CanvasLayer
                 }
                 break;
             case 1: // Exit
+            if (Blocker.Game.UI.GameLaunchData.ReturnToEditor)
+            {
+                Blocker.Game.UI.GameLaunchData.ReturnToEditor = false;
+                GetTree().ChangeSceneToFile("res://Scenes/MapEditor.tscn");
+            }
+            else
+            {
                 GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
+            }
                 break;
         }
     }
