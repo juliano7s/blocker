@@ -155,7 +155,7 @@ public partial class EditorToolbar : Control
             var m = mode; // capture
             btn.Pressed += () =>
             {
-                SetActiveToolMode(m, btn);
+                HighlightToolMode(m);
                 ToolModeSelected?.Invoke(m);
             };
             hbox.AddChild(btn);
@@ -163,7 +163,7 @@ public partial class EditorToolbar : Control
         }
         // Highlight Paint as default
         if (_toolModeButtons.Count > 0)
-            SetActiveToolMode(EditorMode.Paint, _toolModeButtons[0]);
+            HighlightToolMode(EditorMode.Paint);
 
         AddSeparator(hbox);
 
@@ -317,12 +317,6 @@ public partial class EditorToolbar : Control
             unitBtn.QueueRedraw();
         }
         SlotSelected?.Invoke(slot);
-    }
-
-    private void SetActiveToolMode(EditorMode mode, Button btn)
-    {
-        foreach (var b in _toolModeButtons)
-            b.ButtonPressed = b == btn;
     }
 
     public void HighlightToolMode(EditorMode mode)
