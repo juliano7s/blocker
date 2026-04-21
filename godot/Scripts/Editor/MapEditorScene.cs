@@ -31,7 +31,7 @@ public partial class MapEditorScene : Node2D
 	private CanvasLayer _uiLayer = null!;
 
 	private readonly EditorActionStack _actionStack = new();
-	private readonly SymmetryMirror _symmetry = new();
+	private bool _mirrorTeams = true;
 
 	// Current tool state
 	private EditorTool _currentTool = EditorTool.GroundPaint;
@@ -121,7 +121,8 @@ public partial class MapEditorScene : Node2D
 		_toolbar.TerrainSelected += OnTerrainSelected;
 		_toolbar.BlockSelected += OnBlockSelected;
 		_toolbar.SlotSelected += OnSlotSelected;
-		_toolbar.SymmetryChanged += OnSymmetryChanged;
+		_toolbar.MirrorRequested += OnMirrorRequested;
+		_toolbar.MirrorTeamsToggled += on => _mirrorTeams = on;
 		_toolbar.NewMapRequested += OnNewMapRequested;
 		_toolbar.ResizeRequested += OnResizeRequested;
 		_toolbar.TestMapRequested += OnTestMapRequested;
@@ -129,10 +130,7 @@ public partial class MapEditorScene : Node2D
 		_toolbar.LoadRequested += OnLoadRequested;
 		_toolbar.BackRequested += OnBackRequested;
 		_toolbar.MapNameChanged += name => _mapName = name;
-		_toolbar.SlotCountChanged += count => {
-			_slotCount = count;
-			UpdateSymmetryMap(count);
-		};
+		_toolbar.SlotCountChanged += count => _slotCount = count;
 		_toolbar.GuidesToggled += OnGuidesToggled;
 		_toolbar.ToolModeSelected += OnToolModeSelected;
 
@@ -574,85 +572,63 @@ public partial class MapEditorScene : Node2D
 	{
 		if (_currentMode == EditorMode.Erase) isErase = true;
 		if (!_editorState.Grid.InBounds(pos)) return;
+		if (_dragVisited.Contains((pos.X, pos.Y))) return;
+		_dragVisited.Add((pos.X, pos.Y));
 
-		// Get mirrored positions
-		var positions = _symmetry.GetMirroredPositions(pos.X, pos.Y, _currentSlot, _mapWidth, _mapHeight);
+		var cell = _editorState.Grid[pos.X, pos.Y];
+		var existingBlock = _editorState.GetBlockAt(pos);
 
-		foreach (var (mx, my, mirrorSlot) in positions)
+		var before = new CellSnapshot(pos.X, pos.Y, cell.Ground, cell.Terrain,
+			existingBlock?.Type, existingBlock != null ? (int?)existingBlock.PlayerId : null);
+
+		if (isErase)
 		{
-			if (!_editorState.Grid.InBounds(mx, my)) continue;
-			if (_dragVisited.Contains((mx, my))) continue;
-			_dragVisited.Add((mx, my));
-
-			var cell = _editorState.Grid[mx, my];
-			var existingBlock = _editorState.GetBlockAt(new GridPos(mx, my));
-
-			// Record before state
-			var before = new CellSnapshot(mx, my, cell.Ground, cell.Terrain,
-				existingBlock?.Type, existingBlock != null ? (int?)existingBlock.PlayerId : null);
-
-			if (isErase)
+			cell.Ground = GroundType.Normal;
+			cell.Terrain = TerrainType.None;
+			if (existingBlock != null) _editorState.RemoveBlock(existingBlock);
+		}
+		else
+		{
+			switch (_currentTool)
 			{
-				// Erase: reset ground to Normal, terrain to None, remove unit
-				cell.Ground = GroundType.Normal;
-				cell.Terrain = TerrainType.None;
-				if (existingBlock != null)
-					_editorState.RemoveBlock(existingBlock);
+				case EditorTool.GroundPaint:
+					cell.Ground = _currentGround;
+					break;
+				case EditorTool.TerrainPaint:
+					if (existingBlock != null) _editorState.RemoveBlock(existingBlock);
+					cell.Terrain = _currentTerrain;
+					break;
+				case EditorTool.UnitPlace:
+					if (existingBlock != null) _editorState.RemoveBlock(existingBlock);
+					if (cell.Terrain != TerrainType.None) break;
+					EnsurePlayerExists(_currentSlot);
+					var placed = _editorState.AddBlock(_currentBlock, _currentSlot, pos);
+					if (_currentBlockRooted && placed.Type != BlockType.Wall)
+					{
+						placed.State = BlockState.Rooted;
+						placed.RootProgress = Constants.RootTicks;
+					}
+					break;
+				case EditorTool.Eraser:
+					cell.Ground = GroundType.Normal;
+					cell.Terrain = TerrainType.None;
+					if (existingBlock != null) _editorState.RemoveBlock(existingBlock);
+					break;
 			}
-			else
-			{
-				switch (_currentTool)
-				{
-					case EditorTool.GroundPaint:
-						cell.Ground = _currentGround;
-						break;
+		}
 
-					case EditorTool.TerrainPaint:
-						// Remove existing block if placing terrain
-						if (existingBlock != null)
-							_editorState.RemoveBlock(existingBlock);
-						cell.Terrain = _currentTerrain;
-						break;
+		var newBlock = _editorState.GetBlockAt(pos);
+		var after = new CellSnapshot(pos.X, pos.Y, cell.Ground, cell.Terrain,
+			newBlock?.Type, newBlock != null ? (int?)newBlock.PlayerId : null);
 
-					case EditorTool.UnitPlace:
-						// Remove existing block first
-						if (existingBlock != null)
-							_editorState.RemoveBlock(existingBlock);
-						// Can't place on terrain
-                        if (cell.Terrain != TerrainType.None) break;
-                        EnsurePlayerExists(mirrorSlot);
-                        var placedBlock = _editorState.AddBlock(_currentBlock, mirrorSlot, new GridPos(mx, my));
-                        if (_currentBlockRooted && placedBlock.Type != BlockType.Wall)
-                        {
-                            placedBlock.State = BlockState.Rooted;
-                            placedBlock.RootProgress = Constants.RootTicks;
-                        }
-                        break;
+		if (before != after)
+		{
+			_dragAction?.Before.Add(before);
+			_dragAction?.After.Add(after);
+		}
 
-                    case EditorTool.Eraser:
-                        cell.Ground = GroundType.Normal;
-                        cell.Terrain = TerrainType.None;
-                        if (existingBlock != null)
-                            _editorState.RemoveBlock(existingBlock);
-                        break;
-                }
-            }
-
-            // Record after state
-            var newBlock = _editorState.GetBlockAt(new GridPos(mx, my));
-            var after = new CellSnapshot(mx, my, cell.Ground, cell.Terrain,
-                newBlock?.Type, newBlock != null ? (int?)newBlock.PlayerId : null);
-
-            // Only record if something changed
-            if (before != after)
-            {
-                _dragAction?.Before.Add(before);
-                _dragAction?.After.Add(after);
-            }
-        }
-
-        RefreshRenderer();
-    }
+		RefreshRenderer();
+	}
 
     private void EnsurePlayerExists(int slotId)
     {
@@ -981,24 +957,11 @@ public partial class MapEditorScene : Node2D
 
     // --- Map operations ---
 
-    private void UpdateSymmetryMap(int slots)
-    {
-        _symmetry.SlotMirrorMap.Clear();
-        for (int i = 0; i < slots; i++)
-        {
-            if (i % 2 == 0)
-                _symmetry.SlotMirrorMap[i] = i + 1 < slots ? i + 1 : i;
-            else
-                _symmetry.SlotMirrorMap[i] = i - 1;
-        }
-    }
-
     private void CreateNewMap(int width, int height, int slots)
     {
         _mapWidth = width;
         _mapHeight = height;
         _slotCount = slots;
-        UpdateSymmetryMap(slots);
         _editorState = new GameState(new Grid(width, height));
         _actionStack.Clear();
 
@@ -1038,7 +1001,6 @@ public partial class MapEditorScene : Node2D
         _mapWidth = data.Width;
         _mapHeight = data.Height;
         _slotCount = data.SlotCount;
-        UpdateSymmetryMap(data.SlotCount);
 
         _editorState = new GameState(new Grid(data.Width, data.Height));
         _actionStack.Clear();
@@ -1119,7 +1081,136 @@ public partial class MapEditorScene : Node2D
         _currentTool = EditorTool.UnitPlace;
     }
     private void OnSlotSelected(int slot) => _currentSlot = slot;
-    private void OnSymmetryChanged(SymmetryMode mode) => _symmetry.Mode = mode;
+
+    // --- Mirror operations ---
+
+    private int MirrorSlot(int slot)
+    {
+        if (slot % 2 == 0 && slot + 1 < _slotCount) return slot + 1;
+        if (slot % 2 == 1 && slot - 1 >= 0) return slot - 1;
+        return slot;
+    }
+
+    private void CopyCellMirrored(int srcX, int srcY, int dstX, int dstY, EditorAction action)
+    {
+        var grid = _editorState.Grid;
+        var src = grid[srcX, srcY];
+        var dst = grid[dstX, dstY];
+        var srcBlk = _editorState.GetBlockAt(new GridPos(srcX, srcY));
+        var dstBlk = _editorState.GetBlockAt(new GridPos(dstX, dstY));
+
+        action.Before.Add(new CellSnapshot(dstX, dstY, dst.Ground, dst.Terrain,
+            dstBlk?.Type, dstBlk != null ? (int?)dstBlk.PlayerId : null));
+
+        if (dstBlk != null) _editorState.RemoveBlock(dstBlk);
+        dst.Ground = src.Ground;
+        dst.Terrain = src.Terrain;
+
+        if (srcBlk != null)
+        {
+            int mirroredSlot = _mirrorTeams ? MirrorSlot(srcBlk.PlayerId) : srcBlk.PlayerId;
+            EnsurePlayerExists(mirroredSlot);
+            var placed = _editorState.AddBlock(srcBlk.Type, mirroredSlot, new GridPos(dstX, dstY));
+            if (srcBlk.IsFullyRooted && srcBlk.Type != BlockType.Wall)
+            { placed.State = BlockState.Rooted; placed.RootProgress = Constants.RootTicks; }
+        }
+
+        var newBlk = _editorState.GetBlockAt(new GridPos(dstX, dstY));
+        action.After.Add(new CellSnapshot(dstX, dstY, dst.Ground, dst.Terrain,
+            newBlk?.Type, newBlk != null ? (int?)newBlk.PlayerId : null));
+    }
+
+    private void MirrorLeftToRight()
+    {
+        var action = new EditorAction();
+        for (int y = 0; y < _mapHeight; y++)
+            for (int x = 0; x < _mapWidth / 2; x++)
+                CopyCellMirrored(x, y, _mapWidth - 1 - x, y, action);
+        if (action.Before.Count > 0) _actionStack.Push(action);
+        RefreshRenderer();
+    }
+
+    private void MirrorRightToLeft()
+    {
+        var action = new EditorAction();
+        for (int y = 0; y < _mapHeight; y++)
+            for (int x = _mapWidth - 1; x >= (_mapWidth + 1) / 2; x--)
+                CopyCellMirrored(x, y, _mapWidth - 1 - x, y, action);
+        if (action.Before.Count > 0) _actionStack.Push(action);
+        RefreshRenderer();
+    }
+
+    private void MirrorTopToBottom()
+    {
+        var action = new EditorAction();
+        int halfH = _mapHeight / 2;
+        for (int y = 0; y < halfH; y++)
+            for (int x = 0; x < _mapWidth; x++)
+                CopyCellMirrored(x, y, _mapWidth - 1 - x, _mapHeight - 1 - y, action);
+        if (action.Before.Count > 0) _actionStack.Push(action);
+        RefreshRenderer();
+    }
+
+    private void MirrorBottomToTop()
+    {
+        var action = new EditorAction();
+        int halfH = _mapHeight / 2;
+        for (int y = _mapHeight - 1; y >= (_mapHeight + 1) / 2; y--)
+            for (int x = 0; x < _mapWidth; x++)
+                CopyCellMirrored(x, y, _mapWidth - 1 - x, _mapHeight - 1 - y, action);
+        if (action.Before.Count > 0) _actionStack.Push(action);
+        RefreshRenderer();
+    }
+
+    private void MirrorDiagonalTLBR()
+    {
+        var action = new EditorAction();
+        float wf = _mapWidth - 1f, hf = _mapHeight - 1f;
+        if (wf <= 0 || hf <= 0) return;
+        for (int y = 0; y < _mapHeight; y++)
+            for (int x = 0; x < _mapWidth; x++)
+            {
+                if ((float)y * wf >= (float)x * hf) continue;
+                int mx = (int)System.Math.Round(y * wf / hf);
+                int my = (int)System.Math.Round(x * hf / wf);
+                if (mx < 0 || mx >= _mapWidth || my < 0 || my >= _mapHeight) continue;
+                CopyCellMirrored(x, y, mx, my, action);
+            }
+        if (action.Before.Count > 0) _actionStack.Push(action);
+        RefreshRenderer();
+    }
+
+    private void MirrorDiagonalTRBL()
+    {
+        var action = new EditorAction();
+        float wf = _mapWidth - 1f, hf = _mapHeight - 1f;
+        if (wf <= 0 || hf <= 0) return;
+        for (int y = 0; y < _mapHeight; y++)
+            for (int x = 0; x < _mapWidth; x++)
+            {
+                float normX = x / wf, normY = y / hf;
+                if (normX + normY >= 1f) continue;
+                int mx = (int)System.Math.Round((1f - normY) * wf);
+                int my = (int)System.Math.Round((1f - normX) * hf);
+                if (mx < 0 || mx >= _mapWidth || my < 0 || my >= _mapHeight) continue;
+                CopyCellMirrored(x, y, mx, my, action);
+            }
+        if (action.Before.Count > 0) _actionStack.Push(action);
+        RefreshRenderer();
+    }
+
+    private void OnMirrorRequested(MirrorDirection dir)
+    {
+        switch (dir)
+        {
+            case MirrorDirection.LR:       MirrorLeftToRight();   break;
+            case MirrorDirection.RL:       MirrorRightToLeft();   break;
+            case MirrorDirection.TB:       MirrorTopToBottom();   break;
+            case MirrorDirection.BT:       MirrorBottomToTop();   break;
+            case MirrorDirection.DiagTLBR: MirrorDiagonalTLBR(); break;
+            case MirrorDirection.DiagTRBL: MirrorDiagonalTRBL(); break;
+        }
+    }
 
     private void OnNewMapRequested(int width, int height, int slots)
     {

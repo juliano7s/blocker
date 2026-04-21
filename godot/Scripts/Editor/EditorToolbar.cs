@@ -7,8 +7,10 @@ using Godot;
 
 namespace Blocker.Game.Editor;
 
+public enum MirrorDirection { LR, RL, TB, BT, DiagTLBR, DiagTRBL }
+
 /// <summary>
-/// UI overlay for the map editor. Provides tool selection, slot picker, symmetry options,
+/// UI overlay for the map editor. Provides tool selection, slot picker, mirror operations,
 /// and map management (new, save, load, back). Communicates with MapEditorScene via C# events.
 /// </summary>
 public partial class EditorToolbar : Control
@@ -19,7 +21,8 @@ public partial class EditorToolbar : Control
     public event Action<TerrainType>? TerrainSelected;
     public event Action<BlockType, bool>? BlockSelected;
     public event Action<int>? SlotSelected;
-    public event Action<SymmetryMode>? SymmetryChanged;
+    public event Action<MirrorDirection>? MirrorRequested;
+    public event Action<bool>? MirrorTeamsToggled;
     public event Action<int, int, int>? NewMapRequested; // width, height, slots
     public event Action<int, int>? ResizeRequested; // width, height
     public event Action? TestMapRequested;
@@ -41,11 +44,8 @@ public partial class EditorToolbar : Control
     private readonly Color _activeColor = new(0.3f, 0.5f, 1.0f);
     private readonly Color _normalColor = new(0.2f, 0.2f, 0.25f);
 
-    // Symmetry checkboxes
-    private CheckBox _symLR = null!;
-    private CheckBox _symTB = null!;
-    private CheckBox _symDiagTLBR = null!;
-    private CheckBox _symDiagTRBL = null!;
+    // Mirror teams toggle
+    private CheckButton _teamsToggle = null!;
 
     // Slot buttons
     private readonly List<Button> _slotButtons = [];
@@ -286,17 +286,47 @@ public partial class EditorToolbar : Control
         }
         vbox.AddChild(slotGrid);
 
-        // Symmetry
-        AddSectionLabel(vbox, "Symmetry");
-        _symLR = AddCheckbox(vbox, "Left/Right");
-        _symTB = AddCheckbox(vbox, "Top/Bottom");
-        _symDiagTLBR = AddCheckbox(vbox, "Diag TL-BR");
-        _symDiagTRBL = AddCheckbox(vbox, "Diag TR-BL");
+        // Mirror
+        AddSectionLabel(vbox, "Mirror");
+        var mirrorGrid = new GridContainer { Columns = 2 };
+        mirrorGrid.AddThemeConstantOverride("h_separation", 2);
+        mirrorGrid.AddThemeConstantOverride("v_separation", 2);
+        vbox.AddChild(mirrorGrid);
 
-        _symLR.Toggled += _ => EmitSymmetry();
-        _symTB.Toggled += _ => EmitSymmetry();
-        _symDiagTLBR.Toggled += _ => EmitSymmetry();
-        _symDiagTRBL.Toggled += _ => EmitSymmetry();
+        var mirrorBtns = new (string Label, MirrorDirection Dir)[]
+        {
+            ("L → R", MirrorDirection.LR),
+            ("R → L", MirrorDirection.RL),
+            ("T → B", MirrorDirection.TB),
+            ("B → T", MirrorDirection.BT),
+            ("TL→BR", MirrorDirection.DiagTLBR),
+            ("TR→BL", MirrorDirection.DiagTRBL),
+        };
+        foreach (var (label, dir) in mirrorBtns)
+        {
+            var d = dir; // capture
+            var btn = new Button
+            {
+                Text = label,
+                CustomMinimumSize = new Vector2(0, 28),
+                SizeFlagsHorizontal = SizeFlags.ExpandFill
+            };
+            btn.Pressed += () => MirrorRequested?.Invoke(d);
+            mirrorGrid.AddChild(btn);
+        }
+
+        var teamsHBox = new HBoxContainer();
+        var teamsLabel = new Label { Text = "Teams:" };
+        teamsLabel.AddThemeFontSizeOverride("font_size", 10);
+        teamsHBox.AddChild(teamsLabel);
+        _teamsToggle = new CheckButton { Text = "ON", ButtonPressed = true };
+        _teamsToggle.Toggled += pressed =>
+        {
+            _teamsToggle.Text = pressed ? "ON" : "OFF";
+            MirrorTeamsToggled?.Invoke(pressed);
+        };
+        teamsHBox.AddChild(_teamsToggle);
+        vbox.AddChild(teamsHBox);
 
         // Guides
         AddSectionLabel(vbox, "Guides");
@@ -324,16 +354,6 @@ public partial class EditorToolbar : Control
         int idx = (int)mode;
         for (int i = 0; i < _toolModeButtons.Count; i++)
             _toolModeButtons[i].ButtonPressed = i == idx;
-    }
-
-    private void EmitSymmetry()
-    {
-        var mode = SymmetryMode.None;
-        if (_symLR.ButtonPressed) mode |= SymmetryMode.LeftRight;
-        if (_symTB.ButtonPressed) mode |= SymmetryMode.TopBottom;
-        if (_symDiagTLBR.ButtonPressed) mode |= SymmetryMode.DiagonalTLBR;
-        if (_symDiagTRBL.ButtonPressed) mode |= SymmetryMode.DiagonalTRBL;
-        SymmetryChanged?.Invoke(mode);
     }
 
     // --- Dialogs ---
