@@ -465,7 +465,7 @@ public partial class MapEditorScene : Node2D
 
 	private GridPos GetGridPos(Vector2 globalMousePos)
 	{
-		var local = _gridRenderer.ToLocal(GetGlobalMousePosition());
+		var local = _gridRenderer.ToLocal(globalMousePos);
 		int x = (int)Mathf.Floor((local.X - GridRenderer.GridPadding) / GridRenderer.CellSize);
 		int y = (int)Mathf.Floor((local.Y - GridRenderer.GridPadding) / GridRenderer.CellSize);
 		return new GridPos(x, y);
