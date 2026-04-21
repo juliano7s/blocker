@@ -81,6 +81,9 @@ public partial class MapEditorScene : Node2D
 	// Minimap
 	private MinimapPanel _minimap = null!;
 
+	// Status bar
+	private Label _statusLabel = null!;
+
 	// Camera settings
 	private const float PanSpeed = 500f;
 	// Discrete zoom levels — CellSize * zoom is always an integer for pixel-aligned grid lines
@@ -170,6 +173,25 @@ public partial class MapEditorScene : Node2D
 		_minimap.CameraJumpRequested += OnMinimapJump;
 		_uiLayer.AddChild(_minimap);
 
+		// Status bar
+		var statusBar = new PanelContainer();
+		statusBar.SetAnchorsPreset(Control.LayoutPreset.BottomWide);
+		statusBar.OffsetTop = -24;
+		statusBar.OffsetBottom = 0;
+		statusBar.MouseFilter = Control.MouseFilterEnum.Ignore;
+		var statusStyle = new StyleBoxFlat { BgColor = new Color(0.055f, 0.055f, 0.07f, 0.92f) };
+		statusBar.AddThemeStyleboxOverride("panel", statusStyle);
+
+		_statusLabel = new Label
+		{
+			Text = "",
+			VerticalAlignment = VerticalAlignment.Center,
+			LabelSettings = new LabelSettings { FontSize = 11 }
+		};
+		_statusLabel.AddThemeColorOverride("font_color", new Color(0.5f, 0.55f, 0.65f));
+		statusBar.AddChild(_statusLabel);
+		_uiLayer.AddChild(statusBar);
+
 		RefreshRenderer();
 	}
 
@@ -227,6 +249,8 @@ public partial class MapEditorScene : Node2D
 		// Update minimap camera view
 		var viewSize = GetViewportRect().Size / _camera.Zoom;
 		_minimap.SetCameraView(_camera.Position, viewSize);
+
+		UpdateStatusBar();
 	}
 
 	public override void _UnhandledInput(InputEvent @event)
@@ -1319,6 +1343,35 @@ public partial class MapEditorScene : Node2D
             overlay.MapHeight = _mapHeight;
             overlay.QueueRedraw();
         }
+    }
+
+    private void UpdateStatusBar()
+    {
+        var local = _gridRenderer.ToLocal(GetGlobalMousePosition());
+        int gx = (int)Mathf.Floor((local.X - GridRenderer.GridPadding) / GridRenderer.CellSize);
+        int gy = (int)Mathf.Floor((local.Y - GridRenderer.GridPadding) / GridRenderer.CellSize);
+
+        string posStr = "—";
+        string tileStr = "—";
+
+        if (_editorState.Grid.InBounds(gx, gy))
+        {
+            posStr = $"x: {gx}  y: {gy}";
+            var cell = _editorState.Grid[gx, gy];
+            var blk = _editorState.GetBlockAt(new GridPos(gx, gy));
+            if (blk != null)
+                tileStr = $"{blk.Type} (slot {blk.PlayerId})";
+            else if (cell.Terrain != TerrainType.None)
+                tileStr = cell.Terrain.ToString();
+            else
+                tileStr = cell.Ground == GroundType.Normal ? "Normal" : cell.Ground.ToString();
+        }
+
+        string toolStr = _currentMode.ToString();
+        string zoomStr = $"{ZoomLevels[_zoomIndex]:0.##}×";
+        string sizeStr = $"{_mapWidth} × {_mapHeight}";
+
+        _statusLabel.Text = $"  {posStr}    tile: {tileStr}    tool: {toolStr}    zoom: {zoomStr}    size: {sizeStr}";
     }
 }
 
