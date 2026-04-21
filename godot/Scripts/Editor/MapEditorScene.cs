@@ -267,9 +267,16 @@ public partial class MapEditorScene : Node2D
 			{
 				if (mouseButton.Pressed)
 				{
-					StartDrag(false);
 					var gridPos = GetGridPos(mouseButton.GlobalPosition);
-					ApplyToolAt(gridPos, false);
+					if (_currentMode == EditorMode.Fill)
+					{
+						FloodFill(gridPos);
+						GetViewport().SetInputAsHandled();
+						return;
+					}
+					// existing path:
+					StartDrag(_currentMode == EditorMode.Erase);
+					ApplyToolAt(gridPos, _currentMode == EditorMode.Erase);
 				}
 				else
 				{
@@ -336,8 +343,68 @@ public partial class MapEditorScene : Node2D
 		_dragVisited.Clear();
 	}
 
+	private void FloodFill(GridPos start)
+	{
+		var grid = _editorState.Grid;
+		if (!grid.InBounds(start)) return;
+
+		var action = new EditorAction();
+		var startCell = grid[start.X, start.Y];
+		var targetGround = startCell.Ground;
+		var targetTerrain = startCell.Terrain;
+
+		var visited = new HashSet<(int, int)>();
+		var stack = new Stack<GridPos>();
+		stack.Push(start);
+
+		while (stack.Count > 0)
+		{
+			var pos = stack.Pop();
+			if (!grid.InBounds(pos)) continue;
+			if (visited.Contains((pos.X, pos.Y))) continue;
+			visited.Add((pos.X, pos.Y));
+
+			var cell = grid[pos.X, pos.Y];
+			var existingBlock = _editorState.GetBlockAt(pos);
+
+			bool matches = _currentTool switch
+			{
+				EditorTool.GroundPaint  => cell.Ground == targetGround,
+				EditorTool.TerrainPaint => cell.Terrain == targetTerrain,
+				_ => false
+			};
+			if (!matches) continue;
+
+			action.Before.Add(new CellSnapshot(pos.X, pos.Y, cell.Ground, cell.Terrain,
+				existingBlock?.Type, existingBlock != null ? (int?)existingBlock.PlayerId : null));
+
+			if (_currentTool == EditorTool.GroundPaint)
+				cell.Ground = _currentGround;
+			else if (_currentTool == EditorTool.TerrainPaint)
+			{
+				if (existingBlock != null) _editorState.RemoveBlock(existingBlock);
+				cell.Terrain = _currentTerrain;
+			}
+
+			var newBlock = _editorState.GetBlockAt(pos);
+			action.After.Add(new CellSnapshot(pos.X, pos.Y, cell.Ground, cell.Terrain,
+				newBlock?.Type, newBlock != null ? (int?)newBlock.PlayerId : null));
+
+			stack.Push(new GridPos(pos.X + 1, pos.Y));
+			stack.Push(new GridPos(pos.X - 1, pos.Y));
+			stack.Push(new GridPos(pos.X, pos.Y + 1));
+			stack.Push(new GridPos(pos.X, pos.Y - 1));
+		}
+
+		if (action.Before.Count > 0)
+			_actionStack.Push(action);
+
+		RefreshRenderer();
+	}
+
 	private void ApplyToolAt(GridPos pos, bool isErase)
 	{
+		if (_currentMode == EditorMode.Erase) isErase = true;
 		if (!_editorState.Grid.InBounds(pos)) return;
 
 		// Get mirrored positions
