@@ -45,6 +45,19 @@ public enum VisualEventType
     CommandRootIssued,
     CommandUprootIssued,
     CommandWallIssued,
+
+    // Nugget events
+    NuggetMiningStarted,
+    NuggetFreed,
+    NuggetCaptured,
+    NuggetRefineConsumed,
+    NuggetHealConsumed,
+    NuggetFortifyConsumed,
+
+    // Command-issued (nugget)
+    CommandMineIssued,
+    CommandHealIssued,
+    CommandFortifyIssued,
 }
 
 public readonly record struct VisualEvent(
