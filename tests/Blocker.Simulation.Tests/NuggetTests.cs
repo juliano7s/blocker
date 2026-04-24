@@ -1,4 +1,5 @@
 using Blocker.Simulation.Blocks;
+using Blocker.Simulation.Commands;
 using Blocker.Simulation.Core;
 using Blocker.Simulation.Systems;
 using Xunit;
@@ -289,6 +290,22 @@ public class NuggetTests
 
         NuggetSystem.Tick(state);
 
+        Assert.Equal(0, nugget.PlayerId);
+    }
+
+    // --- Part J: Commands ---
+
+    [Fact]
+    public void MineCommand_BuilderMovesToNuggetAndMines()
+    {
+        var state = CreateState();
+        var nugget = state.AddBlock(BlockType.Nugget, -1, new GridPos(5, 5));
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 4)); // Already adjacent
+
+        var cmd = new Command(0, CommandType.MineNugget, [builder.Id], TargetPos: new GridPos(5, 5));
+        state.ProcessCommands([cmd]);
+
+        Assert.Equal(nugget.Id, builder.MiningTargetId);
         Assert.Equal(0, nugget.PlayerId);
     }
 

@@ -194,6 +194,8 @@ public class GameState
                 {
                     // Immediate: clear queue
                     block.CommandQueue.Clear();
+                    if (block.Type == BlockType.Builder)
+                        block.MiningTargetId = null;
 
                     // Root on rooting/uprooting block = immediate toggle (cancel)
                     bool isRootingOrUprooting = block.State is BlockState.Rooting or BlockState.Uprooting;
@@ -238,6 +240,7 @@ public class GameState
         switch (cmd.Type)
         {
             case CommandType.Move:
+                block.MiningTargetId = null;
                 if (cmd.TargetPos.HasValue && block.IsMobile)
                 {
                     block.MoveTarget = cmd.TargetPos.Value;
@@ -294,6 +297,80 @@ public class GameState
                     var (dir, dist) = ResolveJumpDirAndRange(block.Pos, cmd.Direction, cmd.TargetPos);
                     if (dir.HasValue)
                         JumperSystem.Jump(this, block, dir.Value, dist);
+                }
+                break;
+
+            case CommandType.MineNugget:
+                if (block.Type == BlockType.Builder && cmd.TargetPos.HasValue)
+                {
+                    var targetNugget = GetBlockAt(cmd.TargetPos.Value);
+                    if (targetNugget != null && targetNugget.Type == BlockType.Nugget
+                        && targetNugget.NuggetState is { IsMined: false })
+                    {
+                        bool otherTeamMining = false;
+                        if (targetNugget.PlayerId != -1 && targetNugget.PlayerId != block.PlayerId)
+                        {
+                            foreach (var b in Blocks)
+                            {
+                                if (b.MiningTargetId == targetNugget.Id && b.PlayerId != block.PlayerId)
+                                {
+                                    otherTeamMining = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!otherTeamMining)
+                        {
+                            bool isAdjacent = false;
+                            foreach (var offset in GridPos.OrthogonalOffsets)
+                            {
+                                if (block.Pos == cmd.TargetPos.Value + offset)
+                                {
+                                    isAdjacent = true;
+                                    break;
+                                }
+                            }
+
+                            if (!isAdjacent)
+                                block.MoveTarget = cmd.TargetPos.Value;
+
+                            block.MiningTargetId = targetNugget.Id;
+                            targetNugget.PlayerId = block.PlayerId;
+                        }
+                    }
+                }
+                break;
+
+            case CommandType.HealWithNugget:
+                if (block.Type == BlockType.Nugget && block.NuggetState is { IsMined: true }
+                    && cmd.TargetPos.HasValue)
+                {
+                    var healTarget = GetBlockAt(cmd.TargetPos.Value);
+                    if (healTarget != null
+                        && healTarget.Type is BlockType.Soldier or BlockType.Jumper
+                        && healTarget.PlayerId == block.PlayerId)
+                    {
+                        block.NuggetState.HealTargetId = healTarget.Id;
+                        block.NuggetState.FortifyTargetPos = null;
+                        block.MoveTarget = cmd.TargetPos.Value;
+                    }
+                }
+                break;
+
+            case CommandType.FortifyWithNugget:
+                if (block.Type == BlockType.Nugget && block.NuggetState is { IsMined: true }
+                    && cmd.TargetPos.HasValue)
+                {
+                    var fortifyTarget = GetBlockAt(cmd.TargetPos.Value);
+                    if (fortifyTarget != null
+                        && fortifyTarget.Type == BlockType.Wall
+                        && fortifyTarget.PlayerId == block.PlayerId)
+                    {
+                        block.NuggetState.FortifyTargetPos = cmd.TargetPos.Value;
+                        block.NuggetState.HealTargetId = null;
+                        block.MoveTarget = cmd.TargetPos.Value;
+                    }
                 }
                 break;
         }
@@ -363,6 +440,12 @@ public class GameState
                 }
                 return true;
 
+            case CommandType.MineNugget:
+            case CommandType.HealWithNugget:
+            case CommandType.FortifyWithNugget:
+                ExecuteCommand(block, cmd);
+                return true;
+
             default:
                 return true; // Unknown — consume
         }
@@ -429,6 +512,24 @@ public class GameState
             case CommandType.ConvertToWall:
                 VisualEvents.Add(new VisualEvent(VisualEventType.CommandWallIssued,
                     block.Pos, block.PlayerId, BlockId: block.Id));
+                break;
+
+            case CommandType.MineNugget:
+                if (cmd.TargetPos.HasValue)
+                    VisualEvents.Add(new VisualEvent(VisualEventType.CommandMineIssued,
+                        block.Pos, block.PlayerId, BlockId: block.Id));
+                break;
+
+            case CommandType.HealWithNugget:
+                if (cmd.TargetPos.HasValue)
+                    VisualEvents.Add(new VisualEvent(VisualEventType.CommandHealIssued,
+                        block.Pos, block.PlayerId, BlockId: block.Id));
+                break;
+
+            case CommandType.FortifyWithNugget:
+                if (cmd.TargetPos.HasValue)
+                    VisualEvents.Add(new VisualEvent(VisualEventType.CommandFortifyIssued,
+                        block.Pos, block.PlayerId, BlockId: block.Id));
                 break;
         }
     }

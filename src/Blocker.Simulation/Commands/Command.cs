@@ -14,9 +14,12 @@ public enum CommandType
     TogglePush,   // Rooted Builder toggles push mode (G key + direction)
     MagnetPull,   // Rooted Warden pulls nearby enemies (D key)
     Jump,         // Jumper jumps in cardinal direction (F key + direction)
-    AttackMove,   // Move toward target, engage enemies en route (A key + click)
-    Surrender,    // Player-level: marks the issuing player as eliminated. BlockIds is empty.
-    ToggleSpawn,  // Player-level: toggle spawn for a unit type. UnitType field required.
+    AttackMove,         // Move toward target, engage enemies en route (A key + click)
+    Surrender,          // Player-level: marks the issuing player as eliminated. BlockIds is empty.
+    ToggleSpawn,        // Player-level: toggle spawn for a unit type. UnitType field required.
+    MineNugget,         // Builder mines an unmined nugget
+    HealWithNugget,     // Nugget heals a damaged soldier/jumper
+    FortifyWithNugget,  // Nugget fortifies walls
 }
 
 public record Command(
