@@ -164,4 +164,86 @@ public class NuggetTests
 
         Assert.Null(state.GetBlock(nugget.Id));
     }
+
+    // --- Part E: NuggetSystem — Mining ---
+
+    [Fact]
+    public void Mining_OneBuilder_AdvancesProgress()
+    {
+        var state = CreateState();
+        var nugget = state.AddBlock(BlockType.Nugget, -1, new GridPos(5, 5));
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 4));
+        builder.MiningTargetId = nugget.Id;
+        nugget.PlayerId = 0; // Mining has started
+
+        NuggetSystem.Tick(state);
+
+        Assert.Equal(1, nugget.NuggetState!.MiningProgress);
+    }
+
+    [Fact]
+    public void Mining_TwoBuilders_AdvancesFaster()
+    {
+        var state = CreateState();
+        var nugget = state.AddBlock(BlockType.Nugget, -1, new GridPos(5, 5));
+        var b1 = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 4));
+        var b2 = state.AddBlock(BlockType.Builder, 0, new GridPos(6, 5));
+        b1.MiningTargetId = nugget.Id;
+        b2.MiningTargetId = nugget.Id;
+        nugget.PlayerId = 0;
+
+        NuggetSystem.Tick(state);
+
+        Assert.Equal(2, nugget.NuggetState!.MiningProgress);
+    }
+
+    [Fact]
+    public void Mining_NonAdjacentBuilder_DoesNotCount()
+    {
+        var state = CreateState();
+        var nugget = state.AddBlock(BlockType.Nugget, -1, new GridPos(5, 5));
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 3)); // 2 cells away
+        builder.MiningTargetId = nugget.Id;
+        nugget.PlayerId = 0;
+
+        NuggetSystem.Tick(state);
+
+        Assert.Equal(0, nugget.NuggetState!.MiningProgress);
+    }
+
+    [Fact]
+    public void Mining_CompletesAndFreesNugget()
+    {
+        var state = CreateState();
+        var nugget = state.AddBlock(BlockType.Nugget, -1, new GridPos(5, 5));
+        nugget.NuggetState!.MiningProgress = Constants.NuggetMiningTicks - 1;
+        nugget.PlayerId = 0;
+
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 4));
+        builder.MiningTargetId = nugget.Id;
+
+        NuggetSystem.Tick(state);
+
+        Assert.True(nugget.NuggetState.IsMined);
+        Assert.Equal(0, nugget.PlayerId);
+        Assert.False(nugget.IsImmobile);
+    }
+
+    [Fact]
+    public void Mining_ExclusiveToOneTeam()
+    {
+        var state = CreateState();
+        var nugget = state.AddBlock(BlockType.Nugget, -1, new GridPos(5, 5));
+        nugget.PlayerId = 0; // Team 0 started mining
+
+        var b0 = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 4));
+        b0.MiningTargetId = nugget.Id;
+
+        var b1 = state.AddBlock(BlockType.Builder, 1, new GridPos(6, 5));
+        b1.MiningTargetId = nugget.Id;
+
+        NuggetSystem.Tick(state);
+
+        Assert.Equal(1, nugget.NuggetState!.MiningProgress);
+    }
 }

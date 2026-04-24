@@ -7,7 +7,7 @@ public class Block
 {
     public int Id { get; init; }
     public BlockType Type { get; set; }
-    public int PlayerId { get; init; }
+    public int PlayerId { get; set; }
 
     // Position
     public GridPos Pos { get; set; }
