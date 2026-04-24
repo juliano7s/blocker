@@ -246,4 +246,49 @@ public class NuggetTests
 
         Assert.Equal(1, nugget.NuggetState!.MiningProgress);
     }
+
+    // --- Part F: NuggetSystem — Capture ---
+
+    [Fact]
+    public void Capture_EnemyBuilderAdjacent_FlipsOwnership()
+    {
+        var state = CreateState();
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(5, 5));
+        nugget.NuggetState!.IsMined = true;
+
+        state.AddBlock(BlockType.Builder, 1, new GridPos(5, 4));
+
+        NuggetSystem.Tick(state);
+
+        Assert.Equal(1, nugget.PlayerId);
+    }
+
+    [Fact]
+    public void Capture_Contested_DoesNotFlip()
+    {
+        var state = CreateState();
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(5, 5));
+        nugget.NuggetState!.IsMined = true;
+
+        state.AddBlock(BlockType.Builder, 1, new GridPos(5, 4));
+        state.AddBlock(BlockType.Builder, 0, new GridPos(6, 5));
+
+        NuggetSystem.Tick(state);
+
+        Assert.Equal(0, nugget.PlayerId);
+    }
+
+    [Fact]
+    public void Capture_NonBuilderAdjacent_DoesNotCapture()
+    {
+        var state = CreateState();
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(5, 5));
+        nugget.NuggetState!.IsMined = true;
+
+        state.AddBlock(BlockType.Soldier, 1, new GridPos(5, 4));
+
+        NuggetSystem.Tick(state);
+
+        Assert.Equal(0, nugget.PlayerId);
+    }
 }

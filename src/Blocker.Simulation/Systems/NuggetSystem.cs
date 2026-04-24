@@ -64,7 +64,44 @@ public static class NuggetSystem
 
     private static void TickCapture(GameState state)
     {
-        // Implemented in Task 7
+        foreach (var block in state.Blocks)
+        {
+            if (block.Type != BlockType.Nugget) continue;
+            if (block.NuggetState is not { IsMined: true }) continue;
+
+            bool hasEnemyBuilder = false;
+            int enemyPlayerId = -1;
+            bool hasFriendlyBuilder = false;
+
+            foreach (var offset in GridPos.OrthogonalOffsets)
+            {
+                var neighbor = state.GetBlockAt(block.Pos + offset);
+                if (neighbor == null || neighbor.Type != BlockType.Builder) continue;
+
+                if (state.AreEnemies(neighbor.PlayerId, block.PlayerId))
+                {
+                    hasEnemyBuilder = true;
+                    enemyPlayerId = neighbor.PlayerId;
+                }
+                else
+                {
+                    hasFriendlyBuilder = true;
+                }
+            }
+
+            if (hasEnemyBuilder && !hasFriendlyBuilder)
+            {
+                block.PlayerId = enemyPlayerId;
+                block.MoveTarget = null;
+                block.NuggetState.HealTargetId = null;
+                block.NuggetState.FortifyTargetPos = null;
+
+                state.VisualEvents.Add(new VisualEvent(
+                    VisualEventType.NuggetCaptured, block.Pos, enemyPlayerId, BlockId: block.Id));
+
+                SetAutoRallyTarget(state, block);
+            }
+        }
     }
 
     private static void TickAutoRally(GameState state)
