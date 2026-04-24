@@ -89,7 +89,8 @@ public class GameState
                 BlockType.Soldier => Constants.SoldierMaxHp,
                 BlockType.Jumper => Constants.JumperMaxHp,
                 _ => 0
-            }
+            },
+            NuggetState = type == BlockType.Nugget ? new NuggetState() : null
         };
         Blocks.Add(block);
         _blockById[block.Id] = block;
