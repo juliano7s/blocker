@@ -107,4 +107,25 @@ public class CommandSerializerTests
 
         Assert.Null(output.Commands[0].UnitType);
     }
+
+    [Fact]
+    public void MineNugget_Command_Roundtrips()
+    {
+        var input = new TickCommands(
+            PlayerId: 0,
+            Tick: 10,
+            Commands: new[]
+            {
+                new Command(0, CommandType.MineNugget, new List<int> { 1, 2 },
+                    TargetPos: new GridPos(5, 5)),
+            });
+
+        var bytes = CommandSerializer.Serialize(input);
+        var output = CommandSerializer.Deserialize(bytes);
+
+        Assert.Single(output.Commands);
+        Assert.Equal(CommandType.MineNugget, output.Commands[0].Type);
+        Assert.Equal(new GridPos(5, 5), output.Commands[0].TargetPos);
+        Assert.Equal(new List<int> { 1, 2 }, output.Commands[0].BlockIds);
+    }
 }

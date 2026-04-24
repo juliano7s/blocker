@@ -490,4 +490,45 @@ public class NuggetTests
         Assert.Equal(1, freeBuilders);
         Assert.False(nest.NuggetLoaded);
     }
+
+    // --- Part L: Full Lifecycle ---
+
+    [Fact]
+    public void FullLifecycle_MineToRefine()
+    {
+        var state = CreateState();
+        var nest = SetupBuilderNest(state, 0, new GridPos(10, 10));
+
+        // Place nugget adjacent to a miner builder
+        var nugget = state.AddBlock(BlockType.Nugget, -1, new GridPos(5, 5));
+
+        // Place builder adjacent and assign mining
+        var miner = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 4));
+        miner.MiningTargetId = nugget.Id;
+        nugget.PlayerId = 0;
+
+        // Set progress to 1 tick away from completion
+        nugget.NuggetState!.MiningProgress = Constants.NuggetMiningTicks - 1;
+
+        // Tick to complete mining
+        NuggetSystem.Tick(state);
+
+        Assert.True(nugget.NuggetState.IsMined);
+        Assert.Null(miner.MiningTargetId);
+        // Auto-rally should have set a move target toward the nest
+        Assert.True(nugget.MoveTarget.HasValue);
+
+        // Manually place nugget within refine radius of nest
+        state.Grid[nugget.Pos].BlockId = null;
+        nugget.Pos = new GridPos(10, 12); // Chebyshev distance 2 from nest center (10,10)
+        state.Grid[nugget.Pos].BlockId = nugget.Id;
+        nugget.MoveTarget = null; // Arrived
+
+        // Tick again — nugget should be consumed by nest refine
+        int progressBefore = nest.SpawnProgress;
+        NuggetSystem.Tick(state);
+
+        Assert.Null(state.GetBlock(nugget.Id));
+        Assert.True(nest.SpawnProgress > progressBefore);
+    }
 }

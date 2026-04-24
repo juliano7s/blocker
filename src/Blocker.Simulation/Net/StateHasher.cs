@@ -53,6 +53,14 @@ public static class StateHasher
                 MixI32(ref h, b.MoveTarget.Value.X);
                 MixI32(ref h, b.MoveTarget.Value.Y);
             }
+            MixI32(ref h, b.NuggetState != null ? 1 : 0);
+            if (b.NuggetState != null)
+            {
+                MixI32(ref h, b.NuggetState.IsMined ? 1 : 0);
+                MixI32(ref h, b.NuggetState.MiningProgress);
+            }
+            MixI32(ref h, b.MiningTargetId ?? 0);
+            MixI32(ref h, b.FortifiedHp);
         }
 
         // Nests — sorted by Id
@@ -67,6 +75,7 @@ public static class StateHasher
             MixI32(ref h, n.SpawnProgress);
             MixI32(ref h, n.TeardownTimer);
             MixI32(ref h, n.IsPaused ? 1 : 0);
+            MixI32(ref h, n.NuggetLoaded ? 1 : 0);
         }
 
         // Towers — sorted by Id

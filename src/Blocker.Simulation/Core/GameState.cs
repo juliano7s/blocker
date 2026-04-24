@@ -624,6 +624,9 @@ public class GameState
         // Steps 7-8: Push fire + wave advance
         PushSystem.Tick(this);
 
+        // Step 8.5: Nugget system — mining, consumption, capture, auto-rally
+        NuggetSystem.Tick(this);
+
         // Step 9: Command queues — process player commands
         if (commands != null)
             ProcessCommands(commands);
