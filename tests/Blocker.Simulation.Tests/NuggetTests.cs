@@ -445,4 +445,49 @@ public class NuggetTests
 
         Assert.Equal(Constants.FortifiedWallHp, wall.FortifiedHp);
     }
+
+    // --- Part K: NestSystem — Nugget Required ---
+
+    [Fact]
+    public void NestSystem_NuggetRequired_BlocksSpawnWithoutNugget()
+    {
+        Constants.Initialize(new SimulationConfig
+        {
+            Nugget = new NuggetConfig { BuilderRequired = true }
+        });
+
+        var state = CreateState();
+        var nest = SetupBuilderNest(state, 0, new GridPos(10, 10));
+
+        var ground = state.Grid[nest.Center].Ground;
+        nest.SpawnProgress = nest.GetSpawnTicks(ground) - 1;
+
+        NestSystem.TickSpawning(state);
+
+        int freeBuilders = state.Blocks.Count(b => b.Type == BlockType.Builder && b.PlayerId == 0 && !b.IsInFormation);
+        Assert.Equal(0, freeBuilders);
+        Assert.Equal(nest.GetSpawnTicks(ground), nest.SpawnProgress);
+    }
+
+    [Fact]
+    public void NestSystem_NuggetRequired_SpawnsWithNuggetLoaded()
+    {
+        Constants.Initialize(new SimulationConfig
+        {
+            Nugget = new NuggetConfig { BuilderRequired = true }
+        });
+
+        var state = CreateState();
+        var nest = SetupBuilderNest(state, 0, new GridPos(10, 10));
+        nest.NuggetLoaded = true;
+
+        var ground = state.Grid[nest.Center].Ground;
+        nest.SpawnProgress = nest.GetSpawnTicks(ground) - 1;
+
+        NestSystem.TickSpawning(state);
+
+        int freeBuilders = state.Blocks.Count(b => b.Type == BlockType.Builder && b.PlayerId == 0 && !b.IsInFormation);
+        Assert.Equal(1, freeBuilders);
+        Assert.False(nest.NuggetLoaded);
+    }
 }

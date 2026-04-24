@@ -75,6 +75,13 @@ public static class NestSystem
                     continue;
                 }
 
+                // Nugget-required check — hold at threshold until a nugget is loaded
+                if (Constants.Config.GetNuggetRequired(spawnType) && !nest.NuggetLoaded)
+                {
+                    nest.SpawnProgress = spawnTicks;
+                    continue;
+                }
+
                 // Find spawn cell: center first, then BFS outward up to 3 cells
                 var spawnPos = FindSpawnCell(state, nest.Center);
                 if (!spawnPos.HasValue)
@@ -107,6 +114,7 @@ public static class NestSystem
                     VisualEventType.BlockSpawned, spawnPos.Value, nest.PlayerId, BlockId: spawned.Id));
 
                 nest.SpawnProgress = 0;
+                nest.NuggetLoaded = false;
             }
         }
     }
