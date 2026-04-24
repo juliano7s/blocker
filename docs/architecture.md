@@ -18,7 +18,7 @@ Three strictly separated layers. No game logic in Godot scripts — only present
 │  spawning, push, abilities, ticks   │  All game rules live here
 ├─────────────────────────────────────┤
 │  Networking Layer (Pure C#)         │  Lockstep sync, command relay
-│  WebSocket/UDP client, hash verify  │  Replay recording/playback
+│  WebSocket/UDP client, hash verify  │  Replay recording (planned)
 └─────────────────────────────────────┘
 ```
 
@@ -56,36 +56,36 @@ public class GameState
     public List<Player> Players { get; }
     public List<Formation> Formations { get; }
     public List<Nest> Nests { get; }
-    public List<VisualEvent> VisualEvents { get; }  // Consumed by rendering each frame
+    public List<VisualEvent> VisualEvents { get; }
     public int TickNumber { get; }
 
     /// Advance simulation by one tick. All game rules resolve here.
-    /// Commands are validated before application.
     public void Tick(List<Command> commands);
+
+    /// Command entry point and queue processing.
+    public void ProcessCommands(List<Command> commands);
 
     /// FNV-1a hash of full state for desync detection.
     public ulong GetStateHash();
 }
 ```
 
-Tick resolution follows the exact order from game bible Section 14:
+Tick resolution order (`GameState.Tick`):
 
-1. Clear push flags
-2. Formations — root/uproot progress, pattern detection, nest upgrades
-3. Stun Towers — fire stun rays in sweep cycle
-4. Soldier Towers — fire blast rays
-5. Stun — advance ray heads, apply effects, decay cooldowns
-6. Variant cooldowns — Jumper jump, Warden pull
-7. Push fire — rooted Builders fire new push waves
-8. Push waves — advance wave heads, displace blocks
-9. Command queues — pop and execute front command per block
-10. Warden ZoC — compute slow fields
-11. Snap prevPos — store for interpolation
-12. Movement — per-type intervals
-13. Combat — surrounding + soldier kills + HP decay
-14. Spawning — nest timers, spawn blocks
-15. Death effects — emit VisualEvents for dying blocks
-16. Increment tick
+1. Clear push and jump flags
+2. Formations — `RootingSystem`, `NestSystem`, `FormationSystem`
+3. Towers — `TowerSystem` (Stun/Blast fire)
+4. Stun — `StunSystem` (Advance rays, apply effects)
+5. Cooldown decay — Jumper jump, Stunner fire, Warden pull
+6. Push — `PushSystem` (Fire waves + advance)
+7. Commands — `ProcessCommands` executes or queues actions
+8. Warden ZoC — `WardenSystem.UpdateZoC`
+9. Snap `prevPos` — for rendering interpolation
+10. Movement — `PathfindingSystem.GetNextStep` + `TryMoveBlock`
+11. Combat — `CombatSystem` (Surrounding + Soldier kills)
+12. Spawning — `NestSystem.TickSpawning`
+13. Elimination check — `EliminationSystem`
+14. Increment tick
 
 ### 2.3 Command System
 
@@ -93,36 +93,28 @@ Tick resolution follows the exact order from game bible Section 14:
 public record Command(
     int PlayerId,
     CommandType Type,
-    List<int> BlockIds,     // Target blocks
-    GridPos? TargetPos,     // For move, jump aim, etc.
-    Direction? Direction    // For stun ray, push, etc.
+    List<int> BlockIds,
+    GridPos? TargetPos = null,
+    Direction? Direction = null,
+    bool Queue = false,
+    BlockType? UnitType = null
 );
 
 public enum CommandType
 {
-    Move, AttackMove, Root, Uproot, ConvertToWall,
-    FireStunRay, TogglePush, SelfDestruct, MagnetPull,
-    JumpAim, JumpExecute, CreateTower, AssignControlGroup,
-    SelectControlGroup, BlueprintPlace
+    Move, Root, ConvertToWall, FireStunRay, SelfDestruct,
+    CreateTower, TogglePush, MagnetPull, Jump, AttackMove,
+    Surrender, ToggleSpawn
 }
 ```
 
-Commands are validated inside `Tick()` — invalid commands (wrong owner, dead block, on cooldown) are silently dropped. This is important for lockstep: all clients must process identical command lists, so validation must be deterministic.
+Commands are processed in `GameState.ProcessCommands`. Immediate commands clear the `Block.CommandQueue`; queued commands (Shift+action) append to it.
 
 ### 2.4 Visual Events
 
-The simulation emits `VisualEvent` structs each tick to inform rendering of cosmetic triggers. These are one-shot notifications — rendering consumes them and spawns effects.
+One-shot notifications emitted by the simulation for the rendering layer.
 
 ```csharp
-public record VisualEvent(
-    VisualEventType Type,
-    GridPos Position,
-    int? PlayerId,
-    Direction? Direction,
-    int? Range,
-    int? BlockId
-);
-
 public enum VisualEventType
 {
     BlockMoved, BlockDied, BlockSpawned, BlockRooted, BlockUprooted,
@@ -130,61 +122,44 @@ public enum VisualEventType
     PushWaveFired, JumpExecuted, JumpLanded, MagnetPulled,
     SelfDestructed, FormationFormed, FormationDissolved,
     NestSpawned, TowerFired, PlayerEliminated, GameOver,
-    CommandMoveIssued, CommandRootIssued, CommandUprootIssued
+    CommandMoveIssued, CommandRootIssued, CommandUprootIssued,
+    WallDamaged, WallDestroyed
 }
 ```
 
-### 2.5 Project Structure
+### 2.5 Project Structure (Simulation)
 
 ```
 src/Blocker.Simulation/
-├── Blocker.Simulation.csproj
 ├── Core/
-│   ├── GameState.cs          — Top-level state + Tick()
-│   ├── Grid.cs               — 2D grid, cell access
-│   ├── Cell.cs               — Ground type + block ref
-│   ├── Block.cs              — All block state
+│   ├── GameState.cs          — Top-level state + Tick() + Command processing
+│   ├── Grid.cs               — 2D grid logic
+│   ├── Cell.cs               — Ground + block reference
+│   ├── Block.cs              — Unit state + CommandQueue property
 │   ├── Player.cs             — Player + team info
-│   ├── SimulationTicker.cs   — Orchestrator for accumulator math & timing
-│   └── Constants.cs          — All game constants (Section 18)
+│   ├── SimulationTicker.cs   — Accumulator math & timing logic
+│   ├── SimulationConfig.cs   — Configurable constants
+│   ├── Constants.cs          — Static accessor for active config
+│   └── Direction.cs          — Cardinal direction enum/helpers
 ├── Blocks/
-│   ├── BlockType.cs          — Enum: Builder, Wall, Soldier, Stunner, Warden, Jumper
-│   ├── Movement.cs           — Per-type move intervals, pathfinding
-│   ├── Rooting.cs            — Root/uproot state machine
-│   └── Health.cs             — HP tracking for Soldier/Jumper
-├── Combat/
-│   ├── Surrounding.cs        — 3-ortho, 2+2, 2+1diag rules
-│   ├── SoldierKills.cs       — Adjacency kill thresholds
-│   └── NeutralObstacles.cs   — Breakable/Fragile wall logic
-├── Economy/
-│   ├── NestDetection.cs      — Pattern matching for nest formation
-│   ├── Spawning.cs           — Spawn timers, congestion BFS, pop cap
-│   └── NestUpgrade.cs        — Auto-upgrade Builder→Soldier nest
-├── Formations/
-│   ├── FormationDetection.cs — Pattern matching for non-nest formations
-│   ├── StunTower.cs          — Sweep fire cycle, ray logic
-│   ├── SoldierTower.cs       — Simultaneous blast fire
-│   ├── SupplyFormation.cs    — L-shape wall detection, pop cap bonus
-│   └── Dissolution.cs        — Instant vs TearingDown paths
-├── Abilities/
-│   ├── StunRay.cs            — Ray advance, range, LOS blocking
-│   ├── Push.cs               — Wave fire, chain push, two-cell hit zone
-│   ├── Jump.cs               — Range, combo, HP loss, ZoC block
-│   ├── MagnetPull.cs         — Chebyshev radius pull
-│   └── SelfDestruct.cs       — Blast ray in 8 directions
+│   ├── BlockType.cs          — Unit type enum
+│   └── BlockState.cs         — Mobile/Rooting/Rooted/Uprooting enum
+├── Systems/                  — Pure functional game rule modules
+│   ├── CombatSystem.cs       ├── EliminationSystem.cs  ├── ExplosionSystem.cs
+│   ├── FormationSystem.cs    ├── JumperSystem.cs       ├── NestSystem.cs
+│   ├── PathfindingSystem.cs  ├── PushSystem.cs         ├── RootingSystem.cs
+│   ├── StunSystem.cs         ├── TowerSystem.cs        └── WardenSystem.cs
 ├── Commands/
-│   ├── CommandType.cs        — Command enum
-│   ├── Command.cs            — Command record
-│   ├── CommandQueue.cs       — Per-block queue, shift-append, auto-chain
-│   └── CommandValidator.cs   — Deterministic validation
+│   ├── Command.cs            — Command & QueuedCommand records
+│   └── CommandSerializer.cs  — Binary serialization for net/replay
 ├── Maps/
-│   ├── MapLoader.cs          — Parse text format → Grid
-│   └── MapFormat.cs          — Cell char mappings (Section 15.2)
+│   ├── MapLoader.cs          — JSON/Text parser
+│   ├── MapData.cs            — Map record definition
+│   └── SlotAssignment.cs     — Map slot mapping
 └── Net/
-    ├── LockstepManager.cs    — Collect commands, wait for all players, advance
-    ├── StateHash.cs          — FNV-1a hash of GameState
-    ├── CommandSerializer.cs  — Binary serialization for network + replay
-    └── ReplayRecorder.cs     — Record/playback command logs
+    ├── LockstepCoordinator.cs— Lockstep sync management
+    ├── StateHasher.cs        — FNV-1a hashing
+    └── Protocol.cs           — Binary wire protocol
 ```
 
 ---
@@ -193,204 +168,68 @@ src/Blocker.Simulation/
 
 ### 3.1 Tick Runner
 
-Godot drives ticks from `_Process()`, delegating the core accumulator and timing logic to `SimulationTicker` in the pure C# layer to ensure untethered testability and lockstep consistency.
-
-```csharp
-public partial class TickRunner : Node
-{
-    private SimulationTicker? _ticker;
-
-    public override void _Process(double delta)
-    {
-        _ticker?.ProcessFrame(delta);
-    }
-}
-```
-
-For networked play, `MultiplayerTickRunner` relies on `LockstepCoordinator` where the tick only fires when all players' commands for that tick have arrived. Both runners share the same underlying `SimulationTicker` logic to guarantee deterministic execution and frame-level guards (like accumulator drift capping).
+`TickRunner.cs` and `MultiplayerTickRunner.cs` drive the simulation. They use `SimulationTicker` to manage the timing accumulator.
 
 ### 3.2 Rendering
 
-Renderers read `GameState` every frame, not every tick. This enables smooth interpolation.
+`GridRenderer.cs` (partial class) handles all 2D drawing. 
+- `GridRenderer.Blocks.cs`: Block visuals, stripes, rooting.
+- `GridRenderer.Formations.cs`: Formation borders and diamonds.
+- `GridRenderer.Effects.cs`: Ray visuals and grid effects.
+- `GridRenderer.Selection.cs`: Selection boxes and paths.
 
-```csharp
-public partial class BlockRenderer : Node2D
-{
-    public override void _Process(double delta)
-    {
-        float t = (float)(_tickRunner.Accumulator / _tickRunner.TickInterval);
-        foreach (var block in _gameState.Blocks)
-        {
-            var visual = GetOrCreateVisual(block.Id);
-            visual.Position = Lerp(block.PrevPos, block.Pos, t) * CellSize;
-            visual.UpdateAppearance(block);  // rooting state, HP, stun, etc.
-        }
-    }
-}
-```
+`EffectManager.cs` consumes `VisualEvents` to spawn one-shot scenes like `DeathEffect.tscn`.
 
-Visual effects (lightning, death, stun rays) are handled by `EffectManager`, which consumes `GameState.VisualEvents` after each tick and spawns Godot particle/shader nodes.
+### 3.3 Selection and Input
 
-### 3.3 Input Translation
+`SelectionManager.cs` is the primary input gateway, split into:
+- `SelectionManager.Input.cs`: Captures Mouse/Key events.
+- `SelectionManager.Commands.cs`: Builds and sends `Command` objects to the simulation.
+- `SelectionManager.Drawing.cs`: Gizmos and previews.
 
-```
-Godot InputEvent
-  → InputTranslator determines context (selection, ability, movement)
-  → Builds Command(type, blockIds, target, direction)
-  → Queues command for next tick
-```
-
-Selection state (which blocks are selected, control groups, drag rect) lives in the Godot layer — it's UI state, not simulation state.
-
-### 3.4 Project Structure
+### 3.4 Project Structure (Godot)
 
 ```
 godot/
-├── project.godot
-├── Blocker.Game.csproj              — References ../src/Blocker.Simulation
 ├── Scenes/
-│   ├── Main.tscn                    — Entry scene, bootstraps game or menu
-│   ├── Game/
-│   │   ├── GameBoard.tscn           — Grid + blocks + effects container
-│   │   └── GameCamera.tscn          — Camera2D with edge scroll, zoom
-│   ├── Blocks/
-│   │   ├── BlockVisual.tscn         — Base block scene (colored square)
-│   │   ├── BuilderVisual.tscn       — Builder-specific inner detail
-│   │   ├── SoldierVisual.tscn       — Spinning sword arms
-│   │   ├── StunnerVisual.tscn       — Diamond spin
-│   │   ├── WardenVisual.tscn        — Shield pulse
-│   │   ├── JumperVisual.tscn        — Lava ball gradient
-│   │   └── WallVisual.tscn          — Static square
-│   ├── Effects/
-│   │   ├── Lightning.tscn           — Grid lightning system
-│   │   ├── DeathEffect.tscn         — Inflation + brick explosion
-│   │   ├── StunRayEffect.tscn       — Traveling pulse wave
-│   │   ├── PushWaveEffect.tscn      — Double chevron
-│   │   ├── JumpTrailEffect.tscn     — Core streak + embers
-│   │   ├── FrostOverlay.tscn        — Stun visual overlay
-│   │   └── WardenZocEffect.tscn     — Expanding pulse ring
-│   ├── UI/
-│   │   ├── HUD.tscn                 — Pop display, block bar, selection info
-│   │   ├── Minimap.tscn             — Bottom-right minimap
-│   │   ├── MainMenu.tscn            — Title, play, settings
-│   │   ├── Lobby.tscn               — Multiplayer lobby
-│   │   └── Chat.tscn                — In-game chat overlay
-│   └── Audio/
-│       └── AudioManager.tscn        — AudioStreamPlayer pool
+│   ├── Main.tscn                    — Entry point
+│   ├── MapEditor.tscn               — Level editor
+│   └── Game/                        — Container for gameboard scenes
 ├── Scripts/
 │   ├── Game/
-│   │   ├── TickRunner.cs            — _Process tick accumulator
-│   │   ├── GameManager.cs           — Setup, teardown, mode switching
-│   │   └── InputTranslator.cs       — InputEvent → Command
+│   │   ├── TickRunner.cs            — Local tick driver
+│   │   └── GameManager.cs           — Setup & teardown
 │   ├── Rendering/
-│   │   ├── GridRenderer.cs          — Draw grid lines, ground types
-│   │   ├── BlockRenderer.cs         — Per-block visuals + interpolation
-│   │   ├── EffectManager.cs         — Consumes VisualEvents, spawns effects
-│   │   └── PostProcessing.cs        — Bloom, kill flash
+│   │   ├── GridRenderer.cs          — Partial class drawing engine
+│   │   ├── SpriteFactory.cs         — Sprite/texture management
+│   │   └── EffectManager.cs         — VisualEvent consumer
 │   ├── Input/
-│   │   ├── SelectionManager.cs      — Click, drag, modes (partial class)
-│   │   ├── SelectionManager.Input.cs— Translates events to actions
-│   │   ├── SelectionManager.Commands.cs — Builds and emits Commands
-│   │   ├── SelectionManager.Drawing.cs  — Draws gizmos, previews, paths
-│   │   ├── SelectionState.cs        — Pure C# selection & control group state
-│   │   ├── CommandAction.cs         — Enum for UI command mappings
-│   │   ├── CameraController.cs      — Edge scroll, zoom, arrow keys
-│   │   └── CursorManager.cs         — OS-level cursor confinement
-│   ├── UI/
-│   │   ├── HudController.cs         — Population, selection info, keybind hints
-│   │   ├── MinimapController.cs     — Minimap rendering + click-to-jump
-│   │   ├── LobbyController.cs       — Lobby UI logic
-│   │   └── ChatController.cs        — Chat messages
-│   └── Audio/
-│       ├── AudioManager.cs          — Event → sound mapping, pooling
-│       └── MusicManager.cs          — Background music, adaptive layers
+│   │   ├── SelectionManager.cs      — Partial class input hub
+│   │   └── SelectionState.cs        — UI selection logic
+│   └── UI/
+│       ├── HudOverlay.cs            — HUD & command card
+│       └── MinimapPanel.cs          — Overview navigation
 ├── Assets/
-│   ├── Sprites/                     — Optional PNGs (procedural fallback exists)
-│   ├── Shaders/
-│   │   ├── lightning.gdshader       — Multi-pass lightning bloom
-│   │   ├── frost.gdshader           — Ice overlay for stunned blocks
-│   │   ├── bloom.gdshader           — Post-processing bloom
-│   │   └── glow.gdshader            — Radial glow for wardens, stunners
-│   ├── Audio/                       — .wav/.ogg sound files
-│   └── Fonts/
-└── Resources/                       — .tres (themes, materials, palettes)
+│   ├── Maps/                        — Map JSON files
+│   ├── Shaders/                     — Visual shaders
+│   └── Audio/                       — Sound files
+└── Maps/                            — Map storage
 ```
-
-### 3.5 Content Pipeline
-
-**Procedural first**: Every visual (blocks, effects, animations) has a code-drawn procedural implementation. The game is fully playable with zero art assets. This matches the game bible's "procedural fallback" strategy.
-
-**Sprites as optional upgrade**: Drop PNGs in `Assets/Sprites/`. Block renderers check for sprite existence and use it if available, otherwise draw procedurally.
-
-**Audio**: `.wav`/`.ogg` files in `Assets/Audio/`. `AudioManager` maps `VisualEventType` → audio streams. Missing audio files produce no sound (no crash).
-
-**Shaders**: `.gdshader` files for lightning bloom, frost overlay, glow effects. These enhance the procedural visuals — they're not replacements.
 
 ---
 
-## 4. Networking
+## 4. Data Life Cycle (The Handshakes)
 
-### 4.1 Lockstep Flow
+### 4.1 Input → Simulation
+1. **Trigger**: User performs action.
+2. **Translate**: `SelectionManager.Commands.cs` builds a `Command`.
+3. **Buffer**: `LockstepCoordinator` handles local/network delay.
+4. **Execute**: `GameState.ProcessCommands` validates and clears/appends to `Block.CommandQueue`.
 
-```
-Tick N:
-  1. Local player inputs → Command list for tick N+InputDelay
-  2. Send commands to relay via WebSocket (binary)
-  3. Relay fans out commands to all peers in the room
-  4. LockstepCoordinator buffers until all active players submit for tick N
-  5. GameState.Tick(mergedCommands) — identical on all clients
-  6. Exchange FNV-1a state hashes — majority-vote desync detection
-```
-
-Input delay: 1 tick (fixed in M1/M2). Coordinator FSM: Lobby → Running → Stalled/Desynced/Ended.
-
-### 4.2 Relay Server
-
-C# `HttpListener`-based WebSocket relay (`src/Blocker.Relay/`). No game logic — opaque message fan-out. Deployed via systemd + nginx on DigitalOcean.
-
-Key concepts: rooms (4-char code, up to 6 slots), room lifecycle (Lobby → Playing → Lobby on rematch), token-bucket rate limiting per connection, protocol version handshake on Hello.
-
-Wire protocol: hand-rolled binary, defined in `Protocol.cs`. Ranges: 0x00-0x0F session, 0x10-0x1F tick traffic, 0x20-0x2F diagnostics.
-
-### 4.3 Replay System
-
-Not yet implemented. Design: record command logs per tick, replay deterministically.
-
----
-
-## 5. Map Format
-
-JSON-based (`MapData` record). Maps live in `godot/Maps/` and `maps/`. Loaded by `MapLoader` in the simulation layer via `MapFileManager` on the Godot side.
-
-A map defines: name, dimensions, slot count, ground layer, terrain layer, and unit placements per slot. The in-game map editor (`MapEditorScene`) reads and writes this format.
-
-Legacy text format (`.txt`) still supported by `MapLoader.LoadFromFile` for backwards compatibility.
-
----
-
-## 6. Solution Structure
-
-```
-blocker/
-├── blocker.sln                     — Solution: all three projects
-├── docs/
-│   ├── game-bible.md
-│   ├── godot-migration-design.md
-│   └── architecture.md             — This document
-├── src/
-│   └── Blocker.Simulation/
-│       └── Blocker.Simulation.csproj
-│   └── Blocker.Relay/
-│       └── Blocker.Relay.csproj
-├── tests/
-│   └── Blocker.Simulation.Tests/
-│       └── Blocker.Simulation.Tests.csproj  — xUnit, references Simulation
-├── godot/
-│   └── Blocker.Game.csproj         — References ../src/Blocker.Simulation
-└── CLAUDE.md
-```
-
-One `blocker.sln` at the root ties everything together. `dotnet test` runs simulation tests. Godot opens `godot/project.godot`.
+### 4.2 Simulation → Rendering
+1. **Trigger**: `System` resolves a rule and emits a `VisualEvent`.
+2. **Consume**: `EffectManager` polls `GameState.VisualEvents`.
+3. **Present**: Godot spawns a scene or `GridRenderer` updates a property.
 
 ---
 

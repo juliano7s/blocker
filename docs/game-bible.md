@@ -168,6 +168,27 @@ Mineable resource block. Adds strategic diversity — players decide how to allo
 - `FortifiedHp` absorbs stun ray hits (decrements instead of destroying). When 0, wall is normal again.
 - Default `FORTIFIED_WALL_HP = 3`. Affects 5 walls per nugget (target + 4 BFS-connected).
 
+### 4.7 Resource: Nugget
+
+Mineable blocks that provide powerful one-time bonuses for economy, combat, or defense.
+
+| Property | Value |
+|----------|-------|
+| Move speed | Normal (every 3 ticks) |
+| Pop cost | 0 |
+| HP | N/A (killed by blast rays only) |
+| Spawned from | Map editor placement only |
+
+**Lifecycle:**
+1. **Unmined**: Neutral, immobile, acts as a line-of-sight blocker.
+2. **Mining**: Builders right-click unmined nuggets to mine. Progress advances per builder per tick. Exclusive to one team at a time.
+3. **Freed**: Once mined, the nugget becomes a mobile unit. Auto-rallies to the nearest friendly nest.
+4. **Capture**: Enemy builders can capture freed nuggets if no friendly builders are adjacent to defend.
+5. **Consumption**: Removed from game to apply an effect:
+   - **Refine**: Auto-consumed near friendly Nests. Grants instant spawn progress (default: 100%).
+   - **Heal**: Right-click damaged Soldier/Jumper to restore to full HP.
+   - **Fortify**: Right-click friendly Wall to grant it `FortifiedHp` (survives 3 stun ray hits). Fortifies the target wall + 4 connected walls.
+
 ---
 
 ## 5. Combat

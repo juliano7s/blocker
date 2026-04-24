@@ -6,9 +6,15 @@ Blocker is a minimalist RTS where armies of blocks expand across a grid through 
 
 ## Design authority
 
+- **Wiki Index**: `docs/README.md` — The entry point for all current documentation and historical decisions.
 - **Game bible**: `docs/game-bible.md` — the authoritative game design reference. All mechanics, constants, visuals, and audio are defined here.
 - **Architecture**: `docs/architecture.md` — how the game bible maps to Godot. Layer separation, project structure, data flow.
-- **Migration strategy**: `docs/godot-migration-design.md` — why we moved to Godot, phased plan.
+
+## Wiki Maintenance (Mandatory)
+- **Read First**: Always start a new task by reading `docs/README.md` to establish context.
+- **Log Decisions**: For any non-trivial architectural change, append a entry to `docs/ADR.md`.
+- **Sync Architecture**: When a feature is finalized, ensure its "final state" is reflected in `docs/architecture.md`.
+- **Archive Plans**: Once a plan/spec in `docs/` is implemented, move it to `docs/archive/` and update the Wiki Index.
 
 When code and docs disagree, figure out which is wrong and fix it — but discuss first.
 
@@ -43,7 +49,7 @@ Three layers, strictly separated:
 
 ```
 Player input (Godot InputEvent)
-  → InputTranslator builds Command
+  → SelectionManager builds Command
   → Command queued for next tick (local) or sent to relay (networked)
   → Lockstep collects all players' commands for tick N
   → GameState.Tick(commands) advances simulation

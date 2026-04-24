@@ -39,6 +39,7 @@
  - Walls can be turned into gates, gates "lower" and allow units to pass. Player controls the lowering
 
 ## Current Issues
+ - Warden Magnet Pull: Currently only moves units one cell per pull. It should pull targets all the way (as close as possible) in a single action.
 
 # Hud
  - 1-9 -> control groups
