@@ -453,6 +453,17 @@ public partial class GridRenderer : Node2D
             case BlockType.Jumper:
                 DrawJumperAnimated(block, rect, center, palette, time);
                 break;
+
+            case BlockType.Nugget:
+            {
+                var sprite = SpriteFactory.GetSprite(BlockType.Nugget, block.PlayerId);
+                if (sprite != null)
+                    DrawTextureRect(sprite, rect, false);
+                else
+                    DrawSmoothGradientBody(rect, new Color(0.85f, 0.88f, 0.92f), new Color(0.95f, 0.95f, 1f), new Color(0.7f, 0.73f, 0.78f));
+                DrawNuggetDiamond(block, rect, center);
+                break;
+            }
         }
     }
 
@@ -792,6 +803,32 @@ public partial class GridRenderer : Node2D
 
         // Outer heat glow
         QueueGlowRadial(center, radius * 1.8f, palette.JumperPulseGlow with { A = 0.08f + 0.04f * pulse1 });
+    }
+
+    private void DrawNuggetDiamond(Block block, Rect2 rect, Vector2 center)
+    {
+        float d = rect.Size.X * 0.30f;
+        var pts = new Vector2[]
+        {
+            center + new Vector2(0, -d),
+            center + new Vector2(d, 0),
+            center + new Vector2(0, d),
+            center + new Vector2(-d, 0)
+        };
+
+        if (block.NuggetState is { IsMined: true })
+        {
+            var palette = _config.GetPalette(block.PlayerId);
+            DrawColoredPolygon(pts, palette.Base with { A = 0.7f });
+        }
+        else
+        {
+            DrawColoredPolygon(pts, new Color(1f, 1f, 1f, 0.6f));
+        }
+
+        var stroke = new Color(0.7f, 0.75f, 0.85f, 0.8f);
+        for (int i = 0; i < 4; i++)
+            DrawLine(pts[i], pts[(i + 1) % 4], stroke, 1.5f, true);
     }
 
     /// <summary>

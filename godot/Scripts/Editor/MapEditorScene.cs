@@ -625,9 +625,10 @@ public partial class MapEditorScene : Node2D
 				case EditorTool.UnitPlace:
 					if (existingBlock != null) _editorState.RemoveBlock(existingBlock);
 					if (cell.Terrain != TerrainType.None) break;
-					EnsurePlayerExists(_currentSlot);
-					var placed = _editorState.AddBlock(_currentBlock, _currentSlot, pos);
-					if (_currentBlockRooted && placed.Type != BlockType.Wall)
+					int placeSlot = _currentBlock == BlockType.Nugget ? -1 : _currentSlot;
+					if (placeSlot >= 0) EnsurePlayerExists(placeSlot);
+					var placed = _editorState.AddBlock(_currentBlock, placeSlot, pos);
+					if (_currentBlockRooted && placed.Type != BlockType.Wall && placed.Type != BlockType.Nugget)
 					{
 						placed.State = BlockState.Rooted;
 						placed.RootProgress = Constants.RootTicks;
@@ -1040,9 +1041,9 @@ public partial class MapEditorScene : Node2D
 		// Place units
 		foreach (var u in data.Units)
 		{
-			EnsurePlayerExists(u.SlotId);
+			if (u.SlotId >= 0) EnsurePlayerExists(u.SlotId);
 			var block = _editorState.AddBlock(u.Type, u.SlotId, new GridPos(u.X, u.Y));
-			if (u.Rooted && u.Type != BlockType.Wall)
+			if (u.Rooted && u.Type != BlockType.Wall && u.Type != BlockType.Nugget)
 			{
 				block.State = BlockState.Rooted;
 				block.RootProgress = Constants.RootTicks;

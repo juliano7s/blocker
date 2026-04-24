@@ -25,7 +25,7 @@ public static class SpriteFactory
     public static void Build(GameConfig config)
     {
         _cache.Clear();
-        var types = new[] { BlockType.Builder, BlockType.Soldier, BlockType.Stunner, BlockType.Wall, BlockType.Warden, BlockType.Jumper };
+        var types = new[] { BlockType.Builder, BlockType.Soldier, BlockType.Stunner, BlockType.Wall, BlockType.Warden, BlockType.Jumper, BlockType.Nugget };
 
         for (int playerId = 0; playerId < config.PlayerPalettes.Length; playerId++)
         {
@@ -37,6 +37,13 @@ public static class SpriteFactory
                 var tex = ImageTexture.CreateFromImage(image);
                 _cache[(type, playerId)] = tex;
             }
+        }
+
+        // Nuggets are neutral — cache a single sprite keyed to PlayerId -1
+        {
+            var nuggetColor = GetBaseColor(BlockType.Nugget, config.GetPalette(0));
+            var nuggetImage = CreateBlockImage(nuggetColor, BlockType.Nugget, config.GetPalette(0));
+            _cache[(BlockType.Nugget, -1)] = ImageTexture.CreateFromImage(nuggetImage);
         }
     }
 
@@ -99,6 +106,7 @@ public static class SpriteFactory
         BlockType.Wall => palette.WallFill,
         BlockType.Warden => palette.BuilderFill,
         BlockType.Jumper => palette.SoldierFill,
+        BlockType.Nugget => new Color(0.85f, 0.88f, 0.92f),
         _ => palette.Base
     };
 

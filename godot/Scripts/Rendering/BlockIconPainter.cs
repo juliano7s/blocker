@@ -63,6 +63,13 @@ public static class BlockIconPainter
                 if (sprite != null) canvas.DrawTextureRect(sprite, rect, false, tint);
                 break;
             }
+            case BlockType.Nugget:
+            {
+                var sprite = SpriteFactory.GetSprite(BlockType.Nugget, playerId);
+                if (sprite != null) canvas.DrawTextureRect(sprite, rect, false, tint);
+                DrawNuggetDiamond(canvas, rect, alpha);
+                break;
+            }
         }
 
         if (!enabled)
@@ -165,6 +172,17 @@ public static class BlockIconPainter
         }
 
         canvas.DrawCircle(center + lightOff * 0.6f, radius * 0.18f, Colors.White with { A = 0.45f * alpha });
+    }
+
+    private static void DrawNuggetDiamond(CanvasItem canvas, Rect2 rect, float alpha)
+    {
+        var center = rect.GetCenter();
+        float d = rect.Size.X * 0.30f;
+        var pts = DiamondPoints(center, d);
+        canvas.DrawColoredPolygon(pts, new Color(1f, 1f, 1f, 0.6f * alpha));
+        var stroke = new Color(0.7f, 0.75f, 0.85f, 0.8f * alpha);
+        for (int i = 0; i < 4; i++)
+            canvas.DrawLine(pts[i], pts[(i + 1) % 4], stroke, 1.5f, true);
     }
 
     private static Vector2[] DiamondPoints(Vector2 center, float halfSize)

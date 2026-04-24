@@ -301,6 +301,14 @@ public partial class EditorToolbar : Control
         _unitButtons.Add(AddUnitToolButton(rootedGrid, BlockType.Warden, "Rooted Warden", true));
         _unitButtons.Add(AddUnitToolButton(rootedGrid, BlockType.Wall, "Wall", true));
 
+        AddSectionLabel(vbox, "Resources");
+        var resourceGrid = new GridContainer { Columns = 2 };
+        resourceGrid.AddThemeConstantOverride("h_separation", 2);
+        resourceGrid.AddThemeConstantOverride("v_separation", 2);
+        vbox.AddChild(resourceGrid);
+
+        _unitButtons.Add(AddUnitToolButton(resourceGrid, BlockType.Nugget, "Nugget", false));
+
         // Eraser
         AddSectionLabel(vbox, "");
         AddToolButton(vbox, "Eraser", () => { ToolSelected?.Invoke(EditorTool.Eraser); ToolModeSelected?.Invoke(EditorMode.Paint); HighlightToolMode(EditorMode.Paint); });
