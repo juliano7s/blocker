@@ -51,9 +51,20 @@ public class Block
     public int? FormationId { get; set; }
     public bool IsInFormation => FormationId.HasValue;
 
+    // Nugget state (only non-null for BlockType.Nugget)
+    public NuggetState? NuggetState { get; set; }
+
+    // Builder mining state — ID of nugget being mined
+    public int? MiningTargetId { get; set; }
+
+    // Wall fortification — stun ray hits before destruction (0 = normal wall)
+    public int FortifiedHp { get; set; }
+
     public bool IsFullyRooted => State == BlockState.Rooted;
     public bool IsMobile => State == BlockState.Mobile;
-    public bool IsImmobile => Type == BlockType.Wall || State != BlockState.Mobile;
+    public bool IsImmobile => Type == BlockType.Wall
+        || (Type == BlockType.Nugget && NuggetState is { IsMined: false })
+        || State != BlockState.Mobile;
 
     public int PopCost => Type switch
     {
@@ -63,6 +74,7 @@ public class Block
         BlockType.Stunner => Constants.PopCostStunner,
         BlockType.Warden => Constants.PopCostWarden,
         BlockType.Jumper => Constants.PopCostJumper,
+        BlockType.Nugget => Constants.PopCostNugget,
         _ => 0
     };
 
@@ -70,6 +82,7 @@ public class Block
     {
         BlockType.Soldier => Constants.SoldierMoveInterval,
         BlockType.Stunner => Constants.StunnerMoveInterval,
+        BlockType.Nugget => Constants.NuggetMoveInterval,
         _ => Constants.MoveInterval
     };
 

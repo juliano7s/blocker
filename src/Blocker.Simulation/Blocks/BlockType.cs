@@ -7,5 +7,6 @@ public enum BlockType
     Soldier,
     Stunner,
     Warden,
-    Jumper
+    Jumper,
+    Nugget
 }
