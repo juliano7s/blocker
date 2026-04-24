@@ -28,6 +28,7 @@ public static class EliminationSystem
             foreach (var block in state.Blocks)
             {
                 if (block.PlayerId != player.Id) continue;
+                if (block.Type == BlockType.Nugget) continue;
 
                 if (block.Type is BlockType.Soldier or BlockType.Stunner
                     or BlockType.Warden or BlockType.Jumper)

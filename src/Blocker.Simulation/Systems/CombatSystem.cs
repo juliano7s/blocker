@@ -18,6 +18,7 @@ public static class CombatSystem
         foreach (var block in state.Blocks)
         {
             if (block.Type == BlockType.Wall) continue; // Walls immune
+            if (block.Type == BlockType.Nugget) continue; // Nuggets immune to combat
             if (toKill.Contains(block.Id)) continue;
 
             if (ShouldDieFromSurrounding(state, block))
@@ -28,6 +29,7 @@ public static class CombatSystem
         foreach (var block in state.Blocks)
         {
             if (block.Type == BlockType.Wall) continue; // Walls immune to soldier kills
+            if (block.Type == BlockType.Nugget) continue; // Nuggets immune to combat
             if (toKill.Contains(block.Id)) continue;
 
             int soldiersNeeded = GetSoldiersNeededToKill(block);
@@ -149,6 +151,8 @@ public static class CombatSystem
     /// </summary>
     private static bool ShouldDieFromSurrounding(GameState state, Block target)
     {
+        if (target.Type == BlockType.Nugget) return false;
+
         int orthoEnemySoldiers = 0;
         int orthoFriendly = 0;
         int diagEnemySoldiers = 0;
@@ -201,6 +205,8 @@ public static class CombatSystem
     /// </summary>
     private static int GetSoldiersNeededToKill(Block target)
     {
+        if (target.Type == BlockType.Nugget) return 0;
+
         // Uprooted/mobile units: 1 soldier orthogonally
         if (target.IsMobile)
         {

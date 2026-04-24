@@ -560,7 +560,7 @@ public class GameState
                 {
                     var neighbor = block.Pos + offset;
                     var other = GetBlockAt(neighbor);
-                    if (other != null && AreEnemies(other, block) && other.Type != BlockType.Wall)
+                    if (other != null && AreEnemies(other, block) && other.Type != BlockType.Wall && other.Type != BlockType.Nugget)
                     {
                         adjacentEnemy = true;
                         break;

@@ -59,6 +59,13 @@ public static class JumperSystem
             var blockAtPos = state.GetBlockAt(nextPos);
             if (blockAtPos != null)
             {
+                // Unmined nuggets are obstacles — stop the jump
+                if (blockAtPos.Type == BlockType.Nugget && blockAtPos.NuggetState is { IsMined: false })
+                {
+                    hitObstacle = true;
+                    break;
+                }
+
                 // Walls, formations, rooted blocks, friendly blocks stop the jump
                 if (blockAtPos.Type == BlockType.Wall || blockAtPos.IsInFormation || blockAtPos.IsImmobile)
                 {

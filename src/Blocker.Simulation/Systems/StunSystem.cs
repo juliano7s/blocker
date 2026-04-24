@@ -181,6 +181,10 @@ public static class StunSystem
         var block = state.GetBlockAt(ray.HeadPos);
         if (block == null) return false;
 
+        // Nuggets block rays but are not harmed
+        if (block.Type == BlockType.Nugget)
+            return true; // Ray stops, nugget unharmed
+
         // Don't hit friendly blocks (or teammates).
         if (!state.AreEnemies(block.PlayerId, ray.PlayerId)) return false;
 
@@ -189,7 +193,15 @@ public static class StunSystem
             case RayType.Stun:
                 if (block.Type == BlockType.Wall)
                 {
-                    // Walls block and are killed by stun rays
+                    if (block.FortifiedHp > 0)
+                    {
+                        block.FortifiedHp--;
+                        state.VisualEvents.Add(new VisualEvent(
+                            VisualEventType.StunRayHit, ray.HeadPos, ray.PlayerId, BlockId: block.Id));
+                        return true; // Ray stops, wall survives
+                    }
+
+                    // Normal wall destruction
                     state.VisualEvents.Add(new VisualEvent(
                         VisualEventType.StunRayHit, ray.HeadPos, ray.PlayerId, BlockId: block.Id));
                     state.VisualEvents.Add(new VisualEvent(
