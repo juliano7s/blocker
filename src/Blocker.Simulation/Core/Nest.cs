@@ -27,6 +27,9 @@ public class Nest
     /// <summary>Whether spawning is paused (e.g., stunned member).</summary>
     public bool IsPaused { get; set; }
 
+    /// <summary>Whether a nugget has been loaded into this nest (required for some spawn types).</summary>
+    public bool NuggetLoaded { get; set; }
+
     /// <summary>Tearing down countdown. >0 means dissolution in progress (Section 7).</summary>
     public int TeardownTimer { get; set; }
     public bool IsTearingDown => TeardownTimer > 0;

@@ -291,4 +291,69 @@ public class NuggetTests
 
         Assert.Equal(0, nugget.PlayerId);
     }
+
+    // --- Helpers ---
+
+    private Block AddRootedBlock(GameState state, BlockType type, int playerId, GridPos pos)
+    {
+        var block = state.AddBlock(type, playerId, pos);
+        block.State = BlockState.Rooted;
+        block.RootProgress = Constants.RootTicks;
+        return block;
+    }
+
+    private Nest SetupBuilderNest(GameState state, int playerId, GridPos center)
+    {
+        state.Grid[center].Ground = GroundType.Boot;
+        AddRootedBlock(state, BlockType.Builder, playerId, center + new GridPos(0, -1));
+        AddRootedBlock(state, BlockType.Builder, playerId, center + new GridPos(1, 0));
+        AddRootedBlock(state, BlockType.Builder, playerId, center + new GridPos(0, 1));
+        NestSystem.DetectNests(state);
+        return state.Nests[0];
+    }
+
+    // --- Part G: NuggetSystem — Nest Refine ---
+
+    [Fact]
+    public void NestRefine_NuggetWithinRadius_Consumed()
+    {
+        var state = CreateState();
+        var nest = SetupBuilderNest(state, 0, new GridPos(10, 10));
+
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(12, 10));
+        nugget.NuggetState!.IsMined = true;
+
+        NuggetSystem.Tick(state);
+
+        Assert.Null(state.GetBlock(nugget.Id));
+    }
+
+    [Fact]
+    public void NestRefine_NuggetOutsideRadius_NotConsumed()
+    {
+        var state = CreateState();
+        var nest = SetupBuilderNest(state, 0, new GridPos(10, 10));
+
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(14, 10));
+        nugget.NuggetState!.IsMined = true;
+
+        NuggetSystem.Tick(state);
+
+        Assert.NotNull(state.GetBlock(nugget.Id));
+    }
+
+    [Fact]
+    public void NestRefine_AppliesSpawnBonus()
+    {
+        var state = CreateState();
+        var nest = SetupBuilderNest(state, 0, new GridPos(10, 10));
+        nest.SpawnProgress = 0;
+
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(12, 10));
+        nugget.NuggetState!.IsMined = true;
+
+        NuggetSystem.Tick(state);
+
+        Assert.True(nest.SpawnProgress > 0);
+    }
 }

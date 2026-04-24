@@ -59,7 +59,60 @@ public static class NuggetSystem
 
     private static void TickConsumption(GameState state)
     {
-        // Implemented in Tasks 8-9
+        var toRemove = new List<int>();
+
+        foreach (var block in state.Blocks)
+        {
+            if (block.Type != BlockType.Nugget) continue;
+            if (block.NuggetState is not { IsMined: true }) continue;
+            if (toRemove.Contains(block.Id)) continue;
+
+            if (TryConsumeNestRefine(state, block))
+            {
+                toRemove.Add(block.Id);
+                continue;
+            }
+        }
+
+        foreach (var id in toRemove)
+        {
+            var block = state.GetBlock(id);
+            if (block != null) state.RemoveBlock(block);
+        }
+    }
+
+    private static bool TryConsumeNestRefine(GameState state, Block nugget)
+    {
+        foreach (var nest in state.Nests)
+        {
+            if (nest.PlayerId != nugget.PlayerId) continue;
+
+            int chebyshev = Math.Max(
+                Math.Abs(nugget.Pos.X - nest.Center.X),
+                Math.Abs(nugget.Pos.Y - nest.Center.Y));
+
+            if (chebyshev > Constants.NuggetRefineRadius) continue;
+
+            var ground = state.Grid[nest.Center].Ground;
+            var spawnType = nest.GetSpawnBlockType(ground);
+            int bonus = Constants.Config.GetNuggetSpawnBonus(spawnType);
+
+            if (bonus > 0)
+            {
+                int spawnTicks = nest.GetSpawnTicks(ground);
+                nest.SpawnProgress += spawnTicks * bonus / 100;
+            }
+
+            if (Constants.Config.GetNuggetRequired(spawnType))
+                nest.NuggetLoaded = true;
+
+            state.VisualEvents.Add(new VisualEvent(
+                VisualEventType.NuggetRefineConsumed, nugget.Pos, nugget.PlayerId, BlockId: nugget.Id));
+
+            return true;
+        }
+
+        return false;
     }
 
     private static void TickCapture(GameState state)
