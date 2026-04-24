@@ -223,7 +223,39 @@ public partial class HudOverlay : CanvasLayer
                     string popText = $"Pop: {currentPop} / {player.MaxPopulation}";
                     DrawString(font, new Vector2(x, centerY + 5), popText,
                         HorizontalAlignment.Left, -1, HudStyles.FontSizeNormal, HudStyles.TextPrimary);
+                    x += font.GetStringSize(popText, HorizontalAlignment.Left, -1, HudStyles.FontSizeNormal).X + 14;
                 }
+            }
+
+            // Nugget count
+            int nuggetCount = 0;
+            foreach (var block in state.Blocks)
+            {
+                if (block.Type == BlockType.Nugget && block.NuggetState is { IsMined: true } && block.PlayerId == pid)
+                    nuggetCount++;
+            }
+            if (nuggetCount > 0)
+            {
+                // Divider
+                DrawLine(new Vector2(x, centerY - 11), new Vector2(x, centerY + 11), DividerColor, 1f);
+                x += 14;
+
+                // Diamond icon (small white diamond)
+                float iconD = 5f;
+                var iconCenter = new Vector2(x + iconD, centerY);
+                var diamondPts = new Vector2[]
+                {
+                    iconCenter + new Vector2(0, -iconD),
+                    iconCenter + new Vector2(iconD, 0),
+                    iconCenter + new Vector2(0, iconD),
+                    iconCenter + new Vector2(-iconD, 0)
+                };
+                DrawColoredPolygon(diamondPts, new Color(0.85f, 0.9f, 1f, 0.8f));
+                x += iconD * 2 + 6;
+
+                string nuggetText = $"{nuggetCount}";
+                DrawString(font, new Vector2(x, centerY + 5), nuggetText,
+                    HorizontalAlignment.Left, -1, HudStyles.FontSizeNormal, HudStyles.TextPrimary);
             }
 
             // Debug FPS (right side, only if enabled)

@@ -34,7 +34,13 @@ public static class MapLoader
         foreach (var entry in data.Units)
         {
             if (!grid.InBounds(entry.X, entry.Y)) continue;
-            if (!slotToPlayer.TryGetValue(entry.SlotId, out int playerId)) continue;
+
+            // Nuggets are neutral (SlotId -1) — they don't belong to any player slot
+            int playerId;
+            if (entry.Type == BlockType.Nugget)
+                playerId = -1;
+            else if (!slotToPlayer.TryGetValue(entry.SlotId, out playerId))
+                continue;
 
             var block = state.AddBlock(entry.Type, playerId, new GridPos(entry.X, entry.Y));
             if (entry.Rooted && block.Type != BlockType.Wall)

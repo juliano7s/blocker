@@ -58,6 +58,7 @@ public static class StateHasher
             {
                 MixI32(ref h, b.NuggetState.IsMined ? 1 : 0);
                 MixI32(ref h, b.NuggetState.MiningProgress);
+                MixI32(ref h, b.NuggetState.ManuallyMoved ? 1 : 0);
                 MixI32(ref h, b.NuggetState.HealTargetId ?? 0);
                 MixI32(ref h, b.NuggetState.FortifyTargetPos.HasValue ? 1 : 0);
                 if (b.NuggetState.FortifyTargetPos.HasValue)

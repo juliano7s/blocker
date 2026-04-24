@@ -62,11 +62,16 @@ public partial class GridRenderer : Node2D
 	// Reusable set for dead-block cleanup — avoids per-frame allocation
 	private readonly HashSet<int> _liveIdSet = new();
 	private readonly List<int> _deadIds = new();
+	private readonly HashSet<int> _nuggetBlockIds = new();
 
 	// Dying blocks: heat-up animation before explosion into tendrils
-	private record struct DyingBlockData(Vector2 WorldPos, GridPos GridPos, Color Color, float DeathTime);
+	private enum DeathCause { Killed, Consumed }
+	private record struct DyingBlockData(Vector2 WorldPos, GridPos GridPos, Color Color, float DeathTime, bool IsNugget = false, DeathCause Cause = DeathCause.Killed);
 	private readonly Dictionary<int, DyingBlockData> _dyingBlocks = new();
 	private const float DeathAnimationDuration = 0.25f; // 250ms heat-up before explosion
+
+	// Mining hit times — for syncing diamond vibration bursts with sparkle effects
+	private readonly Dictionary<int, float> _lastMiningHitTime = new();
 
 	private EffectManager? _effectManager;
 	public void SetEffectManager(EffectManager em) => _effectManager = em;
@@ -178,11 +183,36 @@ public partial class GridRenderer : Node2D
 					// Capture dying blocks for heat-up animation
 					if (evt.Type == VisualEventType.BlockDied && evt.BlockId.HasValue && !_dyingBlocks.ContainsKey(evt.BlockId.Value))
 					{
-						var dyingColor = evt.PlayerId.HasValue ? _config.GetPalette(evt.PlayerId.Value).Base : Colors.White;
+						bool isNugget = _nuggetBlockIds.Contains(evt.BlockId.Value);
+						var dyingColor = isNugget
+							? Colors.White
+							: (evt.PlayerId.HasValue ? _config.GetPalette(evt.PlayerId.Value).Base : Colors.White);
 						var dyingWorldPos = _visualPositions.TryGetValue(evt.BlockId.Value, out var dvp)
 							? dvp : GridToWorld(evt.Position);
-						_dyingBlocks[evt.BlockId.Value] = new DyingBlockData(dyingWorldPos, evt.Position, dyingColor, now);
+						_dyingBlocks[evt.BlockId.Value] = new DyingBlockData(dyingWorldPos, evt.Position, dyingColor, now, isNugget);
 					}
+
+					// Nugget consumption: flash like death in the cell it occupied
+					if ((evt.Type == VisualEventType.NuggetRefineConsumed
+						|| evt.Type == VisualEventType.NuggetHealConsumed
+						|| evt.Type == VisualEventType.NuggetFortifyConsumed)
+						&& evt.BlockId.HasValue && !_dyingBlocks.ContainsKey(evt.BlockId.Value))
+					{
+						var consumeColor = evt.Type switch
+						{
+							VisualEventType.NuggetHealConsumed => new Color(0.4f, 1f, 0.5f),
+							VisualEventType.NuggetFortifyConsumed => new Color(0.7f, 0.85f, 1f),
+							_ => Colors.White,
+						};
+						var consumeWorldPos = _visualPositions.TryGetValue(evt.BlockId.Value, out var cwp)
+							? cwp : GridToWorld(evt.Position);
+						_dyingBlocks[evt.BlockId.Value] = new DyingBlockData(
+							consumeWorldPos, evt.Position, consumeColor, now, IsNugget: true, Cause: DeathCause.Consumed);
+					}
+
+					// Mining hit: record time for diamond vibration burst
+					if (evt.Type == VisualEventType.NuggetMiningStarted && evt.BlockId.HasValue)
+						_lastMiningHitTime[evt.BlockId.Value] = now;
 
 					// Jumper ghost trails from moves and jumps
 					if (evt.Type == VisualEventType.BlockMoved && evt.BlockId.HasValue)
@@ -224,11 +254,17 @@ public partial class GridRenderer : Node2D
 			}
 
 			// Single pass: smooth visual positions + idle spin angles + build live ID set
+			// Note: _nuggetBlockIds still holds PREVIOUS frame's data here, which is
+			// load-bearing — death event processing above relies on it to detect nuggets
+			// (the block is already removed from GameState when BlockDied fires).
 			float dt = (float)delta;
 			_liveIdSet.Clear();
+			_nuggetBlockIds.Clear();
 			foreach (var block in _gameState.Blocks)
 			{
 				_liveIdSet.Add(block.Id);
+				if (block.Type == BlockType.Nugget)
+					_nuggetBlockIds.Add(block.Id);
 
 				// --- Visual position interpolation ---
 				var target = GridToWorld(block.Pos);
@@ -307,7 +343,12 @@ public partial class GridRenderer : Node2D
 			{
 				if (now - dying.DeathTime >= DeathAnimationDuration)
 				{
-					_effectManager?.SpawnDeathExplosion(dying.GridPos, dying.Color);
+					if (dying.Cause == DeathCause.Consumed)
+						_effectManager?.SpawnNuggetConsumptionFlash(dying.GridPos, dying.Color);
+					else if (dying.IsNugget)
+						_effectManager?.SpawnNuggetDeathExplosion(dying.GridPos);
+					else
+						_effectManager?.SpawnDeathExplosion(dying.GridPos, dying.Color);
 					_deadIds.Add(id);
 				}
 			}
@@ -330,6 +371,7 @@ public partial class GridRenderer : Node2D
 			{
 				_idleAngles.Remove(id);
 				_idleCooldowns.Remove(id);
+				_lastMiningHitTime.Remove(id);
 			}
 		}
 

@@ -90,6 +90,14 @@ public static class EffectFactory
         return CreateLineEffect(parent, paths, color, duration, trail: trail);
     }
 
+    /// <summary>Sparkle on the shared grid edge between two cells — hot tool hit.</summary>
+    public static LineEffect MiningSpark(Node2D parent, GridPos nuggetPos, int dx, int dy,
+        Color color, float duration = 500f, int armCount = 6, int armLen = 3, float trail = 0.20f)
+    {
+        var paths = EffectShapes.MiningSpark(nuggetPos.X, nuggetPos.Y, dx, dy, Rng, armCount, armLen);
+        return CreateLineEffect(parent, paths, color, duration, trail: trail, flicker: true);
+    }
+
     /// <summary>Short arms contracting inward from all edges.</summary>
     public static LineEffect CrossContract(Node2D parent, GridPos origin, Color color,
         float duration = 600f, int armLen = 3, float trail = 0.15f)

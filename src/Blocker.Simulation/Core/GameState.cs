@@ -245,6 +245,8 @@ public class GameState
                 {
                     block.MoveTarget = cmd.TargetPos.Value;
                     block.IsAttackMoving = false;
+                    if (block.Type == BlockType.Nugget && block.NuggetState != null)
+                        block.NuggetState.ManuallyMoved = true;
                 }
                 break;
 
@@ -389,6 +391,8 @@ public class GameState
                 {
                     block.MoveTarget = cmd.TargetPos.Value;
                     block.IsAttackMoving = false;
+                    if (block.Type == BlockType.Nugget && block.NuggetState != null)
+                        block.NuggetState.ManuallyMoved = true;
                 }
                 return true;
 

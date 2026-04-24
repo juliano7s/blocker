@@ -521,6 +521,65 @@ public static class EffectShapes
         return paths;
     }
 
+    // ─── Mining Spark ────────────────────────────────────────────────
+    // Short paths from the shared edge between two adjacent cells, propagating
+    // perpendicular in both directions. Used for the "hot tool hit" sparkle.
+
+    public static List<(Vector2[] Points, float DistStart, float DistEnd)> MiningSpark(
+        int cx, int cy, int dx, int dy, Random rng, int armCount = 6, int armLen = 3)
+    {
+        var paths = new List<(Vector2[], float, float)>();
+
+        // Shared edge endpoints (the grid line between nugget and builder)
+        float ex1, ey1, ex2, ey2;
+        if (dx != 0) // Horizontal adjacency — shared edge is vertical
+        {
+            float edgeX = dx > 0 ? cx + 1 : cx;
+            ex1 = edgeX; ey1 = cy;
+            ex2 = edgeX; ey2 = cy + 1;
+        }
+        else // Vertical adjacency — shared edge is horizontal
+        {
+            float edgeY = dy > 0 ? cy + 1 : cy;
+            ex1 = cx; ey1 = edgeY;
+            ex2 = cx + 1; ey2 = edgeY;
+        }
+
+        // Perpendicular direction along the edge
+        int px = Math.Abs(dy), py = Math.Abs(dx);
+
+        for (int a = 0; a < armCount; a++)
+        {
+            // Start from a random point along the edge
+            float t = (float)rng.NextDouble();
+            float startX = ex1 + (ex2 - ex1) * t;
+            float startY = ey1 + (ey2 - ey1) * t;
+
+            // Alternate directions along the edge and into both cells
+            int dir = (a % 2 == 0) ? 1 : -1;
+            int len = 1 + rng.Next(armLen);
+            var pts = new List<Vector2> { new(startX, startY) };
+
+            float x = startX, y = startY;
+            int sdx = px * dir, sdy = py * dir;
+            for (int i = 0; i < len; i++)
+            {
+                // Occasionally jitter into the perpendicular (toward/away from cells)
+                if (rng.NextSingle() < 0.4f)
+                {
+                    sdx = dx != 0 ? (rng.NextSingle() < 0.5f ? 1 : -1) : sdx;
+                    sdy = dy != 0 ? (rng.NextSingle() < 0.5f ? 1 : -1) : sdy;
+                }
+                x += sdx; y += sdy;
+                pts.Add(new(x, y));
+            }
+
+            paths.Add((pts.ToArray(), 0f, 1f));
+        }
+
+        return paths;
+    }
+
     // ─── Edge Seed Helpers ──────────────────────────────────────────
 
     public record struct EdgeSeed(float Ix, float Iy, int Dx, int Dy);

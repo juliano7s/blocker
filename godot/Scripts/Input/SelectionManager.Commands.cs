@@ -68,6 +68,80 @@ public partial class SelectionManager
         var gridPos = GridRenderer.WorldToGrid(worldPos);
         if (!_gameState!.Grid.InBounds(gridPos)) return;
 
+        var targetBlock = _gameState.GetBlockAt(gridPos);
+
+        // Context-aware: builders selected + right-click unmined nugget → MineNugget
+        if (targetBlock is { Type: BlockType.Nugget, NuggetState.IsMined: false })
+        {
+            var builderIds = _state.SelectedBlocks
+                .Where(b => b.Type == BlockType.Builder)
+                .Select(b => b.Id)
+                .ToList();
+            if (builderIds.Count > 0)
+            {
+                EmitCommand(new Command(ControllingPlayer, CommandType.MineNugget, builderIds, gridPos, Queue: queue));
+                GD.Print($"{(queue ? "Queued" : "Issued")} mine nugget at {gridPos} with {builderIds.Count} builders");
+            }
+
+            // Non-builder selected blocks get a normal move to that area
+            var otherIds = _state.SelectedBlocks
+                .Where(b => b.Type != BlockType.Builder)
+                .Select(b => b.Id)
+                .ToList();
+            if (otherIds.Count > 0)
+                EmitCommand(new Command(ControllingPlayer, CommandType.Move, otherIds, gridPos, Queue: queue));
+            return;
+        }
+
+        // Context-aware: mined nugget(s) selected + right-click damaged friendly soldier/jumper → HealWithNugget
+        if (targetBlock != null
+            && targetBlock.Type is BlockType.Soldier or BlockType.Jumper
+            && targetBlock.PlayerId == ControllingPlayer
+            && targetBlock.Hp < (targetBlock.Type == BlockType.Soldier ? Simulation.Core.Constants.SoldierMaxHp : Simulation.Core.Constants.JumperMaxHp))
+        {
+            var nuggetIds = _state.SelectedBlocks
+                .Where(b => b.Type == BlockType.Nugget && b.NuggetState is { IsMined: true })
+                .Select(b => b.Id)
+                .ToList();
+            if (nuggetIds.Count > 0)
+            {
+                EmitCommand(new Command(ControllingPlayer, CommandType.HealWithNugget, nuggetIds, gridPos, Queue: queue));
+                GD.Print($"{(queue ? "Queued" : "Issued")} heal with {nuggetIds.Count} nuggets on {targetBlock.Type} at {gridPos}");
+
+                // Non-nugget selected blocks get a normal move
+                var otherIds = _state.SelectedBlocks
+                    .Where(b => b.Type != BlockType.Nugget)
+                    .Select(b => b.Id)
+                    .ToList();
+                if (otherIds.Count > 0)
+                    EmitCommand(new Command(ControllingPlayer, CommandType.Move, otherIds, gridPos, Queue: queue));
+                return;
+            }
+        }
+
+        // Context-aware: mined nugget(s) selected + right-click friendly wall → FortifyWithNugget
+        if (targetBlock is { Type: BlockType.Wall } && targetBlock.PlayerId == ControllingPlayer)
+        {
+            var nuggetIds = _state.SelectedBlocks
+                .Where(b => b.Type == BlockType.Nugget && b.NuggetState is { IsMined: true })
+                .Select(b => b.Id)
+                .ToList();
+            if (nuggetIds.Count > 0)
+            {
+                EmitCommand(new Command(ControllingPlayer, CommandType.FortifyWithNugget, nuggetIds, gridPos, Queue: queue));
+                GD.Print($"{(queue ? "Queued" : "Issued")} fortify with {nuggetIds.Count} nuggets on wall at {gridPos}");
+
+                var otherIds = _state.SelectedBlocks
+                    .Where(b => b.Type != BlockType.Nugget)
+                    .Select(b => b.Id)
+                    .ToList();
+                if (otherIds.Count > 0)
+                    EmitCommand(new Command(ControllingPlayer, CommandType.Move, otherIds, gridPos, Queue: queue));
+                return;
+            }
+        }
+
+        // Default: normal move
         var blockIds = _state.SelectedBlocks
             .Select(b => b.Id)
             .ToList();

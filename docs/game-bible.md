@@ -42,7 +42,7 @@ Each cell has:
 
 ## 4. Block Types
 
-There are 6 block types organized in a tech tier system, plus 2 variant units spawned from overload ground.
+There are 6 block types organized in a tech tier system, plus 2 variant units spawned from overload ground, plus 1 resource block (Nugget).
 
 ### 4.1 Tier 1: Builder
 
@@ -104,7 +104,7 @@ The ranged crowd-control unit. Fast and fragile.
 | Combat role | Ranged stun + Wall killer |
 
 **Abilities:**
-- **Stun Ray** (S key): Fires 3 rays in a cardinal direction. Range: 5 cells. Stuns the first enemy hit for 160 ticks (~13.3s). Walls are **killed** instead of stunned. Ray stops at terrain, walls, formations, and the first hit target.
+- **Stun Ray** (S key): Fires 3 rays in a cardinal direction. Range: 5 cells. Stuns all enemies hit for 160 ticks (~13.3s). Walls are **killed** instead of stunned and stop the ray. Ray stops at terrain, walls, and formations, but **pierces** through multiple non-wall enemy units.
 - **Cooldown**: 140 ticks after firing — **cannot move** while on cooldown.
 - **Root** (F key): Can root to participate in Stun Towers.
 - **Self-Destruct** (D key): When fully rooted, fires stun blasts in all 8 directions (range 4 cells). Destroys the Stunner.
@@ -138,10 +138,35 @@ Spawned from Soldier Nests on overload ground instead of normal Soldiers.
 
 **Abilities:**
 - **Jump** (F key → aim → left-click): Leaps up to 5 cells in a cardinal direction, killing all blocks in the path (friendlies and enemies alike). Stops at terrain, formations, map edges, and neutral walls (breakable → fragile on first hit; fragile → destroyed on second).
-- **Combo**: If the jump kills at least one enemy and doesn't hit an obstacle, the Jumper enters **combo-ready** state — can jump again immediately without moving. Issuing a move command consumes the combo and starts a **mobile cooldown** (can move but can't jump).
+- **Combo**: If the jump kills at least one unit (enemy or friendly) and doesn't hit an obstacle, the Jumper enters **combo-ready** state — can jump again immediately without moving. Issuing a move command consumes the combo and starts a **mobile cooldown** (can move but can't jump).
 - **Cooldown**: 120 ticks. If no combo: immobile during cooldown. If combo consumed by moving: mobile but can't jump.
 - **HP loss**: Missed jumps (non-combo, triggering immobile cooldown) cost 1 HP. The visual icon shrinks with HP loss (100% → 60% → 20%).
 - **Warden counter**: Cannot initiate a jump while inside an enemy Warden's Zone of Control. Can jump *into* a ZoC.
+
+### 4.7 Resource: Nugget
+
+Mineable resource block. Adds strategic diversity — players decide how to allocate nuggets across spawning, healing, and fortification.
+
+| Property | Value |
+|----------|-------|
+| Move speed | Normal (every 3 ticks, mined only) |
+| Pop cost | 0 |
+| Placed by | Map designer (finite, no respawning) |
+| Combat role | Non-combatant — immune to surrounding, soldier adjacency, stun |
+
+**Lifecycle:**
+- **Unmined**: Neutral (`PlayerId = -1`), not selectable. Occupies cell, blocks movement. Prismatic shimmer visual with diamond shape. Destroyed by blast rays; stops jumper jumps (obstacle).
+- **Mining**: Builder right-clicks to mine. Progress = adjacent miners per tick. Base time: 180 ticks (~15s with 1 builder). `PlayerId` updates to mining team. Only one team can mine at a time.
+- **Freed**: `IsMined = true`. Fully owned, selectable, commandable. Auto-rallies to nearest friendly nest unless manually moved (Move command permanently disables auto-rally until captured).
+- **Consumption**: Three paths, nugget removed on use:
+  - *Nest Refine*: Within 3 Chebyshev distance of friendly nest → auto-consumed, grants spawn progress bonus.
+  - *Heal Unit*: Right-click damaged soldier/jumper → pathfinds adjacent, heals to full HP on arrival.
+  - *Fortify Walls*: Right-click friendly wall → pathfinds adjacent, grants `FortifiedHp` to target + 4 connected walls (BFS).
+- **Capture**: Enemy builder orthogonally adjacent (no friendly builder contesting) → instant ownership flip, auto-rally retargets.
+
+**Fortified Walls:**
+- `FortifiedHp` absorbs stun ray hits (decrements instead of destroying). When 0, wall is normal again.
+- Default `FORTIFIED_WALL_HP = 3`. Affects 5 walls per nugget (target + 4 BFS-connected).
 
 ---
 

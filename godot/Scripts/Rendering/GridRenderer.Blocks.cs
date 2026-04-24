@@ -410,6 +410,7 @@ public partial class GridRenderer : Node2D
                     DrawTextureRect(sprite, rect, false);
                 else
                     DrawWallBlock(rect, palette);
+                DrawFortifiedWallOverlay(block, rect);
                 break;
             }
 
@@ -807,7 +808,102 @@ public partial class GridRenderer : Node2D
 
     private void DrawNuggetDiamond(Block block, Rect2 rect, Vector2 center)
     {
+        float time = (float)Time.GetTicksMsec() / 1000f;
         float d = rect.Size.X * 0.30f;
+
+        // Mining vibration: short burst synced with sparkle hit, then decays
+        var drawCenter = center;
+        bool isMining = block.NuggetState is { IsMined: false } && block.PlayerId != -1;
+        float miningProgress = 0f;
+        if (isMining && block.NuggetState != null)
+        {
+            miningProgress = (float)block.NuggetState.MiningProgress / Simulation.Core.Constants.NuggetMiningTicks;
+            float hitDecay = 0f;
+            if (_lastMiningHitTime.TryGetValue(block.Id, out float lastHit))
+                hitDecay = Mathf.Max(0f, 1f - (time - lastHit) / 0.25f);
+            float shakeIntensity = hitDecay * (1.5f + miningProgress * 1.5f);
+            drawCenter += new Vector2(
+                Mathf.Sin(time * 35f + block.Id * 7.1f) * shakeIntensity,
+                Mathf.Cos(time * 29f + block.Id * 5.3f) * shakeIntensity);
+        }
+
+        var pts = new Vector2[]
+        {
+            drawCenter + new Vector2(0, -d),
+            drawCenter + new Vector2(d, 0),
+            drawCenter + new Vector2(0, d),
+            drawCenter + new Vector2(-d, 0)
+        };
+
+        if (block.NuggetState is { IsMined: true })
+        {
+            // Mined: team-colored diamond
+            var palette = _config.GetPalette(block.PlayerId);
+            DrawColoredPolygon(pts, palette.Base with { A = 0.7f });
+        }
+        else
+        {
+            // Unmined: prismatic shimmer — cycle hue subtly over time
+            float hueShift = Mathf.Sin(time * 1.2f + block.Id * 3.7f) * 0.08f;
+            var shimmerColor = Color.FromHsv(0.55f + hueShift, 0.08f, 1f, 0.6f);
+            DrawColoredPolygon(pts, shimmerColor);
+
+            // Ambient glow (cool white, ~15% alpha)
+            QueueGlowRadial(center, rect.Size.X * 0.45f, new Color(0.85f, 0.9f, 1f, 0.15f));
+
+            // Sparkle dots — 3 small bright dots that fade in/out at pseudo-random positions
+            for (int i = 0; i < 3; i++)
+            {
+                float phase = time * 1.5f + i * 2.1f + block.Id * 1.3f;
+                float sparkleAlpha = Mathf.Max(0, Mathf.Sin(phase)) * 0.7f;
+                if (sparkleAlpha > 0.05f)
+                {
+                    float sx = Mathf.Sin(phase * 0.7f + i * 4.2f) * rect.Size.X * 0.3f;
+                    float sy = Mathf.Cos(phase * 0.5f + i * 3.1f) * rect.Size.Y * 0.3f;
+                    DrawCircle(center + new Vector2(sx, sy), 1.2f, Colors.White with { A = sparkleAlpha });
+                }
+            }
+        }
+
+        // Diamond stroke (unmined only — mined nuggets show borderless team diamond per spec §9.3)
+        if (block.NuggetState is not { IsMined: true })
+        {
+            var stroke = new Color(0.7f, 0.75f, 0.85f, 0.8f);
+            for (int i = 0; i < 4; i++)
+                DrawLine(pts[i], pts[(i + 1) % 4], stroke, 1.5f, true);
+        }
+
+        // Mining progress: cracks of light growing with progress
+        if (isMining && miningProgress > 0.05f)
+        {
+            var crackColor = Colors.White with { A = 0.4f + 0.5f * miningProgress };
+            float crackLen = rect.Size.X * 0.35f * miningProgress;
+            // Radial crack lines from center outward
+            DrawLine(drawCenter, drawCenter + new Vector2(crackLen, -crackLen * 0.6f), crackColor, 1.2f, true);
+            DrawLine(drawCenter, drawCenter + new Vector2(-crackLen * 0.8f, crackLen * 0.4f), crackColor, 1.0f, true);
+            DrawLine(drawCenter, drawCenter + new Vector2(crackLen * 0.5f, crackLen * 0.7f), crackColor, 1.0f, true);
+            if (miningProgress > 0.4f)
+            {
+                DrawLine(drawCenter, drawCenter + new Vector2(-crackLen * 0.6f, -crackLen * 0.9f), crackColor, 0.8f, true);
+            }
+
+            // Intensify shimmer during mining
+            float shimmerPulse = 0.15f + 0.2f * miningProgress;
+            QueueGlowRadial(center, rect.Size.X * 0.5f, Colors.White with { A = shimmerPulse });
+        }
+    }
+
+    private void DrawFortifiedWallOverlay(Block block, Rect2 rect)
+    {
+        if (block.FortifiedHp <= 0) return;
+
+        var center = rect.GetCenter();
+        float time = (float)Time.GetTicksMsec() / 1000f;
+
+        // Small diamond sparkle overlay on fortified wall
+        float d = rect.Size.X * 0.15f;
+        float pulse = 0.4f + 0.3f * Mathf.Sin(time * 2.5f + block.Id * 1.7f);
+        var sparkleColor = new Color(0.7f, 0.85f, 1f, pulse);
         var pts = new Vector2[]
         {
             center + new Vector2(0, -d),
@@ -815,20 +911,9 @@ public partial class GridRenderer : Node2D
             center + new Vector2(0, d),
             center + new Vector2(-d, 0)
         };
-
-        if (block.NuggetState is { IsMined: true })
-        {
-            var palette = _config.GetPalette(block.PlayerId);
-            DrawColoredPolygon(pts, palette.Base with { A = 0.7f });
-        }
-        else
-        {
-            DrawColoredPolygon(pts, new Color(1f, 1f, 1f, 0.6f));
-        }
-
-        var stroke = new Color(0.7f, 0.75f, 0.85f, 0.8f);
+        DrawColoredPolygon(pts, sparkleColor);
         for (int i = 0; i < 4; i++)
-            DrawLine(pts[i], pts[(i + 1) % 4], stroke, 1.5f, true);
+            DrawLine(pts[i], pts[(i + 1) % 4], Colors.White with { A = pulse * 0.6f }, 1f, true);
     }
 
     /// <summary>

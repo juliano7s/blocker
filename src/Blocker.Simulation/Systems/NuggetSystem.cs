@@ -36,7 +36,27 @@ public static class NuggetSystem
 
             if (minerCount == 0) continue;
 
+            int oldProgress = block.NuggetState.MiningProgress;
             block.NuggetState.MiningProgress += minerCount;
+
+            // Emit mining hit every ~1 second (12 ticks) — one per active miner
+            if (oldProgress / 12 != block.NuggetState.MiningProgress / 12)
+            {
+                foreach (var offset in GridPos.OrthogonalOffsets)
+                {
+                    var neighbor = state.GetBlockAt(block.Pos + offset);
+                    if (neighbor != null
+                        && neighbor.Type == BlockType.Builder
+                        && neighbor.MiningTargetId == block.Id
+                        && neighbor.PlayerId == block.PlayerId)
+                    {
+                        var dir = OffsetToDirection(offset);
+                        state.VisualEvents.Add(new VisualEvent(
+                            VisualEventType.NuggetMiningStarted, block.Pos, block.PlayerId,
+                            Direction: dir, BlockId: block.Id));
+                    }
+                }
+            }
 
             if (block.NuggetState.MiningProgress >= Constants.NuggetMiningTicks)
             {
@@ -251,6 +271,7 @@ public static class NuggetSystem
             {
                 block.PlayerId = enemyPlayerId;
                 block.MoveTarget = null;
+                block.NuggetState.ManuallyMoved = false;
                 block.NuggetState.HealTargetId = null;
                 block.NuggetState.FortifyTargetPos = null;
 
@@ -268,6 +289,7 @@ public static class NuggetSystem
         {
             if (block.Type != BlockType.Nugget) continue;
             if (block.NuggetState is not { IsMined: true }) continue;
+            if (block.NuggetState.ManuallyMoved) continue;
             if (block.MoveTarget.HasValue) continue;
             if (block.NuggetState.HealTargetId.HasValue) continue;
             if (block.NuggetState.FortifyTargetPos.HasValue) continue;
@@ -275,6 +297,14 @@ public static class NuggetSystem
             SetAutoRallyTarget(state, block);
         }
     }
+
+    private static Direction OffsetToDirection(GridPos offset) => (offset.X, offset.Y) switch
+    {
+        (1, 0) => Direction.Right,
+        (-1, 0) => Direction.Left,
+        (0, 1) => Direction.Down,
+        _ => Direction.Up,
+    };
 
     private static void SetAutoRallyTarget(GameState state, Block nugget)
     {

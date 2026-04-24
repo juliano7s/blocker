@@ -84,6 +84,21 @@ public partial class EffectManager : Node2D
             duration: 800f, 10, 2, 8, 0.3f));
     }
 
+    public void SpawnNuggetConsumptionFlash(GridPos pos, Color color)
+    {
+        AddEffect(EffectFactory.ConvergingDrain(this, pos, color,
+            maxSegs: 30, duration: 1000f, trail: 0.15f));
+    }
+
+    public void SpawnNuggetDeathExplosion(GridPos pos)
+    {
+        AddEffect(EffectFactory.DashedTendrils(this, pos, Colors.White,
+            duration: 800f, 10, 2, 8, 0.3f));
+        AddEffect(EffectFactory.LightningBurst(this, pos, new Color(0.85f, 0.9f, 1f),
+            maxSegs: 10, duration: 600f, trail: 0.12f,
+            contProb: 0.7f, branchProb: 0.3f));
+    }
+
     /// <summary>
     /// Called by GameManager each frame with current selected block IDs.
     /// Spawns SelectSquares on newly selected blocks — LOCAL PLAYER ONLY.
@@ -127,6 +142,9 @@ public partial class EffectManager : Node2D
         VisualEventType.CommandRootIssued => true,
         VisualEventType.CommandUprootIssued => true,
         VisualEventType.CommandWallIssued => true,
+        VisualEventType.CommandMineIssued => true,
+        VisualEventType.CommandHealIssued => true,
+        VisualEventType.CommandFortifyIssued => true,
         VisualEventType.WallConverted => true,
         // Formation events are private - you see your own formations form
         VisualEventType.BuilderNestFormed => true,
@@ -301,6 +319,70 @@ public partial class EffectManager : Node2D
             case VisualEventType.MagnetPulled:
                 AddEffect(EffectFactory.LightningConverge(this, pos, color,
                     maxSegs: 28, duration: 700f, trail: 0.12f));
+                break;
+
+            // ─── Nugget effects ────────────────────────────────────
+
+            // Mine command issued: feedback burst at nugget position
+            case VisualEventType.CommandMineIssued:
+                AddEffect(EffectFactory.CellPerimeter(this, pos, Colors.White,
+                    duration: 500f, 0.10f));
+                break;
+
+            // Heal command issued: feedback burst
+            case VisualEventType.CommandHealIssued:
+                AddEffect(EffectFactory.CellPerimeter(this, pos, new Color(0.4f, 1f, 0.5f),
+                    duration: 500f, 0.10f));
+                break;
+
+            // Fortify command issued: feedback burst
+            case VisualEventType.CommandFortifyIssued:
+                AddEffect(EffectFactory.CellPerimeter(this, pos, new Color(0.7f, 0.85f, 1f),
+                    duration: 500f, 0.10f));
+                break;
+
+            // Mining hit: sparkle on the shared edge between builder and nugget
+            case VisualEventType.NuggetMiningStarted:
+                if (evt.Direction.HasValue)
+                {
+                    var d = evt.Direction.Value.ToOffset();
+                    AddEffect(EffectFactory.MiningSpark(this, pos, d.X, d.Y,
+                        new Color(1f, 0.9f, 0.7f), duration: 500f, armCount: 6, armLen: 3, trail: 0.20f));
+                }
+                break;
+
+            // Nugget freed: radial light burst + grid lightning outward
+            case VisualEventType.NuggetFreed:
+                AddEffect(EffectFactory.LightningBurst(this, pos, Colors.White,
+                    maxSegs: 22, duration: 1200f, trail: 0.15f,
+                    contProb: 0.85f, branchProb: 0.4f));
+                AddEffect(EffectFactory.CellPerimeter(this, pos, Colors.White,
+                    duration: 800f, 0.15f));
+                break;
+
+            // Nugget captured: sharp grid lightning burst
+            case VisualEventType.NuggetCaptured:
+                AddEffect(EffectFactory.LightningBurst(this, pos, color,
+                    maxSegs: 12, duration: 600f, trail: 0.12f,
+                    contProb: 0.7f, branchProb: 0.3f));
+                break;
+
+            // Nugget consumed by nest refine: converging drain toward nest
+            case VisualEventType.NuggetRefineConsumed:
+                AddEffect(EffectFactory.ConvergingDrain(this, pos, Colors.White,
+                    maxSegs: 30, duration: 1000f, trail: 0.15f));
+                break;
+
+            // Nugget consumed to heal: converging drain (green) at target
+            case VisualEventType.NuggetHealConsumed:
+                AddEffect(EffectFactory.ConvergingDrain(this, pos, new Color(0.4f, 1f, 0.5f),
+                    maxSegs: 24, duration: 800f, trail: 0.12f));
+                break;
+
+            // Nugget consumed to fortify: converging drain (blue) at wall
+            case VisualEventType.NuggetFortifyConsumed:
+                AddEffect(EffectFactory.ConvergingDrain(this, pos, new Color(0.7f, 0.85f, 1f),
+                    maxSegs: 24, duration: 1000f, trail: 0.15f));
                 break;
 
             // Player eliminated: Screen-wide shockwave

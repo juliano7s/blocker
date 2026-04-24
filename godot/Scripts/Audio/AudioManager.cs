@@ -30,6 +30,9 @@ public partial class AudioManager : Node
         VisualEventType.CommandRootIssued,
         VisualEventType.CommandUprootIssued,
         VisualEventType.CommandWallIssued,
+        VisualEventType.CommandMineIssued,
+        VisualEventType.CommandHealIssued,
+        VisualEventType.CommandFortifyIssued,
         VisualEventType.WallConverted,
         // Formation events are private
         VisualEventType.BuilderNestFormed,
@@ -116,6 +119,7 @@ public partial class AudioManager : Node
                 BlockType.Warden => Config.SelectWarden,
                 BlockType.Jumper => Config.SelectJumper,
                 BlockType.Wall => Config.SelectWall,
+                BlockType.Nugget => null,
                 _ => null
             };
             Play(stream);
@@ -189,6 +193,17 @@ public partial class AudioManager : Node
             VisualEventType.JumpExecuted => Config.JumpLaunch,
             VisualEventType.JumpLanded => Config.JumpLand,
             VisualEventType.MagnetPulled => Config.MagnetPull,
+
+            // Nugget events (sounds TBD — wired so they don't silently drop)
+            VisualEventType.CommandMineIssued => null,
+            VisualEventType.CommandHealIssued => null,
+            VisualEventType.CommandFortifyIssued => null,
+            VisualEventType.NuggetMiningStarted => null,
+            VisualEventType.NuggetFreed => null,
+            VisualEventType.NuggetCaptured => null,
+            VisualEventType.NuggetRefineConsumed => null,
+            VisualEventType.NuggetHealConsumed => null,
+            VisualEventType.NuggetFortifyConsumed => null,
 
             // Game events
             VisualEventType.PlayerEliminated => Config.PlayerEliminated,
