@@ -67,6 +67,18 @@ public static class NuggetSystem
             if (block.NuggetState is not { IsMined: true }) continue;
             if (toRemove.Contains(block.Id)) continue;
 
+            if (TryConsumeHeal(state, block))
+            {
+                toRemove.Add(block.Id);
+                continue;
+            }
+
+            if (TryConsumeFortify(state, block))
+            {
+                toRemove.Add(block.Id);
+                continue;
+            }
+
             if (TryConsumeNestRefine(state, block))
             {
                 toRemove.Add(block.Id);
@@ -113,6 +125,99 @@ public static class NuggetSystem
         }
 
         return false;
+    }
+
+    private static bool TryConsumeHeal(GameState state, Block nugget)
+    {
+        if (!nugget.NuggetState!.HealTargetId.HasValue) return false;
+
+        var target = state.GetBlock(nugget.NuggetState.HealTargetId.Value);
+        if (target == null)
+        {
+            nugget.NuggetState.HealTargetId = null;
+            return false;
+        }
+
+        bool adjacent = false;
+        foreach (var offset in GridPos.OrthogonalOffsets)
+        {
+            if (nugget.Pos + offset == target.Pos)
+            {
+                adjacent = true;
+                break;
+            }
+        }
+
+        if (!adjacent) return false;
+
+        int maxHp = target.Type switch
+        {
+            BlockType.Soldier => Constants.SoldierMaxHp,
+            BlockType.Jumper => Constants.JumperMaxHp,
+            _ => 0
+        };
+
+        if (maxHp > 0)
+            target.Hp = maxHp;
+
+        state.VisualEvents.Add(new VisualEvent(
+            VisualEventType.NuggetHealConsumed, target.Pos, nugget.PlayerId, BlockId: nugget.Id));
+
+        return true;
+    }
+
+    private static bool TryConsumeFortify(GameState state, Block nugget)
+    {
+        if (!nugget.NuggetState!.FortifyTargetPos.HasValue) return false;
+
+        var targetPos = nugget.NuggetState.FortifyTargetPos.Value;
+        var targetWall = state.GetBlockAt(targetPos);
+        if (targetWall == null || targetWall.Type != BlockType.Wall)
+        {
+            nugget.NuggetState.FortifyTargetPos = null;
+            return false;
+        }
+
+        bool adjacent = false;
+        foreach (var offset in GridPos.OrthogonalOffsets)
+        {
+            if (nugget.Pos + offset == targetPos)
+            {
+                adjacent = true;
+                break;
+            }
+        }
+
+        if (!adjacent) return false;
+
+        var fortifyTargets = new List<Block> { targetWall };
+        var visited = new HashSet<GridPos> { targetPos };
+        var queue = new Queue<GridPos>();
+        queue.Enqueue(targetPos);
+
+        while (queue.Count > 0 && fortifyTargets.Count < Constants.FortifiedWallCount)
+        {
+            var pos = queue.Dequeue();
+            foreach (var offset in GridPos.OrthogonalOffsets)
+            {
+                var neighbor = pos + offset;
+                if (!visited.Add(neighbor)) continue;
+                var wall = state.GetBlockAt(neighbor);
+                if (wall == null || wall.Type != BlockType.Wall) continue;
+                if (wall.PlayerId != nugget.PlayerId) continue;
+                fortifyTargets.Add(wall);
+                if (fortifyTargets.Count >= Constants.FortifiedWallCount) break;
+                queue.Enqueue(neighbor);
+            }
+        }
+
+        foreach (var wall in fortifyTargets)
+            wall.FortifiedHp = Constants.FortifiedWallHp;
+
+        state.VisualEvents.Add(new VisualEvent(
+            VisualEventType.NuggetFortifyConsumed, targetPos, nugget.PlayerId, BlockId: nugget.Id));
+
+        return true;
     }
 
     private static void TickCapture(GameState state)

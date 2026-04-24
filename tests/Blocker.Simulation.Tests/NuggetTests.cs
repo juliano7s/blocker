@@ -356,4 +356,76 @@ public class NuggetTests
 
         Assert.True(nest.SpawnProgress > 0);
     }
+
+    // --- Part H: Heal ---
+
+    [Fact]
+    public void Heal_NuggetAdjacentToTarget_HealsToFull()
+    {
+        var state = CreateState();
+        var soldier = state.AddBlock(BlockType.Soldier, 0, new GridPos(5, 5));
+        soldier.Hp = 1;
+
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(5, 4));
+        nugget.NuggetState!.IsMined = true;
+        nugget.NuggetState.HealTargetId = soldier.Id;
+
+        NuggetSystem.Tick(state);
+
+        Assert.Equal(Constants.SoldierMaxHp, soldier.Hp);
+        Assert.Null(state.GetBlock(nugget.Id));
+    }
+
+    [Fact]
+    public void Heal_NuggetNotAdjacent_DoesNotHeal()
+    {
+        var state = CreateState();
+        var soldier = state.AddBlock(BlockType.Soldier, 0, new GridPos(5, 5));
+        soldier.Hp = 1;
+
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(5, 3));
+        nugget.NuggetState!.IsMined = true;
+        nugget.NuggetState.HealTargetId = soldier.Id;
+
+        NuggetSystem.Tick(state);
+
+        Assert.Equal(1, soldier.Hp);
+        Assert.NotNull(state.GetBlock(nugget.Id));
+    }
+
+    // --- Part I: Fortify ---
+
+    [Fact]
+    public void Fortify_NuggetAdjacentToWall_FortifiesFiveWalls()
+    {
+        var state = CreateState();
+        for (int x = 3; x <= 8; x++)
+            state.AddBlock(BlockType.Wall, 0, new GridPos(x, 5));
+
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(5, 4));
+        nugget.NuggetState!.IsMined = true;
+        nugget.NuggetState.FortifyTargetPos = new GridPos(5, 5);
+
+        NuggetSystem.Tick(state);
+
+        Assert.Null(state.GetBlock(nugget.Id));
+
+        int fortifiedCount = state.Blocks.Count(b => b.Type == BlockType.Wall && b.FortifiedHp > 0);
+        Assert.Equal(5, fortifiedCount);
+    }
+
+    [Fact]
+    public void Fortify_SetsCorrectHp()
+    {
+        var state = CreateState();
+        var wall = state.AddBlock(BlockType.Wall, 0, new GridPos(5, 5));
+
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(5, 4));
+        nugget.NuggetState!.IsMined = true;
+        nugget.NuggetState.FortifyTargetPos = new GridPos(5, 5);
+
+        NuggetSystem.Tick(state);
+
+        Assert.Equal(Constants.FortifiedWallHp, wall.FortifiedHp);
+    }
 }
