@@ -65,6 +65,26 @@ public record WallConfig
     public int PopCost { get; init; } = 0;
 }
 
+public record NuggetConfig
+{
+    public int MiningTicks { get; init; } = 180;
+    public int MoveInterval { get; init; } = 3;
+    public int PopCost { get; init; } = 0;
+    public int RefineRadius { get; init; } = 3;
+    public int FortifiedWallHp { get; init; } = 3;
+    public int FortifiedWallCount { get; init; } = 5;
+    public int BuilderSpawnBonus { get; init; } = 100;
+    public int SoldierSpawnBonus { get; init; } = 100;
+    public int StunnerSpawnBonus { get; init; } = 100;
+    public int WardenSpawnBonus { get; init; } = 100;
+    public int JumperSpawnBonus { get; init; } = 100;
+    public bool BuilderRequired { get; init; } = false;
+    public bool SoldierRequired { get; init; } = false;
+    public bool StunnerRequired { get; init; } = false;
+    public bool WardenRequired { get; init; } = false;
+    public bool JumperRequired { get; init; } = false;
+}
+
 public record EconomyConfig
 {
     public int SupplyPopCap { get; init; } = 7;
@@ -117,6 +137,7 @@ public record SimulationConfig
     public WardenConfig Warden { get; init; } = new();
     public JumperConfig Jumper { get; init; } = new();
     public WallConfig Wall { get; init; } = new();
+    public NuggetConfig Nugget { get; init; } = new();
     public EconomyConfig Economy { get; init; } = new();
     public CombatConfig Combat { get; init; } = new();
     public TowerConfig Tower { get; init; } = new();
@@ -150,6 +171,7 @@ public record SimulationConfig
         Blocks.BlockType.Stunner => Stunner.MoveInterval,
         Blocks.BlockType.Warden => Warden.MoveInterval,
         Blocks.BlockType.Jumper => Jumper.MoveInterval,
+        Blocks.BlockType.Nugget => Nugget.MoveInterval,
         _ => Builder.MoveInterval
     };
 
@@ -161,6 +183,7 @@ public record SimulationConfig
         Blocks.BlockType.Stunner => Stunner.PopCost,
         Blocks.BlockType.Warden => Warden.PopCost,
         Blocks.BlockType.Jumper => Jumper.PopCost,
+        Blocks.BlockType.Nugget => Nugget.PopCost,
         _ => 0
     };
 
@@ -186,4 +209,24 @@ public record SimulationConfig
             baseTicks *= Economy.ProtoSpawnMultiplier;
         return baseTicks;
     }
+
+    public int GetNuggetSpawnBonus(Blocks.BlockType unitType) => unitType switch
+    {
+        Blocks.BlockType.Builder => Nugget.BuilderSpawnBonus,
+        Blocks.BlockType.Soldier => Nugget.SoldierSpawnBonus,
+        Blocks.BlockType.Stunner => Nugget.StunnerSpawnBonus,
+        Blocks.BlockType.Warden => Nugget.WardenSpawnBonus,
+        Blocks.BlockType.Jumper => Nugget.JumperSpawnBonus,
+        _ => 0
+    };
+
+    public bool GetNuggetRequired(Blocks.BlockType unitType) => unitType switch
+    {
+        Blocks.BlockType.Builder => Nugget.BuilderRequired,
+        Blocks.BlockType.Soldier => Nugget.SoldierRequired,
+        Blocks.BlockType.Stunner => Nugget.StunnerRequired,
+        Blocks.BlockType.Warden => Nugget.WardenRequired,
+        Blocks.BlockType.Jumper => Nugget.JumperRequired,
+        _ => false
+    };
 }

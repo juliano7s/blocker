@@ -103,4 +103,12 @@ public static class Constants
     public static int PopCostStunner => _config.Stunner.PopCost;
     public static int PopCostWarden => _config.Warden.PopCost;
     public static int PopCostJumper => _config.Jumper.PopCost;
+
+    // Nugget
+    public static int NuggetMiningTicks => _config.Nugget.MiningTicks;
+    public static int NuggetMoveInterval => _config.Nugget.MoveInterval;
+    public static int PopCostNugget => _config.Nugget.PopCost;
+    public static int NuggetRefineRadius => _config.Nugget.RefineRadius;
+    public static int FortifiedWallHp => _config.Nugget.FortifiedWallHp;
+    public static int FortifiedWallCount => _config.Nugget.FortifiedWallCount;
 }
