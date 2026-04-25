@@ -139,6 +139,7 @@ metadata/_custom_type_script = "uid://b0tdonjk25i0t"
 
 [sub_resource type="Resource" id="Resource_4kpch"]
 script = ExtResource("3_50glp")
+MoveGiveUpTicks = 12
 GridLineColor = Color(0.1173, 0.1173, 0.23, 1)
 NormalGroundColor = Color(0.050980393, 0.050980393, 0.13725491, 1)
 BootGroundColor = Color(0.18479998, 0.32, 0.112, 0.74509805)
