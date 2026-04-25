@@ -111,10 +111,10 @@ public partial class GridRenderer : Node2D
                 mat.SetShaderParameter("max_radius", (float)refineR + 1f);
                 mat.SetShaderParameter("trail", 1.5f);
                 mat.SetShaderParameter("ring_color", new Color(0.8f, 0.85f, 0.95f, 0.6f));
-                mat.SetShaderParameter("fade_mult", 0.6f);
+                mat.SetShaderParameter("fade_mult", 0.8f);
                 mat.SetShaderParameter("mode", 0); // square rings
                 mat.SetShaderParameter("loop_mode", true);
-                mat.SetShaderParameter("base_alpha", 0.04f);
+                mat.SetShaderParameter("base_alpha", 0.06f);
                 mat.SetShaderParameter("progress", 0f);
                 mat.SetShaderParameter("age_ms", 0f);
 
@@ -132,8 +132,8 @@ public partial class GridRenderer : Node2D
             var mat2 = (ShaderMaterial)rect.Material;
             mat2.SetShaderParameter("center", new Vector2(nest.Center.X + 0.5f, nest.Center.Y + 0.5f));
             mat2.SetShaderParameter("age_ms", (float)Time.GetTicksMsec());
-            float waveCycleMs = 3000f;
-            mat2.SetShaderParameter("progress", ((float)Time.GetTicksMsec() % waveCycleMs) / waveCycleMs);
+            // No expanding wave — just steady glow with gentle shimmer from age_ms
+            mat2.SetShaderParameter("progress", 0f);
         }
 
         var stale = new List<int>();

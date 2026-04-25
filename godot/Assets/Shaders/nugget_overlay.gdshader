@@ -90,22 +90,28 @@ void fragment() {
             alpha = max(alpha, glow_a);
         }
 
-        // 4 prismatic star sparkles
+        // 4 prismatic star sparkles — per-nugget randomized orbits
         vec3 star_colors[4] = vec3[4](
             vec3(0.67, 0.87, 1.0),  // ice blue
             vec3(1.0, 0.83, 1.0),   // pink
             vec3(0.83, 1.0, 0.87),  // green
             vec3(1.0, 1.0, 1.0)     // white
         );
+        // Per-nugget speed/orbit variation from phase (block ID)
+        float speed_var = 0.8 + fract(phase * 0.618) * 0.8; // golden ratio hash, range [0.8, 1.6]
+        float orbit_var = fract(phase * 0.3183) * 6.28;      // 1/pi hash, full rotation offset
 
         for (int i = 0; i < 4; i++) {
             float fi = float(i);
-            float sp = TIME * 1.5 + fi * 2.1 + phase * 0.051;
+            // Stagger timing strongly per nugget: large phase offset + varied speed
+            float sp = TIME * (1.2 + fi * 0.3) * speed_var + fi * 2.1 + orbit_var;
             float sparkle_alpha = max(0.0, sin(sp)) * 0.9;
 
             if (sparkle_alpha > 0.05) {
-                float sx = center.x + sin(sp * 0.7 + fi * 4.2) * cs * 0.3;
-                float sy = center.y + cos(sp * 0.5 + fi * 3.1) * cs * 0.3;
+                // Varied orbit radii and directions per nugget
+                float orbit_r = cs * (0.2 + 0.15 * sin(orbit_var + fi * 1.7));
+                float sx = center.x + sin(sp * (0.5 + fi * 0.15) + orbit_var) * orbit_r;
+                float sy = center.y + cos(sp * (0.4 + fi * 0.12) + orbit_var * 1.3) * orbit_r;
                 float arm_len = 2.5 + sparkle_alpha * 1.5;
                 float arm_w = 0.6;
                 float s = star4(p, vec2(sx, sy), arm_len, arm_w);
