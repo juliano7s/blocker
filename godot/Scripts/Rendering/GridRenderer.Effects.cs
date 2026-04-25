@@ -110,11 +110,11 @@ public partial class GridRenderer : Node2D
                 mat.SetShaderParameter("cell_size", CellSize);
                 mat.SetShaderParameter("max_radius", (float)refineR + 1f);
                 mat.SetShaderParameter("trail", 1.5f);
-                mat.SetShaderParameter("ring_color", new Color(0.8f, 0.85f, 0.95f, 0.6f));
-                mat.SetShaderParameter("fade_mult", 0.8f);
+                mat.SetShaderParameter("ring_color", new Color(0.85f, 0.9f, 1.0f, 1.0f));
+                mat.SetShaderParameter("fade_mult", 1.0f);
                 mat.SetShaderParameter("mode", 0); // square rings
                 mat.SetShaderParameter("loop_mode", true);
-                mat.SetShaderParameter("base_alpha", 0.06f);
+                mat.SetShaderParameter("base_alpha", 0.15f);
                 mat.SetShaderParameter("progress", 0f);
                 mat.SetShaderParameter("age_ms", 0f);
 
