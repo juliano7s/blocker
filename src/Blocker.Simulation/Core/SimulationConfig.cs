@@ -70,7 +70,7 @@ public record NuggetConfig
     public int MiningTicks { get; init; } = 180;
     public int MoveInterval { get; init; } = 3;
     public int PopCost { get; init; } = 0;
-    public int RefineRadius { get; init; } = 3;
+    public int RefineRadius { get; init; } = 2;
     public int FortifiedWallHp { get; init; } = 3;
     public int FortifiedWallCount { get; init; } = 5;
     public int BuilderSpawnBonus { get; init; } = 100;

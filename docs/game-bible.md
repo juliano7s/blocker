@@ -159,13 +159,13 @@ Mineable resource block. Adds strategic diversity — players decide how to allo
 - **Mining**: Builder right-clicks to mine. Progress = adjacent miners per tick. Base time: 180 ticks (~15s with 1 builder). `PlayerId` updates to mining team. Only one team can mine at a time.
 - **Freed**: `IsMined = true`. Fully owned, selectable, commandable. Auto-rallies to nearest friendly nest unless manually moved (Move command permanently disables auto-rally until captured).
 - **Consumption**: Three paths, nugget removed on use:
-  - *Nest Refine*: Within 3 Chebyshev distance of friendly nest → auto-consumed, grants spawn progress bonus.
+  - *Nest Refine*: Within 2 Chebyshev distance of friendly nest → auto-consumed, grants spawn progress bonus.
   - *Heal Unit*: Right-click damaged soldier/jumper → pathfinds adjacent, heals to full HP on arrival.
   - *Fortify Walls*: Right-click friendly wall → pathfinds adjacent, grants `FortifiedHp` to target + 4 connected walls (BFS).
 - **Capture**: Enemy builder orthogonally adjacent (no friendly builder contesting) → instant ownership flip, auto-rally retargets.
 
 **Fortified Walls:**
-- `FortifiedHp` absorbs stun ray hits (decrements instead of destroying). When 0, wall is normal again.
+- `FortifiedHp` absorbs stun ray hits (decrements instead of destroying). Visual: inverted triangle of 3 diamonds at full HP, vertical pair at 2 HP, single diamond at 1 HP. When 0, wall is normal again.
 - Default `FORTIFIED_WALL_HP = 3`. Affects 5 walls per nugget (target + 4 BFS-connected).
 
 ### 4.7 Resource: Nugget
