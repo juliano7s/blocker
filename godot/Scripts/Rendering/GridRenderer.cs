@@ -131,6 +131,11 @@ public partial class GridRenderer : Node2D
 			rect.QueueFree();
 		_wardenZocRects.Clear();
 
+		// Clean up nest refine zone rects from previous game state
+		foreach (var (_, rect) in _nestRefineRects)
+			rect.QueueFree();
+		_nestRefineRects.Clear();
+
 		QueueRedraw();
 	}
 
@@ -417,6 +422,9 @@ public partial class GridRenderer : Node2D
 
 		// Update warden ZoC shader-based sine rings
 		UpdateWardenZoC();
+
+		// Update nest refine zone visualization
+		UpdateNestRefineZones();
 
 		QueueRedraw();
 	}

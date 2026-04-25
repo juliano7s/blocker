@@ -12,6 +12,7 @@ public partial class GridRenderer : Node2D
 {
     // Warden ZoC: shader-based sine rings per rooted warden
     private readonly Dictionary<int, ColorRect> _wardenZocRects = new();
+    private readonly Dictionary<int, ColorRect> _nestRefineRects = new();
     private static readonly Shader _gridRingsShader = GD.Load<Shader>("res://Assets/Shaders/grid_rings.gdshader");
 
     private void UpdateWardenZoC()
@@ -86,6 +87,66 @@ public partial class GridRenderer : Node2D
     private void DrawWardenZoC()
     {
         // Legacy entry point kept for compatibility — all work done in UpdateWardenZoC
+    }
+
+    private void UpdateNestRefineZones()
+    {
+        if (_gameState == null) return;
+
+        var grid = _gameState.Grid;
+        int refineR = Simulation.Core.Constants.NuggetRefineRadius;
+        var gridPixelSize = new Vector2(grid.Width * CellSize, grid.Height * CellSize);
+
+        var activeNests = new HashSet<int>();
+        foreach (var nest in _gameState.Nests)
+        {
+            activeNests.Add(nest.Id);
+
+            if (!_nestRefineRects.TryGetValue(nest.Id, out var rect))
+            {
+                var mat = new ShaderMaterial { Shader = _gridRingsShader };
+
+                mat.SetShaderParameter("grid_size", new Vector2(grid.Width, grid.Height));
+                mat.SetShaderParameter("cell_size", CellSize);
+                mat.SetShaderParameter("max_radius", (float)refineR + 1f);
+                mat.SetShaderParameter("trail", 1.5f);
+                mat.SetShaderParameter("ring_color", new Color(0.8f, 0.85f, 0.95f, 0.6f));
+                mat.SetShaderParameter("fade_mult", 0.6f);
+                mat.SetShaderParameter("mode", 0); // square rings
+                mat.SetShaderParameter("loop_mode", true);
+                mat.SetShaderParameter("base_alpha", 0.04f);
+                mat.SetShaderParameter("progress", 0f);
+                mat.SetShaderParameter("age_ms", 0f);
+
+                rect = new ColorRect
+                {
+                    Position = new Vector2(GridPadding, GridPadding),
+                    Size = gridPixelSize,
+                    Material = mat,
+                    MouseFilter = Control.MouseFilterEnum.Ignore,
+                };
+                AddChild(rect);
+                _nestRefineRects[nest.Id] = rect;
+            }
+
+            var mat2 = (ShaderMaterial)rect.Material;
+            mat2.SetShaderParameter("center", new Vector2(nest.Center.X + 0.5f, nest.Center.Y + 0.5f));
+            mat2.SetShaderParameter("age_ms", (float)Time.GetTicksMsec());
+            float waveCycleMs = 3000f;
+            mat2.SetShaderParameter("progress", ((float)Time.GetTicksMsec() % waveCycleMs) / waveCycleMs);
+        }
+
+        var stale = new List<int>();
+        foreach (var (id, rect) in _nestRefineRects)
+        {
+            if (!activeNests.Contains(id))
+            {
+                rect.QueueFree();
+                stale.Add(id);
+            }
+        }
+        foreach (var id in stale)
+            _nestRefineRects.Remove(id);
     }
 
     private void DrawRays()
