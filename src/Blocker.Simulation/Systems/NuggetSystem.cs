@@ -66,7 +66,10 @@ public static class NuggetSystem
                 foreach (var b in state.Blocks)
                 {
                     if (b.MiningTargetId == block.Id)
+                    {
                         b.MiningTargetId = null;
+                        b.MiningIsFallback = false;
+                    }
                 }
 
                 state.VisualEvents.Add(new VisualEvent(
@@ -296,6 +299,65 @@ public static class NuggetSystem
 
             SetAutoRallyTarget(state, block);
         }
+    }
+
+    public static void TryAssignFallbackMiningTarget(GameState state, Block builder, int excludeNuggetId)
+    {
+        Block? best = null;
+        int bestDist = int.MaxValue;
+
+        foreach (var block in state.Blocks)
+        {
+            if (block.Type != BlockType.Nugget) continue;
+            if (block.NuggetState is not { IsMined: false }) continue;
+            if (block.Id == excludeNuggetId) continue;
+
+            int chebyshev = Math.Max(
+                Math.Abs(block.Pos.X - builder.Pos.X),
+                Math.Abs(block.Pos.Y - builder.Pos.Y));
+            if (chebyshev > Constants.BuilderLineOfSight) continue;
+
+            // Reject if another team is actively mining it
+            if (block.PlayerId != -1 && block.PlayerId != builder.PlayerId)
+            {
+                bool enemyMining = false;
+                foreach (var b in state.Blocks)
+                {
+                    if (b.MiningTargetId == block.Id && b.PlayerId != builder.PlayerId)
+                    {
+                        enemyMining = true;
+                        break;
+                    }
+                }
+                if (enemyMining) continue;
+            }
+
+            int dist = builder.Pos.ManhattanDistance(block.Pos);
+            if (dist < bestDist)
+            {
+                bestDist = dist;
+                best = block;
+            }
+        }
+
+        if (best == null) return;
+
+        bool isAdjacent = false;
+        foreach (var offset in GridPos.OrthogonalOffsets)
+        {
+            if (builder.Pos + offset == best.Pos)
+            {
+                isAdjacent = true;
+                break;
+            }
+        }
+
+        if (!isAdjacent)
+            builder.MoveTarget = best.Pos;
+
+        builder.MiningTargetId = best.Id;
+        builder.MiningIsFallback = true;
+        best.PlayerId = builder.PlayerId;
     }
 
     private static Direction OffsetToDirection(GridPos offset) => (offset.X, offset.Y) switch

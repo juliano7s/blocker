@@ -95,7 +95,7 @@ public record EconomyConfig
 public record CombatConfig
 {
     public int FragileWallSoldierThreshold { get; init; } = 2;
-    public int MoveGiveUpTicks { get; init; } = 10;
+    public int MoveGiveUpTicks { get; init; } = 12; // Real ticks (~1 second at 12 tps)
 }
 
 public record TowerConfig

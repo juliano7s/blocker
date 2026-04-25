@@ -195,7 +195,10 @@ public class GameState
                     // Immediate: clear queue
                     block.CommandQueue.Clear();
                     if (block.Type == BlockType.Builder)
+                    {
                         block.MiningTargetId = null;
+                        block.MiningIsFallback = false;
+                    }
 
                     // Root on rooting/uprooting block = immediate toggle (cancel)
                     bool isRootingOrUprooting = block.State is BlockState.Rooting or BlockState.Uprooting;
@@ -241,6 +244,7 @@ public class GameState
         {
             case CommandType.Move:
                 block.MiningTargetId = null;
+                block.MiningIsFallback = false;
                 if (cmd.TargetPos.HasValue && block.IsMobile)
                 {
                     block.MoveTarget = cmd.TargetPos.Value;
@@ -459,6 +463,7 @@ public class GameState
     {
         // A block is idle when it has no active task
         if (block.MoveTarget.HasValue) return false;
+        if (block.MiningTargetId.HasValue) return false;
         if (block.State == BlockState.Rooting) return false;
         if (block.State == BlockState.Uprooting) return false;
         if (block.IsOnCooldown && !block.MobileCooldown) return false; // Immobile cooldown
@@ -693,11 +698,21 @@ public class GameState
                 if (TryMoveBlock(block, nextStep.Value))
                     block.StuckTicks = 0;
                 else
-                    block.StuckTicks++;
+                {
+                    // Builder adjacent to its mining nugget — that cell will never be free, clear immediately
+                    if (block.Type == BlockType.Builder && block.MiningTargetId.HasValue
+                        && nextStep.Value == target)
+                    {
+                        block.MoveTarget = null;
+                        block.StuckTicks = 0;
+                        continue;
+                    }
+                    block.StuckTicks += block.EffectiveMoveInterval;
+                }
             }
             else
             {
-                block.StuckTicks++;
+                block.StuckTicks += block.EffectiveMoveInterval;
             }
 
             // Give up if stuck too long
@@ -706,6 +721,37 @@ public class GameState
                 block.MoveTarget = null;
                 block.IsAttackMoving = false;
                 block.StuckTicks = 0;
+
+                if (block.Type == BlockType.Builder && block.MiningTargetId.HasValue)
+                {
+                    var miningTarget = GetBlock(block.MiningTargetId.Value);
+                    bool adjacentToTarget = false;
+                    if (miningTarget != null)
+                    {
+                        foreach (var offset in GridPos.OrthogonalOffsets)
+                        {
+                            if (block.Pos + offset == miningTarget.Pos)
+                            {
+                                adjacentToTarget = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!adjacentToTarget)
+                    {
+                        bool wasFallback = block.MiningIsFallback;
+                        int excludeId = block.MiningTargetId.Value;
+                        block.MiningTargetId = null;
+                        block.MiningIsFallback = false;
+
+                        if (!wasFallback)
+                            NuggetSystem.TryAssignFallbackMiningTarget(this, block, excludeId);
+                        // else: fallback also failed — truly give up, player must reassign
+                    }
+                    // else: already adjacent and mining — MoveTarget cleared above is enough
+                }
+
                 continue;
             }
 

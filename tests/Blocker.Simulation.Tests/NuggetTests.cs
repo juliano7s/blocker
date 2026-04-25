@@ -491,6 +491,93 @@ public class NuggetTests
         Assert.False(nest.NuggetLoaded);
     }
 
+    // --- Part M: Mining queue and give-up ---
+
+    [Fact]
+    public void MiningQueue_ShiftQueue_WaitsForActiveMining()
+    {
+        var state = CreateState();
+        var nuggetA = state.AddBlock(BlockType.Nugget, 0, new GridPos(5, 5));
+        var nuggetB = state.AddBlock(BlockType.Nugget, -1, new GridPos(5, 9));
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 4)); // adjacent to A
+
+        builder.MiningTargetId = nuggetA.Id; // actively mining A, no MoveTarget
+
+        var cmd = new Command(0, CommandType.MineNugget, [builder.Id], TargetPos: nuggetB.Pos, Queue: true);
+        state.Tick([cmd]);
+
+        // B queued but not consumed — builder is not idle while MiningTargetId is set
+        Assert.Equal(nuggetA.Id, builder.MiningTargetId);
+        Assert.Equal(-1, nuggetB.PlayerId);
+    }
+
+    [Fact]
+    public void MiningQueue_CompletionFiresQueuedCommand()
+    {
+        var state = CreateState();
+        var nuggetA = state.AddBlock(BlockType.Nugget, 0, new GridPos(5, 5));
+        nuggetA.NuggetState!.MiningProgress = Constants.NuggetMiningTicks - 1;
+        var nuggetB = state.AddBlock(BlockType.Nugget, -1, new GridPos(5, 9));
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 4)); // adjacent to A
+        builder.MiningTargetId = nuggetA.Id;
+        builder.CommandQueue.Enqueue(new QueuedCommand(CommandType.MineNugget, TargetPos: nuggetB.Pos));
+
+        // NuggetSystem (step 8.5) completes A and clears MiningTargetId;
+        // queue consumption (step 9) fires B in the same tick.
+        // Must pass empty list (not null) — null skips ProcessCommands entirely.
+        state.Tick([]);
+
+        Assert.Equal(nuggetB.Id, builder.MiningTargetId);
+    }
+
+    [Fact]
+    public void GiveUp_BlockedBuilder_AssignsFallbackNugget()
+    {
+        var state = CreateState(30, 30);
+        // Target nugget far away — builder can't reach it
+        var nuggetA = state.AddBlock(BlockType.Nugget, 0, new GridPos(20, 5));
+        var nuggetB = state.AddBlock(BlockType.Nugget, -1, new GridPos(7, 5)); // within BuilderLineOfSight
+
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 5));
+        builder.MiningTargetId = nuggetA.Id;
+        builder.MoveTarget = nuggetA.Pos;
+
+        // Surround builder so it can't move
+        state.AddBlock(BlockType.Wall, 0, new GridPos(5, 4));
+        state.AddBlock(BlockType.Wall, 0, new GridPos(5, 6));
+        state.AddBlock(BlockType.Wall, 0, new GridPos(4, 5));
+        state.AddBlock(BlockType.Wall, 0, new GridPos(6, 5));
+
+        // Builder MoveInterval=3, MoveGiveUpTicks=12: first give-up fires around tick 9
+        for (int i = 0; i < 15; i++) state.Tick(null);
+
+        Assert.Equal(nuggetB.Id, builder.MiningTargetId);
+        Assert.True(builder.MiningIsFallback);
+    }
+
+    [Fact]
+    public void GiveUp_FallbackAlsoBlocked_GivesUpEntirely()
+    {
+        var state = CreateState(30, 30);
+        var nuggetA = state.AddBlock(BlockType.Nugget, 0, new GridPos(20, 5));
+        state.AddBlock(BlockType.Nugget, -1, new GridPos(7, 5)); // nearby, also unreachable (builder is surrounded)
+
+        var builder = state.AddBlock(BlockType.Builder, 0, new GridPos(5, 5));
+        builder.MiningTargetId = nuggetA.Id;
+        builder.MoveTarget = nuggetA.Pos;
+
+        state.AddBlock(BlockType.Wall, 0, new GridPos(5, 4));
+        state.AddBlock(BlockType.Wall, 0, new GridPos(5, 6));
+        state.AddBlock(BlockType.Wall, 0, new GridPos(4, 5));
+        state.AddBlock(BlockType.Wall, 0, new GridPos(6, 5));
+
+        // First give-up ~tick 9, second give-up ~tick 21 — run past both
+        for (int i = 0; i < 30; i++) state.Tick(null);
+
+        Assert.Null(builder.MiningTargetId);
+        Assert.False(builder.MiningIsFallback);
+    }
+
     // --- Part L: Full Lifecycle ---
 
     [Fact]

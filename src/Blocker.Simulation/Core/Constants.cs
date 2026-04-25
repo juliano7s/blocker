@@ -104,6 +104,9 @@ public static class Constants
     public static int PopCostWarden => _config.Warden.PopCost;
     public static int PopCostJumper => _config.Jumper.PopCost;
 
+    // Builder
+    public const int BuilderLineOfSight = 5; // Chebyshev radius — future fog-of-war LOS
+
     // Nugget
     public static int NuggetMiningTicks => _config.Nugget.MiningTicks;
     public static int NuggetMoveInterval => _config.Nugget.MoveInterval;

@@ -56,6 +56,7 @@ public class Block
 
     // Builder mining state — ID of nugget being mined
     public int? MiningTargetId { get; set; }
+    public bool MiningIsFallback { get; set; } // True when MiningTargetId was auto-assigned after a failed attempt
 
     // Wall fortification — stun ray hits before destruction (0 = normal wall)
     public int FortifiedHp { get; set; }
