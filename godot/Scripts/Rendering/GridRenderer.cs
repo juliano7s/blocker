@@ -26,6 +26,12 @@ public partial class GridRenderer : Node2D
 	private ShaderMaterial _bgMaterial = null!;
 	private ImageTexture? _mapDataTexture;
 
+	// Nugget overlay: shader-based sparkles for unmined nuggets + fortified wall diamonds
+	private ColorRect? _nuggetOverlayRect;
+	private ShaderMaterial? _nuggetOverlayMaterial;
+	private ImageTexture? _nuggetDataTexture;
+	private Image? _nuggetDataImage;
+
 	public override void _Ready()
 	{
 		_glowLayer = new GlowLayer { Name = "GlowLayer" };
@@ -42,6 +48,18 @@ public partial class GridRenderer : Node2D
 			ZIndex = -10, // Ensure it's behind everything
 		};
 		AddChild(_bgRect);
+
+		// Initialize nugget overlay shader
+		var nuggetShader = GD.Load<Shader>("res://Assets/Shaders/nugget_overlay.gdshader");
+		_nuggetOverlayMaterial = new ShaderMaterial { Shader = nuggetShader };
+		_nuggetOverlayRect = new ColorRect
+		{
+			Material = _nuggetOverlayMaterial,
+			Color = Colors.White,
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			ZIndex = 5,
+		};
+		AddChild(_nuggetOverlayRect);
 	}
 
 	public void SetTickInterval(float interval) => _tickInterval = interval;
@@ -160,6 +178,25 @@ public partial class GridRenderer : Node2D
 		_bgMaterial.SetShaderParameter("terrain_color", _config.TerrainGroundColor);
 		_bgMaterial.SetShaderParameter("breakable_color", _config.BreakableWallGroundColor);
 		_bgMaterial.SetShaderParameter("fragile_color", _config.FragileWallGroundColor);
+
+		// Update nugget overlay shader params
+		if (_nuggetOverlayMaterial != null)
+		{
+			var grid2 = _gameState.Grid;
+			_nuggetOverlayMaterial.SetShaderParameter("grid_size", new Vector2I(grid2.Width, grid2.Height));
+			_nuggetOverlayMaterial.SetShaderParameter("cell_size", CellSize);
+			_nuggetOverlayMaterial.SetShaderParameter("grid_padding", GridPadding);
+
+			// Create data image (reused each tick)
+			_nuggetDataImage = Image.CreateEmpty(grid2.Width, grid2.Height, false, Image.Format.Rgba8);
+			_nuggetDataTexture = ImageTexture.CreateFromImage(_nuggetDataImage);
+			_nuggetOverlayMaterial.SetShaderParameter("nugget_data", _nuggetDataTexture);
+
+			float totalW = grid2.Width * CellSize + GridPadding * 2f;
+			float totalH = grid2.Height * CellSize + GridPadding * 2f;
+			_nuggetOverlayRect!.Size = new Vector2(totalW, totalH);
+			_nuggetOverlayRect.Position = Vector2.Zero;
+		}
 
 		// Size the ColorRect to cover grid + padding
 		float totalWidth = width * CellSize + GridPadding * 2.0f;
@@ -375,10 +412,44 @@ public partial class GridRenderer : Node2D
 			}
 		}
 
+		// Update nugget overlay data texture
+		UpdateNuggetOverlayData();
+
 		// Update warden ZoC shader-based sine rings
 		UpdateWardenZoC();
 
 		QueueRedraw();
+	}
+
+	private void UpdateNuggetOverlayData()
+	{
+		if (_gameState == null || _nuggetDataImage == null || _nuggetDataTexture == null) return;
+
+		// Clear to black (all zeros = empty cells)
+		_nuggetDataImage.Fill(Colors.Black);
+
+		foreach (var block in _gameState.Blocks)
+		{
+			if (block.Type == BlockType.Nugget && block.NuggetState is { IsMined: false })
+			{
+				// Unmined nugget: R=1, G=mining progress, B=phase
+				int miningProgress = 0;
+				if (block.PlayerId != -1)
+					miningProgress = (int)(255f * block.NuggetState.MiningProgress / Simulation.Core.Constants.NuggetMiningTicks);
+				int phaseByte = block.Id & 0xFF;
+				_nuggetDataImage.SetPixel(block.Pos.X, block.Pos.Y,
+					new Color(1f / 255f, miningProgress / 255f, phaseByte / 255f, 0f));
+			}
+			else if (block.Type == BlockType.Wall && block.FortifiedHp > 0)
+			{
+				// Fortified wall: R=2, G=HP, B=phase
+				int phaseByte = block.Id & 0xFF;
+				_nuggetDataImage.SetPixel(block.Pos.X, block.Pos.Y,
+					new Color(2f / 255f, block.FortifiedHp / 255f, phaseByte / 255f, 0f));
+			}
+		}
+
+		_nuggetDataTexture.Update(_nuggetDataImage);
 	}
 
 	public override void _Draw()
