@@ -125,6 +125,8 @@ public partial class GridRenderer : Node2D
 	{
 		_gameState = state;
 		_lastProcessedTick = -1; // Reset when state changes
+		_fogGhosts.Clear();
+		_fogLastTick = -1;
 
 		// Update background shader
 		UpdateGridShader();
@@ -217,6 +219,7 @@ public partial class GridRenderer : Node2D
 	{
 		if (_gameState != null)
 		{
+			UpdateFog();
 			float now = (float)Time.GetTicksMsec() / 1000f;
 
 			// Consume visual events once per tick
@@ -498,6 +501,8 @@ public partial class GridRenderer : Node2D
 				}
 			}
 		}
+
+		DrawFogGhosts();
 
 		// Draw blocks — viewport cull using visible cell range with extra margin
 		float blockViewMinX = (minX - 1) * CellSize + GridPadding;
