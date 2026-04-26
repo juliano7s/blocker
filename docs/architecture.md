@@ -137,6 +137,7 @@ src/Blocker.Simulation/
 │   ├── Cell.cs               — Ground + block reference
 │   ├── Block.cs              — Unit state + CommandQueue property
 │   ├── Player.cs             — Player + team info
+│   ├── VisibilityMap.cs      — Fog of war explored/visible state
 │   ├── SimulationTicker.cs   — Accumulator math & timing logic
 │   ├── SimulationConfig.cs   — Configurable constants
 │   ├── Constants.cs          — Static accessor for active config

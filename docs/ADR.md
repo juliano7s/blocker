@@ -4,6 +4,11 @@
 
 This log tracks significant architectural decisions in the evolution of Blocker.
 
+## [2026-04-26] Fog of War Architecture
+- **Context**: Implementing Fog of War requires deciding where visibility is computed (client vs sim) and how it affects game state.
+- **Decision**: Visibility is computed inside the deterministic simulation (`VisibilitySystem`) and stored in `GameState.VisibilityMaps`. Explored maps are hashed for desync detection. Rendering layer reads these maps to drive a Godot shader (`fog_overlay.gdshader`), cull enemies, and render ghost blocks (`GridRenderer.Fog.cs`).
+- **Impact**: Ensures FoW behaves identically across multiplayer clients. Prevents cheating by ensuring the client renderer only draws what the sim explicitly marks as visible.
+
 ## [2026-04-23] Nugget Blocks Simulation
 - **Context**: Needed a way to handle "Nuggets" (resource/objective units) that can be moved and processed.
 - **Decision**: Nuggets are implemented as a specialized `BlockType` within the standard simulation. They respect the same movement and push rules as other blocks but have unique interaction triggers (e.g., being "collected" or "processed" by specific structures).

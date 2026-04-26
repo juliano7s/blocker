@@ -849,6 +849,51 @@ Background music during gameplay. Separate tracks or adaptive layers based on ga
 
 These features are not part of the current game but are being considered:
 
+- **New unit types**: Virus (spreads through enemy formations?), Sticker (immobilizes on contact?), Wall-Breaker (specialized anti-wall?)
+- **Hospital Formation**: Heals damaged Soldiers/Jumpers?
+- **Domination win condition**: Control X% of boot zones for N consecutive ticks.
+- **Spectator mode**: Watch live games without participating.
+- **Reconnection**: Rejoin after disconnect in multiplayer.
+- **Replays**: Games recorded as tick-by-tick command logs. Playback re-simulates from commands. Version-tagged for compatibility.
+- **Toggle Spawning**: Each unit has a toggle to keep spawning it or not
+
+---
+
+## 20. Replays
+
+Games are recorded as a sparse list of commands per tick. On playback, the same commands are re-applied to a fresh game state tick by tick — the deterministic simulation reproduces the exact game. Replay files include a simulation version; loading a replay with a mismatched version shows a compatibility warning.
+
+---
+
+*This document is the design authority. When the code and this document disagree, update whichever is wrong — but discuss first.*
+| 4 | Push wave range in cells |
+| PUSH_KNOCKBACK | 3 | Max displacement per push |
+| SOLDIER_EXPLODE_RANGE | 3 | Self-destruct blast range |
+| SOLDIER_MAX_HP | 4 | Soldier starting HP |
+| SUPPLY_POP_CAP | 7 | Pop per Supply Formation |
+| SUPPLY_MEMBERS | 3 | Walls needed for Supply |
+| FRAGILE_WALL_SOLDIER_THRESHOLD | 2 | Adjacent soldiers to break fragile wall |
+| WARDEN_ZOC_RADIUS | 4 | Zone of Control radius |
+| WARDEN_PULL_RADIUS | 4 | Magnet Pull range |
+| WARDEN_PULL_COOLDOWN | 140 | Pull cooldown ticks |
+| JUMPER_JUMP_RANGE | 5 | Jump distance in cells |
+| JUMPER_JUMP_COOLDOWN | 120 | Jump cooldown ticks |
+| JUMPER_MAX_HP | 3 | Jumper starting HP |
+| STUN_RAY_FADE | 8 | Ticks for ray visual fade |
+| STUN_UNIT_RAY_ADVANCE_INTERVAL | 2 | Ticks per cell for unit stun rays |
+| STUN_TOWER_RAY_ADVANCE_INTERVAL | 2 | Ticks per cell for tower stun rays |
+| BLAST_UNIT_RAY_ADVANCE_INTERVAL | 1 | Ticks per cell for unit blast rays |
+| BLAST_TOWER_RAY_ADVANCE_INTERVAL | 1 | Ticks per cell for tower blast rays |
+| PUSH_WAVE_ADVANCE_INTERVAL | 1 | Ticks per cell for push waves |
+| PUSH_WAVE_FADE | 6 | Ticks for push wave visual fade |
+| DEATH_EFFECT_TICKS | 10 | Duration of death animation |
+
+---
+
+## 19. Future / Maybe
+
+These features are not part of the current game but are being considered:
+
 - **Fog of War**: Proximity-based vision (only see cells adjacent to own blocks). Could be a game mode toggle.
 - **New unit types**: Virus (spreads through enemy formations?), Sticker (immobilizes on contact?), Wall-Breaker (specialized anti-wall?)
 - **Hospital Formation**: Heals damaged Soldiers/Jumpers?
