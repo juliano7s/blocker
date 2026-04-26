@@ -692,7 +692,13 @@ public class GameState
 
             // A* pathfinding toward target
             var target = block.MoveTarget.Value;
-            var nextStep = PathfindingSystem.GetNextStep(this, block.Pos, target);
+            VisibilityMap? exploredMap = null;
+            if (Constants.FogOfWarEnabled && block.PlayerId >= 0)
+            {
+                int teamId = GetTeamFor(block.PlayerId);
+                VisibilityMaps.TryGetValue(teamId, out exploredMap);
+            }
+            var nextStep = PathfindingSystem.GetNextStep(this, block.Pos, target, exploredMap);
 
             if (nextStep.HasValue)
             {

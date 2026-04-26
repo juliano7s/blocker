@@ -284,4 +284,49 @@ public class VisibilityTests
         Assert.DoesNotContain(state.VisualEvents, e =>
             e.Type == Blocker.Simulation.Core.VisualEventType.TowerFired);
     }
+
+    [Fact]
+    public void Pathfinding_OptimisticallyNavigatesUnexploredCells()
+    {
+        // Unit at (0,5), target at (10,5). Direct path is through unexplored cells.
+        // With FoW and optimistic navigation, pathfinder should step directly into the fog.
+        var state = MakeState();
+        AddPlayer(state, 1, 1);
+        var block = state.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 1, new GridPos(0, 5));
+
+        var vm = new VisibilityMap(20, 20);
+        state.VisibilityMaps[1] = vm;
+        // Only origin is explored
+        vm.SetVisible(0, 5);
+        vm.ClearVisible();
+
+        var target = new GridPos(10, 5);
+        var step = Blocker.Simulation.Systems.PathfindingSystem.GetNextStep(state, block.Pos, target, vm);
+
+        // Should step rightward (into unexplored) rather than failing
+        Assert.NotNull(step);
+        Assert.Equal(new GridPos(1, 5), step.Value);
+    }
+
+    [Fact]
+    public void Pathfinding_IgnoresExploredMap_WhenFogDisabled()
+    {
+        var state = MakeState();
+        Constants.Initialize(new SimulationConfig
+        {
+            Vision = new VisionConfig { FogOfWarEnabled = false }
+        });
+        AddPlayer(state, 1, 1);
+        state.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 1, new GridPos(0, 5));
+
+        // No visibility maps at all when fog disabled
+        var target = new GridPos(5, 5);
+        var step = Blocker.Simulation.Systems.PathfindingSystem.GetNextStep(state, new GridPos(0, 5), target);
+
+        // Should go directly rightward
+        Assert.NotNull(step);
+        Assert.Equal(new GridPos(1, 5), step.Value);
+
+        Constants.Reset();
+    }
 }
