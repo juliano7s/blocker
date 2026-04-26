@@ -767,6 +767,9 @@ public class GameState
         // Step 14: Spawning — nest timers and unit production
         NestSystem.TickSpawning(this);
 
+        // Step 14.5: Visibility — recompute per-team LoS after all movement and spawning
+        VisibilitySystem.Tick(this);
+
         // Step 15: Death effects — Handled by Godot layer (VisualEvents -> EffectManager)
         
         // Step 16: Elimination check

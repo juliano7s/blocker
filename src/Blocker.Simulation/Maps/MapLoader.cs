@@ -57,6 +57,7 @@ public static class MapLoader
                 state.Players.Add(new Player { Id = assignment.PlayerId, TeamId = assignment.TeamId });
         }
 
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state);
         return state;
     }
 }
