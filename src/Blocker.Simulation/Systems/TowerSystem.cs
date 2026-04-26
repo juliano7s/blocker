@@ -288,6 +288,13 @@ public static class TowerSystem
     /// </summary>
     private static bool ScanForEnemies(GameState state, Block center, List<Direction> directions, int range)
     {
+        VisibilityMap? visMap = null;
+        if (Constants.FogOfWarEnabled)
+        {
+            int teamId = state.GetTeamFor(center.PlayerId);
+            state.VisibilityMaps.TryGetValue(teamId, out visMap);
+        }
+
         foreach (var dir in directions)
         {
             var offset = dir.ToOffset();
@@ -297,15 +304,15 @@ public static class TowerSystem
             {
                 pos = pos + offset;
                 if (!state.Grid.InBounds(pos)) break;
-                if (!state.Grid[pos].IsPassable) break; // Blocked by terrain/walls
+                if (!state.Grid[pos].IsPassable) break;
+
+                if (visMap != null && !visMap.IsVisible(pos)) continue;
 
                 var block = state.GetBlockAt(pos);
                 if (block == null) continue;
 
                 if (state.AreEnemies(block, center))
-                    return true; // Enemy found
-
-                // Friendly / teammate block doesn't block LoS for scanning
+                    return true;
             }
         }
 

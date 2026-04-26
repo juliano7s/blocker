@@ -250,4 +250,38 @@ public class VisibilityTests
         var hash2 = Blocker.Simulation.Net.StateHasher.Hash(state2);
         Assert.Equal(hash1, hash2);
     }
+
+    [Fact]
+    public void TowerSystem_DoesNotFireAtFoggedEnemy()
+    {
+        Constants.Initialize(new SimulationConfig());
+        var state = MakeState(30, 30);
+        AddPlayer(state, 1, 1);
+        AddPlayer(state, 2, 2);
+
+        // Stun tower for player 1: center (Stunner) at (5,5), arm (Builder) at (6,5)
+        var center = state.AddBlock(Blocker.Simulation.Blocks.BlockType.Stunner, 1, new GridPos(5, 5));
+        center.State = Blocker.Simulation.Blocks.BlockState.Rooted;
+        center.RootProgress = Constants.RootTicks;
+        var arm = state.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 1, new GridPos(6, 5));
+        arm.State = Blocker.Simulation.Blocks.BlockState.Rooted;
+        arm.RootProgress = Constants.RootTicks;
+        Blocker.Simulation.Systems.TowerSystem.CreateTower(state, center);
+
+        // Enemy at (5, 25) — far beyond Stunner LoS radius 7, so out of visibility
+        state.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 2, new GridPos(5, 25));
+
+        // Compute initial visibility (enemy is not visible to team 1)
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state);
+
+        // Prime tower fire timer
+        var tower = state.Towers.First();
+        tower.FireTimer = Constants.StunTowerFireInterval + 1;
+
+        state.VisualEvents.Clear();
+        Blocker.Simulation.Systems.TowerSystem.Tick(state);
+
+        Assert.DoesNotContain(state.VisualEvents, e =>
+            e.Type == Blocker.Simulation.Core.VisualEventType.TowerFired);
+    }
 }
