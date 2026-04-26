@@ -1,54 +1,108 @@
 using Blocker.Game.Maps;
+using Blocker.Game.Rendering;
+using Blocker.Game.Rendering.Effects;
+using Blocker.Simulation.Core;
 using Blocker.Simulation.Maps;
 using Godot;
+using System.Collections.Generic;
 
 namespace Blocker.Game.UI;
 
 public partial class MainMenu : Control
 {
+	private static readonly Color EffectColor = new(1f, 0.667f, 0.2f);
+
+	private MenuGrid _menuGrid = null!;
+	private MenuTitle _menuTitle = null!;
+	private MenuAmbience _menuAmbience = null!;
+	private Node2D _effectLayer = null!;
+	private readonly List<MenuButton> _buttons = new();
+	private readonly List<GpuEffect> _clickEffects = new();
+
 	public override void _Ready()
 	{
-		var vbox = new VBoxContainer
+		_menuGrid = new MenuGrid { Name = "MenuGrid" };
+		AddChild(_menuGrid);
+
+		_effectLayer = new Node2D { Name = "EffectLayer" };
+		AddChild(_effectLayer);
+
+		_menuTitle = new MenuTitle { Name = "MenuTitle" };
+		AddChild(_menuTitle);
+
+		CallDeferred(MethodName.InitializeComponents);
+	}
+
+	private void InitializeComponents()
+	{
+		float cellSize = MenuGrid.CellSize;
+		int cols = _menuGrid.Cols;
+		int rows = _menuGrid.Rows;
+
+		_effectLayer.Position = new Vector2(
+			_menuGrid.OffsetX - GridRenderer.GridPadding,
+			_menuGrid.OffsetY - GridRenderer.GridPadding);
+
+		EffectFactory.Initialize();
+
+		int titleRow = 3;
+		_menuTitle.Initialize(0, 0, cellSize, _menuGrid.GridToPixel);
+		int titleGridWidth = _menuTitle.TotalWidth;
+		int titleOffsetX = (cols - titleGridWidth) / 2;
+		_menuTitle.Initialize(titleOffsetX, titleRow, cellSize, _menuGrid.GridToPixel);
+
+		int buttonStartRow = titleRow + _menuTitle.TotalHeight + 3;
+		var buttonDefs = new (string Label, System.Action Action)[]
 		{
-			AnchorLeft = 0.5f, AnchorRight = 0.5f,
-			AnchorTop = 0.5f, AnchorBottom = 0.5f,
-			OffsetLeft = -150, OffsetRight = 150,
-			OffsetTop = -100, OffsetBottom = 100,
-			GrowHorizontal = GrowDirection.Both,
-			GrowVertical = GrowDirection.Both
+			("PLAY TEST", OnPlayTestPressed),
+			("PLAY VS AI", OnPlayVsAiPressed),
+			("PLAY MULTIPLAYER", OnPlayMultiplayerPressed),
+			("MAP EDITOR", OnMapEditorPressed),
+			("EXIT GAME", OnExitPressed),
 		};
-		vbox.AddThemeConstantOverride("separation", 16);
-		AddChild(vbox);
 
-		var title = new Label
+		int buttonBlockWidth = 3;
+		int buttonGridX = (cols - buttonBlockWidth) / 2 - 2;
+
+		for (int i = 0; i < buttonDefs.Length; i++)
 		{
-			Text = "BLOCKER",
-			HorizontalAlignment = HorizontalAlignment.Center
-		};
-		title.AddThemeFontSizeOverride("font_size", 48);
-		vbox.AddChild(title);
+			var (label, action) = buttonDefs[i];
+			var btn = new MenuButton { Name = $"MenuButton_{label.Replace(" ", "")}" };
+			AddChild(btn);
+			btn.Initialize(label, buttonGridX, buttonStartRow + i * 2, cellSize,
+				_menuGrid.GridToPixel, action);
 
-		vbox.AddChild(new HSeparator());
+			btn.Clicked += () => OnButtonClicked(btn);
+			_buttons.Add(btn);
+		}
 
-		var playTestBtn = new Button { Text = "Play Test", CustomMinimumSize = new Vector2(0, 50) };
-		playTestBtn.Pressed += OnPlayTestPressed;
-		vbox.AddChild(playTestBtn);
+		_menuAmbience = new MenuAmbience { Name = "MenuAmbience" };
+		AddChild(_menuAmbience);
+		_menuAmbience.Initialize(cols, rows, cellSize, _menuGrid.GridToPixel, _effectLayer);
+	}
 
-		var playVsAiBtn = new Button { Text = "Play vs AI", CustomMinimumSize = new Vector2(0, 50) };
-		playVsAiBtn.Pressed += OnPlayVsAiPressed;
-		vbox.AddChild(playVsAiBtn);
+	public override void _Process(double delta)
+	{
+		float dt = (float)delta * 1000f;
+		for (int i = _clickEffects.Count - 1; i >= 0; i--)
+		{
+			var effect = _clickEffects[i];
+			effect.Age += dt;
+			effect.Update();
+			if (effect.Progress >= 1f)
+			{
+				effect.Destroy();
+				_clickEffects.RemoveAt(i);
+			}
+		}
+	}
 
-		var playMpBtn = new Button { Text = "Play Multiplayer", CustomMinimumSize = new Vector2(0, 50) };
-		playMpBtn.Pressed += OnPlayMultiplayerPressed;
-		vbox.AddChild(playMpBtn);
-
-		var editorBtn = new Button { Text = "Map Editor", CustomMinimumSize = new Vector2(0, 50) };
-		editorBtn.Pressed += OnMapEditorPressed;
-		vbox.AddChild(editorBtn);
-
-		var exitBtn = new Button { Text = "Exit Game", CustomMinimumSize = new Vector2(0, 50) };
-		exitBtn.Pressed += OnExitPressed;
-		vbox.AddChild(exitBtn);
+	private void OnButtonClicked(MenuButton btn)
+	{
+		var (gx, gy) = btn.GridPosition;
+		var effect = EffectFactory.LightningBurst(_effectLayer, new GridPos(gx, gy),
+			EffectColor, maxSegs: 25, duration: 500f);
+		_clickEffects.Add(effect);
 	}
 
 	private void OnPlayTestPressed()
@@ -60,7 +114,7 @@ public partial class MainMenu : Control
 			return;
 		}
 
-		var assignments = new System.Collections.Generic.List<SlotAssignment>();
+		var assignments = new List<SlotAssignment>();
 		for (int i = 0; i < data.SlotCount; i++)
 			assignments.Add(new SlotAssignment(i, i));
 
@@ -69,23 +123,15 @@ public partial class MainMenu : Control
 		GetTree().ChangeSceneToFile("res://Scenes/Main.tscn");
 	}
 
-	private void OnPlayVsAiPressed()
-	{
+	private void OnPlayVsAiPressed() =>
 		GetTree().ChangeSceneToFile("res://Scenes/MapSelect.tscn");
-	}
 
-	private void OnPlayMultiplayerPressed()
-	{
+	private void OnPlayMultiplayerPressed() =>
 		GetTree().ChangeSceneToFile("res://Scenes/MultiplayerMenu.tscn");
-	}
 
-	private void OnMapEditorPressed()
-	{
+	private void OnMapEditorPressed() =>
 		GetTree().ChangeSceneToFile("res://Scenes/MapEditor.tscn");
-	}
 
-	private void OnExitPressed()
-	{
+	private void OnExitPressed() =>
 		GetTree().Quit();
-	}
 }

@@ -208,6 +208,11 @@ godot/
 │   │   ├── SelectionManager.cs      — Partial class input hub
 │   │   └── SelectionState.cs        — UI selection logic
 │   └── UI/
+│       ├── MainMenu.cs              — Grid-integrated menu (composes MenuGrid/Title/Button/Ambience)
+│       ├── MenuGrid.cs              — Full-screen grid background + coordinate helpers
+│       ├── MenuTitle.cs             — Animated "blocker" letter cells (sweep/radial/cascade/lightning)
+│       ├── MenuButton.cs            — Block-cluster buttons with hover/click effects
+│       ├── MenuAmbience.cs          — Sparse drifting blocks with random explosions
 │       ├── HudOverlay.cs            — HUD & command card
 │       └── MinimapPanel.cs          — Overview navigation
 ├── Assets/
