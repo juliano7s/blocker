@@ -15,6 +15,7 @@ public class GameState
     public List<Ray> Rays { get; } = [];
     public List<PushWave> PushWaves { get; } = [];
     public List<VisualEvent> VisualEvents { get; } = [];
+    public Dictionary<int, VisibilityMap> VisibilityMaps { get; } = new();
     public int TickNumber { get; private set; }
 
     private int _nextBlockId = 1;
