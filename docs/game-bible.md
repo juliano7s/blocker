@@ -845,7 +845,63 @@ Background music during gameplay. Separate tracks or adaptive layers based on ga
 
 ---
 
-## 19. Future / Maybe
+## 19. Fog of War and Shroud
+
+### 19.1 Overview
+
+- **Shroud**: Unexplored territory. Shown as solid black. The entire map starts in shroud.
+- **Fog of War (FoW)**: Explored territory not currently in any friendly unit's LoS. Shows terrain and last-seen static entities (walls, rooted blocks, formation members) as semi-transparent ghosts. Hides mobile enemy units.
+- **Visible**: Currently within at least one friendly unit's LoS. Shows full real-time state.
+
+### 19.2 Vision Sources and Radii
+
+All friendly units, walls, nests, and towers provide vision. Radius is Chebyshev distance. Line of sight is blocked by Wall blocks and Terrain cells. The blocking cell itself is always visible (you see what blocks you).
+
+| Entity | LoS Radius |
+|--------|-----------|
+| Builder | 5 |
+| Soldier | 3 |
+| Stunner | 2 |
+| Warden | 5 |
+| Jumper | 3 |
+| Nugget (mined) | 1 |
+| Wall | 2 |
+| Nest | 2 |
+| Tower | 2 |
+| Any unit in formation | 2 |
+
+Radii are tunable in `SimulationConfig.Vision`. Units in formations use `FormationLosRadius` regardless of their base type.
+
+### 19.3 Team Vision
+
+Teammates share a single visibility map. All units on the same team contribute to it. FFA: each player has their own map (team ID equals player ID).
+
+### 19.4 Multiplayer Model
+
+All clients compute full visibility for all teams identically (lockstep). Each client renders only its local team's perspective. Explored maps are included in the state hash — any LoS divergence triggers desync detection immediately.
+
+### 19.5 Ghost Entities
+
+In Fog of War areas, last-seen static entities are displayed as dim ghosts. Ghosts persist even if the entity has since been destroyed — until the player re-explores the cell and sees it is gone.
+
+- **Shown as ghosts:** Walls, fully rooted blocks, formation members, nests, towers.
+- **Not shown:** Mobile units (they vanish when they leave LoS).
+
+### 19.6 Tower Targeting
+
+Towers only fire when a hostile unit is in a **visible** cell within their scan range. They do not fire at enemies in fog or shroud.
+
+### 19.7 Pathfinding
+
+Pathfinding uses optimistic navigation: explored cells are checked against actual terrain, but unexplored cells are assumed passable. This means units will walk into unexplored territory toward their target rather than refusing to move. If an explored cell is known to be impassable, A* routes around it.
+
+### 19.8 Information Hiding
+
+Visual effects (lightning, rays, push waves, death animations, spawn effects) and audio are suppressed for events occurring in fogged cells. The minimap also respects fog of war: shroud is black, fog is dimmed, enemy blocks in fog are hidden. Path indicators and move targets are drawn above the fog overlay so the player always sees their own commands. On game-over, the full map is revealed.
+
+---
+
+## 20. Future / Maybe
 
 These features are not part of the current game but are being considered:
 
@@ -854,58 +910,11 @@ These features are not part of the current game but are being considered:
 - **Domination win condition**: Control X% of boot zones for N consecutive ticks.
 - **Spectator mode**: Watch live games without participating.
 - **Reconnection**: Rejoin after disconnect in multiplayer.
-- **Replays**: Games recorded as tick-by-tick command logs. Playback re-simulates from commands. Version-tagged for compatibility.
 - **Toggle Spawning**: Each unit has a toggle to keep spawning it or not
 
 ---
 
-## 20. Replays
-
-Games are recorded as a sparse list of commands per tick. On playback, the same commands are re-applied to a fresh game state tick by tick — the deterministic simulation reproduces the exact game. Replay files include a simulation version; loading a replay with a mismatched version shows a compatibility warning.
-
----
-
-*This document is the design authority. When the code and this document disagree, update whichever is wrong — but discuss first.*
-| 4 | Push wave range in cells |
-| PUSH_KNOCKBACK | 3 | Max displacement per push |
-| SOLDIER_EXPLODE_RANGE | 3 | Self-destruct blast range |
-| SOLDIER_MAX_HP | 4 | Soldier starting HP |
-| SUPPLY_POP_CAP | 7 | Pop per Supply Formation |
-| SUPPLY_MEMBERS | 3 | Walls needed for Supply |
-| FRAGILE_WALL_SOLDIER_THRESHOLD | 2 | Adjacent soldiers to break fragile wall |
-| WARDEN_ZOC_RADIUS | 4 | Zone of Control radius |
-| WARDEN_PULL_RADIUS | 4 | Magnet Pull range |
-| WARDEN_PULL_COOLDOWN | 140 | Pull cooldown ticks |
-| JUMPER_JUMP_RANGE | 5 | Jump distance in cells |
-| JUMPER_JUMP_COOLDOWN | 120 | Jump cooldown ticks |
-| JUMPER_MAX_HP | 3 | Jumper starting HP |
-| STUN_RAY_FADE | 8 | Ticks for ray visual fade |
-| STUN_UNIT_RAY_ADVANCE_INTERVAL | 2 | Ticks per cell for unit stun rays |
-| STUN_TOWER_RAY_ADVANCE_INTERVAL | 2 | Ticks per cell for tower stun rays |
-| BLAST_UNIT_RAY_ADVANCE_INTERVAL | 1 | Ticks per cell for unit blast rays |
-| BLAST_TOWER_RAY_ADVANCE_INTERVAL | 1 | Ticks per cell for tower blast rays |
-| PUSH_WAVE_ADVANCE_INTERVAL | 1 | Ticks per cell for push waves |
-| PUSH_WAVE_FADE | 6 | Ticks for push wave visual fade |
-| DEATH_EFFECT_TICKS | 10 | Duration of death animation |
-
----
-
-## 19. Future / Maybe
-
-These features are not part of the current game but are being considered:
-
-- **Fog of War**: Proximity-based vision (only see cells adjacent to own blocks). Could be a game mode toggle.
-- **New unit types**: Virus (spreads through enemy formations?), Sticker (immobilizes on contact?), Wall-Breaker (specialized anti-wall?)
-- **Hospital Formation**: Heals damaged Soldiers/Jumpers?
-- **Domination win condition**: Control X% of boot zones for N consecutive ticks.
-- **Spectator mode**: Watch live games without participating.
-- **Reconnection**: Rejoin after disconnect in multiplayer.
-- **Replays**: Games recorded as tick-by-tick command logs. Playback re-simulates from commands. Version-tagged for compatibility.
-- **Toggle Spawning**: Each unit has a toggle to keep spawning it or not
-
----
-
-## 20. Replays
+## 21. Replays
 
 Games are recorded as a sparse list of commands per tick. On playback, the same commands are re-applied to a fresh game state tick by tick — the deterministic simulation reproduces the exact game. Replay files include a simulation version; loading a replay with a mismatched version shows a compatibility warning.
 

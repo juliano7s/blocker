@@ -179,7 +179,7 @@ public class VisibilityTests
         // but should NOT block LoS from (0,0) to (2,0) or (0,2).
         var state = MakeState();
         AddPlayer(state, 1, 1);
-        state.AddBlock(Blocker.Simulation.Blocks.BlockType.Stunner, 1, new GridPos(0, 0)); // r=7
+        state.AddBlock(Blocker.Simulation.Blocks.BlockType.Stunner, 1, new GridPos(0, 0)); // r=2
         state.AddBlock(Blocker.Simulation.Blocks.BlockType.Wall, -1, new GridPos(1, 1));
 
         Blocker.Simulation.Systems.VisibilitySystem.Tick(state);
@@ -268,7 +268,7 @@ public class VisibilityTests
         arm.RootProgress = Constants.RootTicks;
         Blocker.Simulation.Systems.TowerSystem.CreateTower(state, center);
 
-        // Enemy at (5, 25) — far beyond Stunner LoS radius 7, so out of visibility
+        // Enemy at (5, 25) — far beyond Stunner LoS radius 2, so out of visibility
         state.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 2, new GridPos(5, 25));
 
         // Compute initial visibility (enemy is not visible to team 1)

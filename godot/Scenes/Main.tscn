@@ -198,6 +198,7 @@ script = ExtResource("8_audio")
 Config = SubResource("Resource_audio")
 
 [node name="SelectionManager" type="Node2D" parent="." unique_id=1234077948]
+z_index = 15
 script = ExtResource("4_sel")
 
 [node name="Camera" type="Camera2D" parent="." unique_id=243441696]

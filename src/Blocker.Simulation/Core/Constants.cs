@@ -119,6 +119,7 @@ public static class Constants
     public static bool FogOfWarEnabled => _config.Vision.FogOfWarEnabled;
     public static int NestLosRadius => _config.Vision.NestLosRadius;
     public static int TowerLosRadius => _config.Vision.TowerLosRadius;
+    public static int FormationLosRadius => _config.Vision.FormationLosRadius;
 
     public static int GetLosRadius(BlockType type) => type switch
     {
@@ -127,6 +128,7 @@ public static class Constants
         BlockType.Stunner => _config.Vision.StunnerLosRadius,
         BlockType.Warden => _config.Vision.WardenLosRadius,
         BlockType.Jumper => _config.Vision.JumperLosRadius,
+        BlockType.Nugget => _config.Vision.NuggetLosRadius,
         BlockType.Wall => _config.Vision.WallLosRadius,
         _ => 0
     };

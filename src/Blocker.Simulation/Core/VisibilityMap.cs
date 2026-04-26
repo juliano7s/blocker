@@ -38,12 +38,5 @@ public class VisibilityMap
         Array.Fill(_visible, true);
     }
 
-    /// <summary>
-    /// Returns true if the cell at (x,y) has explored terrain data suitable
-    /// for pathfinding: the cell has been explored, AND its terrain was passable
-    /// when last visible. Unknown cells (unexplored) return false.
-    /// </summary>
-    public bool IsExploredPassable(int x, int y) => _explored[y * Width + x];
-
     public bool[] ExploredArray => _explored;
 }

@@ -133,13 +133,15 @@ public record VisionConfig
 {
     public bool FogOfWarEnabled { get; init; } = true;
     public int BuilderLosRadius { get; init; } = 5;
-    public int SoldierLosRadius { get; init; } = 5;
-    public int StunnerLosRadius { get; init; } = 7;
-    public int WardenLosRadius { get; init; } = 6;
-    public int JumperLosRadius { get; init; } = 5;
+    public int SoldierLosRadius { get; init; } = 3;
+    public int StunnerLosRadius { get; init; } = 2;
+    public int WardenLosRadius { get; init; } = 5;
+    public int JumperLosRadius { get; init; } = 3;
+    public int NuggetLosRadius { get; init; } = 1;
     public int WallLosRadius { get; init; } = 2;
     public int NestLosRadius { get; init; } = 2;
     public int TowerLosRadius { get; init; } = 2;
+    public int FormationLosRadius { get; init; } = 2;
 }
 
 public record SimulationConfig

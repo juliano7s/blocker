@@ -180,9 +180,10 @@ public partial class GameManager : Node2D
 		_hudBar.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_effectManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_audioManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
+		_gridRenderer.SetControllingPlayer(_selectionManager.ControllingPlayer);
 
 		VisibilityMap? visMap = null;
-		if (_gameState != null && Blocker.Simulation.Core.Constants.FogOfWarEnabled)
+		if (!_gameOverShown && _gameState != null && Blocker.Simulation.Core.Constants.FogOfWarEnabled)
 		{
 			int localTeam = _gameState.GetTeamFor(_selectionManager.ControllingPlayer);
 			_gameState.VisibilityMaps.TryGetValue(localTeam, out visMap);

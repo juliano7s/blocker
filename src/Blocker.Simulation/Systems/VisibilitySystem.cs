@@ -24,7 +24,7 @@ public static class VisibilitySystem
             if (block.PlayerId < 0) continue;
             int teamId = state.GetTeamFor(block.PlayerId);
             if (!state.VisibilityMaps.TryGetValue(teamId, out var vm)) continue;
-            int radius = Constants.GetLosRadius(block.Type);
+            int radius = block.IsInFormation ? Constants.FormationLosRadius : Constants.GetLosRadius(block.Type);
             if (radius <= 0) continue;
             RevealFrom(state, block.Pos, radius, vm);
         }

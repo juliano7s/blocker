@@ -19,10 +19,17 @@ public partial class GridRenderer : Node2D
 	private GameConfig _config = GameConfig.CreateDefault();
 	private GameState? _gameState;
 	private VisibilityMap? _localVisibility;
+	private int _controllingTeamId = -1;
 	private float _tickInterval = 1f / 12f; // Updated by GameManager
 	private GlowLayer? _glowLayer;
 
 	public void SetVisibility(VisibilityMap? visibility) => _localVisibility = visibility;
+
+	public void SetControllingPlayer(int playerId)
+	{
+		if (_gameState == null) return;
+		_controllingTeamId = _gameState.GetTeamFor(playerId);
+	}
 
 	// Shader-based grid background
 	private ColorRect _bgRect = null!;
@@ -125,7 +132,7 @@ public partial class GridRenderer : Node2D
 	{
 		_gameState = state;
 		_lastProcessedTick = -1; // Reset when state changes
-		_fogGhosts.Clear();
+		ClearAllGhosts();
 		_fogLastTick = -1;
 
 		// Update background shader
@@ -512,6 +519,13 @@ public partial class GridRenderer : Node2D
 
 		foreach (var block in _gameState.Blocks)
 		{
+			if (Constants.FogOfWarEnabled && _localVisibility != null && block.PlayerId != -1)
+			{
+				int blockTeam = _gameState.GetTeamFor(block.PlayerId);
+				if (blockTeam != _controllingTeamId && !_localVisibility.IsVisible(block.Pos))
+					continue;
+			}
+
 			var worldPos = _visualPositions.TryGetValue(block.Id, out var vp)
 				? vp
 				: GridToWorld(block.Pos);

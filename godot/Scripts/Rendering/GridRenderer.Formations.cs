@@ -2,6 +2,8 @@ using Blocker.Game.Config;
 using Blocker.Simulation.Blocks;
 using Blocker.Simulation.Core;
 using Godot;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Blocker.Game.Rendering;
 
@@ -41,6 +43,8 @@ public partial class GridRenderer : Node2D
 
         foreach (var nest in _gameState!.Nests)
         {
+            if (_localVisibility != null && !_localVisibility.IsVisible(nest.Center)) continue;
+
             var palette = _config.GetPalette(nest.PlayerId);
             var (outlineColor, outlineGlow, diamondColor) = GetNestStyle(nest.Type, palette);
             float alpha = nest.TeardownTimer > 0 ? 0.45f : 0.9f;
@@ -63,29 +67,29 @@ public partial class GridRenderer : Node2D
 
         foreach (var tower in _gameState!.Towers)
         {
+            var centerBlock = _gameState.GetBlock(tower.CenterId);
+            if (centerBlock == null) continue;
+            if (_localVisibility != null && !_localVisibility.IsVisible(centerBlock.Pos)) continue;
+
             var palette = _config.GetPalette(tower.PlayerId);
             var (outlineColor, outlineGlow, diamondColor) = GetTowerStyle(tower.Type, palette);
             float alpha = tower.TeardownTimer > 0 ? 0.45f : 0.9f;
 
             _formationMembers.Clear();
-            var centerBlock = _gameState.GetBlock(tower.CenterId);
-            if (centerBlock != null)
-            {
-                _formationMembers.Add((tower.CenterId, centerBlock.Pos));
-                var blockRect = GetFormationBlockRect(centerBlock.Pos);
-                DrawFormationBlock(blockRect, outlineColor with { A = alpha }, outlineGlow with { A = alpha * 0.35f }, diamondColor with { A = alpha });
+            _formationMembers.Add((tower.CenterId, centerBlock.Pos));
+            var blockRect = GetFormationBlockRect(centerBlock.Pos);
+            DrawFormationBlock(blockRect, outlineColor with { A = alpha }, outlineGlow with { A = alpha * 0.35f }, diamondColor with { A = alpha });
 
-                if (tower.TeardownTimer > 0)
-                    DrawTeardownOverlay(centerBlock, tower.TeardownTimer);
-            }
+            if (tower.TeardownTimer > 0)
+                DrawTeardownOverlay(centerBlock, tower.TeardownTimer);
 
             foreach (var builderId in tower.BuilderDirections.Keys)
             {
                 var block = _gameState.GetBlock(builderId);
                 if (block == null) continue;
                 _formationMembers.Add((builderId, block.Pos));
-                var blockRect = GetFormationBlockRect(block.Pos);
-                DrawFormationBlock(blockRect, outlineColor with { A = alpha }, outlineGlow with { A = alpha * 0.35f }, diamondColor with { A = alpha });
+                var blockRect2 = GetFormationBlockRect(block.Pos);
+                DrawFormationBlock(blockRect2, outlineColor with { A = alpha }, outlineGlow with { A = alpha * 0.35f }, diamondColor with { A = alpha });
 
                 if (tower.TeardownTimer > 0)
                     DrawTeardownOverlay(block, tower.TeardownTimer);
