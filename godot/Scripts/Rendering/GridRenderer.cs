@@ -441,6 +441,8 @@ public partial class GridRenderer : Node2D
 
 		foreach (var block in _gameState.Blocks)
 		{
+			if (_localVisibility != null && !_localVisibility.IsVisible(block.Pos)) continue;
+
 			if (block.Type == BlockType.Nugget && block.NuggetState is { IsMined: false })
 			{
 				// Unmined nugget: R=1, G=mining progress, B=phase
@@ -490,6 +492,7 @@ public partial class GridRenderer : Node2D
 				var cell = grid[x, y];
 				if (cell.Terrain != TerrainType.None)
 				{
+					if (_localVisibility != null && !_localVisibility.IsExplored(x, y)) continue;
 					var rect = new Rect2(x * CellSize + GridPadding, y * CellSize + GridPadding, CellSize, CellSize);
 					DrawTerrainWallBlock(rect, cell.Terrain);
 				}

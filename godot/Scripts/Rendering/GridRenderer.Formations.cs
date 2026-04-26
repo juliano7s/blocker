@@ -15,6 +15,11 @@ public partial class GridRenderer : Node2D
     {
         foreach (var formation in _gameState!.Formations)
         {
+            if (formation.MemberIds.Count == 0) continue;
+            var centerBlock = _gameState.GetBlock(formation.MemberIds[0]);
+            if (centerBlock == null) continue;
+            if (_localVisibility != null && !_localVisibility.IsVisible(centerBlock.Pos)) continue;
+
             var palette = _config.GetPalette(formation.PlayerId);
             var (outlineColor, outlineGlow, diamondColor) = GetFormationStyle(formation.Type, palette);
 
@@ -210,6 +215,7 @@ public partial class GridRenderer : Node2D
         {
             if (nest.IsPaused) continue;
             if (nest.SpawnProgress <= 0) continue;
+            if (_localVisibility != null && !_localVisibility.IsVisible(nest.Center)) continue;
 
             var center = GridToWorld(nest.Center);
             int spawnTicks = nest.GetSpawnTicks(

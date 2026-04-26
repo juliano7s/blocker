@@ -100,6 +100,8 @@ public partial class GridRenderer : Node2D
         var activeNests = new HashSet<int>();
         foreach (var nest in _gameState.Nests)
         {
+            if (_localVisibility != null && !_localVisibility.IsVisible(nest.Center)) continue;
+
             activeNests.Add(nest.Id);
 
             if (!_nestRefineRects.TryGetValue(nest.Id, out var rect))
