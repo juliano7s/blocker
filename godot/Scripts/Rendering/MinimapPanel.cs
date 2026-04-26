@@ -31,8 +31,11 @@ public partial class MinimapPanel : Control
     private int _frameCounter;
     private const int RedrawEveryNFrames = 3;
 
+    private VisibilityMap? _localVisibility;
+
     public void SetGameState(GameState state) => _gameState = state;
     public void SetConfig(GameConfig config) => _config = config;
+    public void SetVisibility(VisibilityMap? vm) => _localVisibility = vm;
 
     public void SetCameraView(Vector2 worldPos, Vector2 viewSize)
     {
@@ -117,12 +120,29 @@ public partial class MinimapPanel : Control
                 var cell = grid[x, y];
                 Color color;
 
-                if (cell.Terrain != TerrainType.None)
-                    color = TerrainColor;
-                else if (cell.Ground != GroundType.Normal)
-                    color = _config.GetGroundColor(cell.Ground);
+                bool explored = _localVisibility == null || _localVisibility.IsExplored(x, y);
+                bool visible = _localVisibility == null || _localVisibility.IsVisible(x, y);
+
+                if (!explored)
+                {
+                    color = Colors.Black; // Shroud
+                }
                 else
-                    continue; // Normal ground — skip, grid area bg covers it
+                {
+                    if (cell.Terrain != TerrainType.None)
+                        color = TerrainColor;
+                    else if (cell.Ground != GroundType.Normal)
+                        color = _config.GetGroundColor(cell.Ground);
+                    else
+                        color = HudStyles.PanelBgTop; // Draw bg manually if explored to override shroud
+
+                    // Dim if in fog (explored but not visible)
+                    if (!visible)
+                        color = color.Darkened(0.5f);
+                }
+
+                if (color == HudStyles.PanelBgTop && explored && visible)
+                    continue; // Optimize: background already covers it
 
                 var rect = new Rect2(
                     gridOffX + x * scale,
@@ -137,6 +157,9 @@ public partial class MinimapPanel : Control
         float dotSize = Mathf.Max(scale * 0.8f, 1.5f);
         foreach (var block in _gameState.Blocks)
         {
+            if (_localVisibility != null && !_localVisibility.IsVisible(block.Pos))
+                continue;
+
             var bcolor = _config.GetPalette(block.PlayerId).Base;
             float bx = gridOffX + (block.Pos.X + 0.5f) * scale;
             float by = gridOffY + (block.Pos.Y + 0.5f) * scale;

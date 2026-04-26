@@ -188,6 +188,7 @@ public partial class GameManager : Node2D
 			_gameState.VisibilityMaps.TryGetValue(localTeam, out visMap);
 		}
 		_gridRenderer.SetVisibility(visMap);
+		_hudBar.SetVisibility(visMap);
 
 		// Pass selected IDs to renderer so selection border tracks visual position
 		_gridRenderer.SetSelectedIds(_selectionManager.SelectedBlocks);

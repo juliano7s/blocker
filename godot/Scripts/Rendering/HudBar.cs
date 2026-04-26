@@ -91,6 +91,7 @@ public partial class HudBar : CanvasLayer
         _selectionPanel.SetConfig(config);
         _commandCard.SetConfig(config);
     }
+    public void SetVisibility(VisibilityMap? vm) => _minimap.SetVisibility(vm);
 
     public void SetControllingPlayer(int playerId) => _commandCard.SetControllingPlayer(playerId);
 
