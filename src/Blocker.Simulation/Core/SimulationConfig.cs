@@ -129,6 +129,19 @@ public record GridConfig
     public int DefaultHeight { get; init; } = 25;
 }
 
+public record VisionConfig
+{
+    public bool FogOfWarEnabled { get; init; } = true;
+    public int BuilderLosRadius { get; init; } = 5;
+    public int SoldierLosRadius { get; init; } = 5;
+    public int StunnerLosRadius { get; init; } = 7;
+    public int WardenLosRadius { get; init; } = 6;
+    public int JumperLosRadius { get; init; } = 5;
+    public int WallLosRadius { get; init; } = 2;
+    public int NestLosRadius { get; init; } = 2;
+    public int TowerLosRadius { get; init; } = 2;
+}
+
 public record SimulationConfig
 {
     public BuilderConfig Builder { get; init; } = new();
@@ -146,6 +159,7 @@ public record SimulationConfig
     public GridConfig Grid { get; init; } = new();
     public int DeathEffectTicks { get; init; } = 10;
     public int TeardownTicks { get; init; } = 24;
+    public VisionConfig Vision { get; init; } = new();
 
     public int GetRootTicks(Blocker.Simulation.Blocks.BlockType type) => type switch
     {

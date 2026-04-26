@@ -315,7 +315,7 @@ public static class NuggetSystem
             int chebyshev = Math.Max(
                 Math.Abs(block.Pos.X - builder.Pos.X),
                 Math.Abs(block.Pos.Y - builder.Pos.Y));
-            if (chebyshev > Constants.BuilderLineOfSight) continue;
+            if (chebyshev > Constants.GetLosRadius(BlockType.Builder)) continue;
 
             // Reject if another team is actively mining it
             if (block.PlayerId != -1 && block.PlayerId != builder.PlayerId)

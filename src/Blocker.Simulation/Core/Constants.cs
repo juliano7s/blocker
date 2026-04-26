@@ -105,7 +105,7 @@ public static class Constants
     public static int PopCostJumper => _config.Jumper.PopCost;
 
     // Builder
-    public const int BuilderLineOfSight = 5; // Chebyshev radius — future fog-of-war LOS
+    // (LineOfSight removed)
 
     // Nugget
     public static int NuggetMiningTicks => _config.Nugget.MiningTicks;
@@ -114,4 +114,20 @@ public static class Constants
     public static int NuggetRefineRadius => _config.Nugget.RefineRadius;
     public static int FortifiedWallHp => _config.Nugget.FortifiedWallHp;
     public static int FortifiedWallCount => _config.Nugget.FortifiedWallCount;
+
+    // Vision / Fog of War
+    public static bool FogOfWarEnabled => _config.Vision.FogOfWarEnabled;
+    public static int NestLosRadius => _config.Vision.NestLosRadius;
+    public static int TowerLosRadius => _config.Vision.TowerLosRadius;
+
+    public static int GetLosRadius(BlockType type) => type switch
+    {
+        BlockType.Builder => _config.Vision.BuilderLosRadius,
+        BlockType.Soldier => _config.Vision.SoldierLosRadius,
+        BlockType.Stunner => _config.Vision.StunnerLosRadius,
+        BlockType.Warden => _config.Vision.WardenLosRadius,
+        BlockType.Jumper => _config.Vision.JumperLosRadius,
+        BlockType.Wall => _config.Vision.WallLosRadius,
+        _ => 0
+    };
 }
