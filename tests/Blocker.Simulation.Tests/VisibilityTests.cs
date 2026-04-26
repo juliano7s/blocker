@@ -214,4 +214,40 @@ public class VisibilityTests
         Assert.True(vm2.IsVisible(19, 19));
         Assert.False(vm2.IsVisible(0, 0));
     }
+
+    [Fact]
+    public void StateHasher_DifferentExploredMaps_DifferentHash()
+    {
+        var state1 = MakeState();
+        AddPlayer(state1, 1, 1);
+        state1.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 1, new GridPos(0, 0));
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state1);
+
+        var state2 = MakeState();
+        AddPlayer(state2, 1, 1);
+        state2.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 1, new GridPos(19, 19));
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state2);
+
+        var hash1 = Blocker.Simulation.Net.StateHasher.Hash(state1);
+        var hash2 = Blocker.Simulation.Net.StateHasher.Hash(state2);
+        Assert.NotEqual(hash1, hash2);
+    }
+
+    [Fact]
+    public void StateHasher_SameExploredMaps_SameHash()
+    {
+        var state1 = MakeState();
+        AddPlayer(state1, 1, 1);
+        state1.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 1, new GridPos(5, 5));
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state1);
+
+        var state2 = MakeState();
+        AddPlayer(state2, 1, 1);
+        state2.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 1, new GridPos(5, 5));
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state2);
+
+        var hash1 = Blocker.Simulation.Net.StateHasher.Hash(state1);
+        var hash2 = Blocker.Simulation.Net.StateHasher.Hash(state2);
+        Assert.Equal(hash1, hash2);
+    }
 }

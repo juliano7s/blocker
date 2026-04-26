@@ -146,6 +146,14 @@ public static class StateHasher
             MixI32(ref h, w.IsExpired ? 1 : 0);
         }
 
+        var visTeams = state.VisibilityMaps.Keys.OrderBy(k => k).ToArray();
+        MixI32(ref h, visTeams.Length);
+        foreach (var teamId in visTeams)
+        {
+            MixI32(ref h, teamId);
+            MixBoolArray(ref h, state.VisibilityMaps[teamId].ExploredArray);
+        }
+
         return h;
     }
 
@@ -156,5 +164,23 @@ public static class StateHasher
         h ^= (byte)((u >> 8) & 0xFF); h *= FnvPrime;
         h ^= (byte)((u >> 16) & 0xFF); h *= FnvPrime;
         h ^= (byte)((u >> 24) & 0xFF); h *= FnvPrime;
+    }
+
+    private static void MixBoolArray(ref uint h, bool[] arr)
+    {
+        int packed = 0;
+        int bits = 0;
+        for (int i = 0; i < arr.Length; i++)
+        {
+            if (arr[i]) packed |= (1 << bits);
+            bits++;
+            if (bits == 32)
+            {
+                MixI32(ref h, packed);
+                packed = 0;
+                bits = 0;
+            }
+        }
+        if (bits > 0) MixI32(ref h, packed);
     }
 }
