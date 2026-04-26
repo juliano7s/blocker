@@ -10,10 +10,8 @@
  - We need to review which sounds should play only for the players units. For example spawn sounds.
 
 # Gameplay
- - Fog of war and shroud
 
 # Visuals
- - Blueprints:
 
  - Shaders: Only one is being applied. Directional bloom is a bit weird, generates some permanent artifacts. Screen distortion is too intense.
 
