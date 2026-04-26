@@ -33,4 +33,185 @@ public class VisibilityTests
         Assert.False(vm.IsVisible(0, 0));
         Assert.False(vm.IsExplored(0, 0));
     }
+
+    // --- VisibilitySystem tests ---
+
+    private static GameState MakeState(int width = 20, int height = 20)
+    {
+        Constants.Reset();
+        return new GameState(new Grid(width, height));
+    }
+
+    private static void AddPlayer(GameState state, int playerId, int teamId)
+    {
+        state.Players.Add(new Player { Id = playerId, TeamId = teamId });
+    }
+
+    [Fact]
+    public void VisibilitySystem_SingleBlock_RevealsRadius()
+    {
+        var state = MakeState();
+        AddPlayer(state, 1, 1);
+        state.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 1, new GridPos(5, 5));
+
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state);
+
+        Assert.True(state.VisibilityMaps.ContainsKey(1));
+        var vm = state.VisibilityMaps[1];
+
+        Assert.True(vm.IsVisible(5, 5));   // Origin
+        Assert.True(vm.IsVisible(9, 5));   // 4 cells right — within radius 5
+        Assert.True(vm.IsVisible(5, 9));   // 4 cells down
+        Assert.True(vm.IsVisible(9, 9));   // 4 diagonal (Chebyshev)
+        Assert.False(vm.IsVisible(11, 5)); // 6 cells right — outside radius 5
+    }
+
+    [Fact]
+    public void VisibilitySystem_WallBlocksLoSBehindIt()
+    {
+        var state = MakeState();
+        AddPlayer(state, 1, 1);
+        state.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 1, new GridPos(0, 0));
+        // Wall at (2,0) should block (3,0) but not (0,2)
+        state.AddBlock(Blocker.Simulation.Blocks.BlockType.Wall, -1, new GridPos(2, 0));
+
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state);
+
+        var vm = state.VisibilityMaps[1];
+        Assert.True(vm.IsVisible(2, 0));   // Wall itself visible
+        Assert.False(vm.IsVisible(3, 0)); // Behind wall — blocked
+        Assert.True(vm.IsVisible(0, 2));   // Perpendicular — unaffected
+    }
+
+    [Fact]
+    public void VisibilitySystem_TerrainBlocksLoS()
+    {
+        var state = MakeState();
+        AddPlayer(state, 1, 1);
+        state.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 1, new GridPos(0, 0));
+        state.Grid[2, 0].Terrain = TerrainType.Terrain; // Terrain cell at (2,0)
+
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state);
+
+        var vm = state.VisibilityMaps[1];
+        Assert.True(vm.IsVisible(2, 0));   // Terrain cell itself visible
+        Assert.False(vm.IsVisible(3, 0)); // Behind terrain — blocked
+    }
+
+    [Fact]
+    public void VisibilitySystem_TeamsShareVision()
+    {
+        var state = MakeState();
+        AddPlayer(state, 1, 99);
+        AddPlayer(state, 2, 99);
+        state.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 1, new GridPos(0, 0));
+        state.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 2, new GridPos(19, 19));
+
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state);
+
+        // Single map for team 99
+        Assert.Single(state.VisibilityMaps);
+        Assert.True(state.VisibilityMaps.ContainsKey(99));
+        var vm = state.VisibilityMaps[99];
+        Assert.True(vm.IsVisible(0, 0));
+        Assert.True(vm.IsVisible(19, 19));
+    }
+
+    [Fact]
+    public void VisibilitySystem_ExploredAccumulates_AfterUnitMoves()
+    {
+        var state = MakeState();
+        AddPlayer(state, 1, 1);
+        var block = state.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 1, new GridPos(0, 0));
+
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state);
+        var vm = state.VisibilityMaps[1];
+        Assert.True(vm.IsExplored(4, 4));
+
+        // Teleport block to far corner
+        state.Grid[0, 0].BlockId = null;
+        block.Pos = new GridPos(19, 19);
+        state.Grid[19, 19].BlockId = block.Id;
+
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state);
+        Assert.True(vm.IsExplored(4, 4));   // Still explored from tick 1
+        Assert.False(vm.IsVisible(4, 4));  // No longer visible
+        Assert.True(vm.IsVisible(19, 19)); // New position visible
+    }
+
+    [Fact]
+    public void VisibilitySystem_NestGrantsVision()
+    {
+        var state = MakeState();
+        AddPlayer(state, 1, 1);
+        state.Nests.Add(new Nest { Id = 1, PlayerId = 1, Center = new GridPos(10, 10), Type = NestType.Builder });
+
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state);
+
+        var vm = state.VisibilityMaps[1];
+        Assert.True(vm.IsVisible(10, 10));
+        Assert.True(vm.IsVisible(12, 10));  // 2 cells right — within radius 2
+        Assert.False(vm.IsVisible(13, 10)); // 3 cells right — outside radius 2
+    }
+
+    [Fact]
+    public void VisibilitySystem_FogOfWarDisabled_AllVisible()
+    {
+        var state = MakeState();
+        Constants.Initialize(new SimulationConfig
+        {
+            Vision = new VisionConfig { FogOfWarEnabled = false }
+        });
+        AddPlayer(state, 1, 1);
+
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state);
+
+        // With FoW disabled, VisibilityMaps stays empty — renderer treats everything visible
+        Assert.Empty(state.VisibilityMaps);
+
+        Constants.Reset();
+    }
+
+    [Fact]
+    public void VisibilitySystem_DiagonalCornerLoS()
+    {
+        // A wall at (1,1) should block LoS from (0,0) to (2,2) via Bresenham,
+        // but should NOT block LoS from (0,0) to (2,0) or (0,2).
+        var state = MakeState();
+        AddPlayer(state, 1, 1);
+        state.AddBlock(Blocker.Simulation.Blocks.BlockType.Stunner, 1, new GridPos(0, 0)); // r=7
+        state.AddBlock(Blocker.Simulation.Blocks.BlockType.Wall, -1, new GridPos(1, 1));
+
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state);
+
+        var vm = state.VisibilityMaps[1];
+        Assert.True(vm.IsVisible(1, 1));   // Wall itself visible
+        Assert.False(vm.IsVisible(2, 2)); // Directly behind wall on diagonal — blocked
+        Assert.True(vm.IsVisible(2, 0));   // Not blocked — different line
+        Assert.True(vm.IsVisible(0, 2));   // Not blocked — different line
+    }
+
+    [Fact]
+    public void VisibilitySystem_AsymmetricTeamVisibility()
+    {
+        // Team 1 and Team 2 have blocks far apart — each sees only their own area
+        var state = MakeState();
+        AddPlayer(state, 1, 1);
+        AddPlayer(state, 2, 2);
+        state.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 1, new GridPos(0, 0));
+        state.AddBlock(Blocker.Simulation.Blocks.BlockType.Builder, 2, new GridPos(19, 19));
+
+        Blocker.Simulation.Systems.VisibilitySystem.Tick(state);
+
+        var vm1 = state.VisibilityMaps[1];
+        var vm2 = state.VisibilityMaps[2];
+
+        // Team 1 sees origin, not far corner
+        Assert.True(vm1.IsVisible(0, 0));
+        Assert.False(vm1.IsVisible(19, 19));
+
+        // Team 2 sees far corner, not origin
+        Assert.True(vm2.IsVisible(19, 19));
+        Assert.False(vm2.IsVisible(0, 0));
+    }
 }
