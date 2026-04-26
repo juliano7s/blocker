@@ -181,6 +181,14 @@ public partial class GameManager : Node2D
 		_effectManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_audioManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
 
+		VisibilityMap? visMap = null;
+		if (_gameState != null && Blocker.Simulation.Core.Constants.FogOfWarEnabled)
+		{
+			int localTeam = _gameState.GetTeamFor(_selectionManager.ControllingPlayer);
+			_gameState.VisibilityMaps.TryGetValue(localTeam, out visMap);
+		}
+		_gridRenderer.SetVisibility(visMap);
+
 		// Pass selected IDs to renderer so selection border tracks visual position
 		_gridRenderer.SetSelectedIds(_selectionManager.SelectedBlocks);
 

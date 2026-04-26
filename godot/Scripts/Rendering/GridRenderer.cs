@@ -18,8 +18,11 @@ public partial class GridRenderer : Node2D
 
 	private GameConfig _config = GameConfig.CreateDefault();
 	private GameState? _gameState;
+	private VisibilityMap? _localVisibility;
 	private float _tickInterval = 1f / 12f; // Updated by GameManager
 	private GlowLayer? _glowLayer;
+
+	public void SetVisibility(VisibilityMap? visibility) => _localVisibility = visibility;
 
 	// Shader-based grid background
 	private ColorRect _bgRect = null!;
