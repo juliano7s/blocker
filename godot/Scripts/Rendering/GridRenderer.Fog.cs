@@ -29,13 +29,14 @@ public partial class GridRenderer : Node2D
         _fogRect = new ColorRect
         {
             Material = _fogMaterial,
+            Color = Colors.Transparent, // Prevent white screen if shader fails
             MouseFilter = Control.MouseFilterEnum.Ignore,
             ZIndex = 10, // Above blocks (~Z 0), below UI
         };
         AddChild(_fogRect);
 
         var grid = _gameState.Grid;
-        _fogImage = Image.CreateEmpty(grid.Width, grid.Height, false, Image.Format.R8);
+        _fogImage = Image.CreateEmpty(grid.Width, grid.Height, false, Image.Format.Rgba8);
         _fogTexture = ImageTexture.CreateFromImage(_fogImage);
 
         _fogMaterial.SetShaderParameter("fog_data", _fogTexture);
