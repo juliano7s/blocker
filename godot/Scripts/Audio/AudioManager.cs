@@ -140,6 +140,17 @@ public partial class AudioManager : Node
             if (!evt.PlayerId.HasValue || evt.PlayerId.Value != _controllingPlayer)
                 return;
         }
+        else
+        {
+            if (_gameState != null && Blocker.Simulation.Core.Constants.FogOfWarEnabled)
+            {
+                int localTeam = _gameState.GetTeamFor(_controllingPlayer);
+                if (_gameState.VisibilityMaps.TryGetValue(localTeam, out var vm))
+                {
+                    if (!vm.IsVisible(evt.Position)) return;
+                }
+            }
+        }
 
         // Handle spawn events with per-type audio
         if (evt.Type == VisualEventType.BlockSpawned)

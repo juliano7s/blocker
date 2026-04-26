@@ -180,6 +180,17 @@ public partial class EffectManager : Node2D
             if (!evt.PlayerId.HasValue || evt.PlayerId.Value != _controllingPlayer)
                 return;
         }
+        else
+        {
+            if (_gameState != null && Constants.FogOfWarEnabled)
+            {
+                int localTeam = _gameState.GetTeamFor(_controllingPlayer);
+                if (_gameState.VisibilityMaps.TryGetValue(localTeam, out var vm))
+                {
+                    if (!vm.IsVisible(evt.Position)) return;
+                }
+            }
+        }
 
         switch (evt.Type)
         {
