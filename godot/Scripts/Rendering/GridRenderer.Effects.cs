@@ -112,7 +112,7 @@ public partial class GridRenderer : Node2D
 
                 mat.SetShaderParameter("grid_size", new Vector2(grid.Width, grid.Height));
                 mat.SetShaderParameter("cell_size", CellSize);
-                mat.SetShaderParameter("max_radius", (float)refineR + 1f);
+                mat.SetShaderParameter("max_radius", (float)refineR + 0.5f);
                 mat.SetShaderParameter("zone_color", new Color(0.55f, 0.67f, 1.0f, 0.8f));
                 mat.SetShaderParameter("march_speed", 40f);
                 mat.SetShaderParameter("time_ms", 0f);
