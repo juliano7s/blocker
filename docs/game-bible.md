@@ -157,9 +157,9 @@ Mineable resource block. Adds strategic diversity — players decide how to allo
 **Lifecycle:**
 - **Unmined**: Neutral (`PlayerId = -1`), not selectable. Occupies cell, blocks movement. Prismatic shimmer visual with diamond shape. Destroyed by blast rays; stops jumper jumps (obstacle).
 - **Mining**: Builder right-clicks to mine. Progress = adjacent miners per tick. Base time: 180 ticks (~15s with 1 builder). `PlayerId` updates to mining team. Only one team can mine at a time.
-- **Freed**: `IsMined = true`. Fully owned, selectable, commandable. Auto-rallies to nearest friendly nest unless manually moved (Move command permanently disables auto-rally until captured).
+- **Freed**: `IsMined = true`. Fully owned, selectable, commandable. Auto-rallies to nearest friendly nest **with refining enabled** unless manually moved (Move command permanently disables auto-rally until captured). If no enabled nest exists, nugget stays at its mined location.
 - **Consumption**: Three paths, nugget removed on use:
-  - *Nest Refine*: Within 2 Chebyshev distance of friendly nest → auto-consumed, grants spawn progress bonus.
+  - *Nest Refine*: Within 2 Chebyshev distance of friendly nest **with refining enabled** → auto-consumed, grants spawn progress bonus.
   - *Heal Unit*: Right-click damaged soldier/jumper → pathfinds adjacent, heals to full HP on arrival.
   - *Fortify Walls*: Right-click friendly wall → pathfinds adjacent, grants `FortifiedHp` to target + 4 connected walls (BFS).
 - **Capture**: Enemy builder orthogonally adjacent (no friendly builder contesting) → instant ownership flip, auto-rally retargets.
@@ -182,10 +182,10 @@ Mineable blocks that provide powerful one-time bonuses for economy, combat, or d
 **Lifecycle:**
 1. **Unmined**: Neutral, immobile, acts as a line-of-sight blocker.
 2. **Mining**: Builders right-click unmined nuggets to mine. Progress advances per builder per tick. Exclusive to one team at a time.
-3. **Freed**: Once mined, the nugget becomes a mobile unit. Auto-rallies to the nearest friendly nest.
+3. **Freed**: Once mined, the nugget becomes a mobile unit. Auto-rallies to the nearest friendly nest with refining enabled. If no enabled nest exists, stays at mined location.
 4. **Capture**: Enemy builders can capture freed nuggets if no friendly builders are adjacent to defend.
 5. **Consumption**: Removed from game to apply an effect:
-   - **Refine**: Auto-consumed near friendly Nests. Grants instant spawn progress (default: 100%).
+   - **Refine**: Auto-consumed near friendly Nests with refining enabled. Grants instant spawn progress (default: 100%).
    - **Heal**: Right-click damaged Soldier/Jumper to restore to full HP.
    - **Fortify**: Right-click friendly Wall to grant it `FortifiedHp` (survives 3 stun ray hits). Fortifies the target wall + 4 connected walls.
 
@@ -269,11 +269,19 @@ Proto ground multiplies all spawn times by 5x.
 ```
 Where `[a]` = main unit (Builder or Soldier) and `[w]` = Wall. The two Walls occupy diagonal positions relative to the center.
 
-### 6.3 Automatic Nest Upgrade
+### 6.3 Refine Toggle
+
+Each nest has a **Refine Enabled** flag (default: true). Controlled via the "Refine Nuggets" command (hotkey: N) on any nest member block.
+
+- **Enabled**: Nest displays a marching-ants perimeter with sparkles. Mined nuggets auto-rally to it and are consumed within refine radius.
+- **Disabled**: Zone visual hidden. Nuggets will not auto-rally to or be consumed by this nest.
+- **Toggle effects**: Disabling re-routes in-flight auto-rallying nuggets to the next enabled nest (or stops them if none). Enabling wakes idle mined nuggets with no target. Manually-moved nuggets are unaffected.
+
+### 6.4 Automatic Nest Upgrade
 
 A Builder Nest upgrades automatically to a Soldier Nest when 2 free Walls appear in the correct diagonal positions — no need to dissolve and reform.
 
-### 6.4 Spawn Mechanics
+### 6.5 Spawn Mechanics
 
 - Spawn progress accumulates each tick while required members are present and owned.
 - Progress **pauses** if any nest member is stunned.
@@ -281,7 +289,7 @@ A Builder Nest upgrades automatically to a Soldier Nest when 2 free Walls appear
 - Newly spawned blocks auto-move one cell away from the center so they don't block production.
 - Spawning is **blocked** by the population cap (see Section 8).
 
-### 6.5 Nest Congestion
+### 6.6 Nest Congestion
 
 Economy is entirely physical and visible. When the center cell is occupied, spawning searches outward (BFS up to 3 cells) for the nearest free cell. If no free cell exists within range, spawn progress holds and retries each tick. Congestion delays production but doesn't permanently block it — however, a heavily congested nest spawns units further from the center, which is strategically disadvantageous.
 
