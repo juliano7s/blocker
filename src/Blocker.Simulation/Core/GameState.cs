@@ -177,13 +177,47 @@ public class GameState
 
             if (cmd.Type == CommandType.ToggleRefine)
             {
+                var toggled = new HashSet<int>();
                 foreach (var blockId in cmd.BlockIds)
                 {
                     var block = GetBlock(blockId);
                     if (block == null || block.PlayerId != cmd.PlayerId) continue;
                     var nest = Nests.FirstOrDefault(n => n.MemberIds.Contains(blockId));
-                    if (nest == null) continue;
+                    if (nest == null || !toggled.Add(nest.Id)) continue;
                     nest.RefineEnabled = !nest.RefineEnabled;
+                }
+
+                foreach (var nestId in toggled)
+                {
+                    var nest = Nests.FirstOrDefault(n => n.Id == nestId);
+                    if (nest == null) continue;
+
+                    if (!nest.RefineEnabled)
+                    {
+                        foreach (var block in Blocks)
+                        {
+                            if (block.Type != BlockType.Nugget) continue;
+                            if (block.NuggetState is not { IsMined: true }) continue;
+                            if (block.NuggetState.ManuallyMoved) continue;
+                            if (block.MoveTarget != nest.Center) continue;
+                            block.MoveTarget = null;
+                            NuggetSystem.SetAutoRallyTarget(this, block);
+                        }
+                    }
+                    else
+                    {
+                        foreach (var block in Blocks)
+                        {
+                            if (block.Type != BlockType.Nugget) continue;
+                            if (block.NuggetState is not { IsMined: true }) continue;
+                            if (block.NuggetState.ManuallyMoved) continue;
+                            if (block.MoveTarget.HasValue) continue;
+                            if (block.NuggetState.HealTargetId.HasValue) continue;
+                            if (block.NuggetState.FortifyTargetPos.HasValue) continue;
+                            if (block.PlayerId != nest.PlayerId) continue;
+                            NuggetSystem.SetAutoRallyTarget(this, block);
+                        }
+                    }
                 }
                 continue;
             }

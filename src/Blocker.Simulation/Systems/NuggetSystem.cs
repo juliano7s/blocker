@@ -369,7 +369,7 @@ public static class NuggetSystem
         _ => Direction.Up,
     };
 
-    private static void SetAutoRallyTarget(GameState state, Block nugget)
+    internal static void SetAutoRallyTarget(GameState state, Block nugget)
     {
         GridPos? nearest = null;
         int bestDist = int.MaxValue;

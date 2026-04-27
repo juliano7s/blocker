@@ -749,4 +749,78 @@ public class NuggetTests
 
         Assert.NotNull(state.GetBlock(nugget.Id));
     }
+
+    [Fact]
+    public void ToggleRefine_Disable_ReroutesNuggetsToNextNest()
+    {
+        var state = CreateState();
+
+        var nestA = CreateNestWithMembers(state, 0, new GridPos(3, 3));
+
+        var nestB = new Nest
+        {
+            Id = state.NextNestId(),
+            Type = NestType.Builder,
+            PlayerId = 0,
+            Center = new GridPos(15, 15),
+        };
+        state.Nests.Add(nestB);
+
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(5, 5));
+        nugget.NuggetState!.IsMined = true;
+        nugget.MoveTarget = nestA.Center;
+
+        state.ProcessCommands([new Command(0, CommandType.ToggleRefine, [nestA.MemberIds[0]])]);
+
+        Assert.Equal(new GridPos(15, 15), nugget.MoveTarget);
+    }
+
+    [Fact]
+    public void ToggleRefine_Disable_NoOtherNest_NuggetStops()
+    {
+        var state = CreateState();
+
+        var nest = CreateNestWithMembers(state, 0, new GridPos(3, 3));
+
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(5, 5));
+        nugget.NuggetState!.IsMined = true;
+        nugget.MoveTarget = nest.Center;
+
+        state.ProcessCommands([new Command(0, CommandType.ToggleRefine, [nest.MemberIds[0]])]);
+
+        Assert.Null(nugget.MoveTarget);
+    }
+
+    [Fact]
+    public void ToggleRefine_Disable_ManuallyMovedNuggetKeepsTarget()
+    {
+        var state = CreateState();
+
+        var nest = CreateNestWithMembers(state, 0, new GridPos(3, 3));
+
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(5, 5));
+        nugget.NuggetState!.IsMined = true;
+        nugget.NuggetState.ManuallyMoved = true;
+        nugget.MoveTarget = nest.Center;
+
+        state.ProcessCommands([new Command(0, CommandType.ToggleRefine, [nest.MemberIds[0]])]);
+
+        Assert.Equal(new GridPos(3, 3), nugget.MoveTarget);
+    }
+
+    [Fact]
+    public void ToggleRefine_Enable_WakesIdleNuggets()
+    {
+        var state = CreateState();
+
+        var nest = CreateNestWithMembers(state, 0, new GridPos(3, 3));
+        nest.RefineEnabled = false;
+
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(10, 10));
+        nugget.NuggetState!.IsMined = true;
+
+        state.ProcessCommands([new Command(0, CommandType.ToggleRefine, [nest.MemberIds[0]])]);
+
+        Assert.Equal(new GridPos(3, 3), nugget.MoveTarget);
+    }
 }
