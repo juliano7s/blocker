@@ -456,12 +456,20 @@ public partial class GridRenderer : Node2D
 
             case BlockType.Nugget:
             {
-                var sprite = SpriteFactory.GetSprite(BlockType.Nugget, block.PlayerId);
-                if (sprite != null)
-                    DrawTextureRect(sprite, rect, false);
+                var shakeOffset = ComputeNuggetShake(block, time);
+                if (block.NuggetState is { IsMined: false })
+                {
+                    DrawRoughNuggetBody(rect, block.Id, shakeOffset);
+                }
                 else
-                    DrawSmoothGradientBody(rect, new Color(0.85f, 0.88f, 0.92f), new Color(0.95f, 0.95f, 1f), new Color(0.7f, 0.73f, 0.78f));
-                DrawNuggetDiamond(block, rect, center);
+                {
+                    var sprite = SpriteFactory.GetSprite(BlockType.Nugget, block.PlayerId);
+                    if (sprite != null)
+                        DrawTextureRect(sprite, rect, false);
+                    else
+                        DrawSmoothGradientBody(rect, new Color(0.85f, 0.88f, 0.92f), new Color(0.95f, 0.95f, 1f), new Color(0.7f, 0.73f, 0.78f));
+                }
+                DrawNuggetDiamond(block, rect, center, shakeOffset);
                 break;
             }
         }
@@ -805,26 +813,81 @@ public partial class GridRenderer : Node2D
         QueueGlowRadial(center, radius * 1.8f, palette.JumperPulseGlow with { A = 0.08f + 0.04f * pulse1 });
     }
 
-    private void DrawNuggetDiamond(Block block, Rect2 rect, Vector2 center)
+    private static int NuggetHash(int x)
+    {
+        x = ((x >> 16) ^ x) * 0x45d9f3b;
+        x = ((x >> 16) ^ x) * 0x45d9f3b;
+        x = (x >> 16) ^ x;
+        return x & 0x7fffffff;
+    }
+
+    private static float NuggetHashFloat(int seed) => (NuggetHash(seed) % 10000) / 10000f;
+
+    private Vector2 ComputeNuggetShake(Block block, float time)
+    {
+        if (block.NuggetState is not { IsMined: false } || block.PlayerId == -1)
+            return Vector2.Zero;
+
+        float hitDecay = 0f;
+        if (_lastMiningHitTime.TryGetValue(block.Id, out float lastHit))
+            hitDecay = Mathf.Max(0f, 1f - (time - lastHit) / 0.25f);
+        float progress = (float)block.NuggetState.MiningProgress / Simulation.Core.Constants.NuggetMiningTicks;
+        float intensity = hitDecay * (1.5f + progress * 1.5f);
+        return new Vector2(
+            Mathf.Sin(time * 35f + block.Id * 7.1f) * intensity,
+            Mathf.Cos(time * 29f + block.Id * 5.3f) * intensity);
+    }
+
+    private void DrawRoughNuggetBody(Rect2 rect, int blockId, Vector2 shakeOffset)
+    {
+        int vertCount = 10 + NuggetHash(blockId + 99) % 5;
+        var verts = new Vector2[vertCount];
+        var colors = new Color[vertCount];
+
+        var c = rect.GetCenter() + shakeOffset;
+        float halfW = rect.Size.X * 0.54f;
+        float jitter = rect.Size.X * 0.12f;
+
+        var light = new Color(0.95f, 0.95f, 1f);
+        var dark = new Color(0.70f, 0.73f, 0.78f);
+
+        for (int i = 0; i < vertCount; i++)
+        {
+            float angle = Mathf.Tau * i / vertCount;
+            angle += (NuggetHashFloat(blockId * 37 + i * 53) - 0.5f) * 0.4f;
+
+            float r = halfW + (NuggetHashFloat(blockId * 71 + i * 29) - 0.5f) * jitter * 2f;
+            float x = c.X + Mathf.Cos(angle) * r;
+            float y = c.Y + Mathf.Sin(angle) * r;
+
+            x = Mathf.Clamp(x, rect.Position.X + 0.5f, rect.End.X - 0.5f);
+            y = Mathf.Clamp(y, rect.Position.Y + 0.5f, rect.End.Y - 0.5f);
+
+            verts[i] = new Vector2(x, y);
+
+            float tx = (x - shakeOffset.X - rect.Position.X) / rect.Size.X;
+            float ty = (y - shakeOffset.Y - rect.Position.Y) / rect.Size.Y;
+            colors[i] = light.Lerp(dark, (tx + ty) * 0.5f);
+        }
+
+        DrawPolygon(verts, colors);
+
+        // Hard edge outline
+        var edgeColor = new Color(0.3f, 0.33f, 0.4f, 0.9f);
+        for (int i = 0; i < vertCount; i++)
+            DrawLine(verts[i], verts[(i + 1) % vertCount], edgeColor, 1.5f, false);
+    }
+
+    private void DrawNuggetDiamond(Block block, Rect2 rect, Vector2 center, Vector2 shakeOffset)
     {
         float time = (float)Time.GetTicksMsec() / 1000f;
         float d = rect.Size.X * 0.30f;
 
-        // Mining vibration: short burst synced with sparkle hit, then decays
-        var drawCenter = center;
+        var drawCenter = center + shakeOffset;
         bool isMining = block.NuggetState is { IsMined: false } && block.PlayerId != -1;
         float miningProgress = 0f;
         if (isMining && block.NuggetState != null)
-        {
             miningProgress = (float)block.NuggetState.MiningProgress / Simulation.Core.Constants.NuggetMiningTicks;
-            float hitDecay = 0f;
-            if (_lastMiningHitTime.TryGetValue(block.Id, out float lastHit))
-                hitDecay = Mathf.Max(0f, 1f - (time - lastHit) / 0.25f);
-            float shakeIntensity = hitDecay * (1.5f + miningProgress * 1.5f);
-            drawCenter += new Vector2(
-                Mathf.Sin(time * 35f + block.Id * 7.1f) * shakeIntensity,
-                Mathf.Cos(time * 29f + block.Id * 5.3f) * shakeIntensity);
-        }
 
         if (block.NuggetState is { IsMined: true })
         {

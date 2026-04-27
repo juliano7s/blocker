@@ -15,12 +15,12 @@ float diamond_df(vec2 p, vec2 center, float size) {
     return (d.x + d.y) / size;
 }
 
-// 4-pointed star sparkle — cross pattern
-float star4(vec2 p, vec2 center, float arm_len, float arm_w) {
+// 4-pointed star sparkle — two perpendicular diamond lobes
+float sparkle_star(vec2 p, vec2 center, float size) {
     vec2 d = abs(p - center);
-    float h = step(d.y, arm_w) * step(d.x, arm_len);
-    float v = step(d.x, arm_w) * step(d.y, arm_len);
-    return max(h, v);
+    float d1 = d.x / size + d.y / (size * 0.35);
+    float d2 = d.x / (size * 0.35) + d.y / size;
+    return min(d1, d2);
 }
 
 void fragment() {
@@ -90,34 +90,35 @@ void fragment() {
             alpha = max(alpha, glow_a);
         }
 
-        // 4 prismatic star sparkles — per-nugget randomized orbits
+        // 4 prismatic sparkles — diamond-star with hot center
         vec3 star_colors[4] = vec3[4](
             vec3(0.67, 0.87, 1.0),  // ice blue
             vec3(1.0, 0.83, 1.0),   // pink
             vec3(0.83, 1.0, 0.87),  // green
-            vec3(1.0, 1.0, 1.0)     // white
+            vec3(1.0, 0.94, 0.7)    // gold
         );
-        // Per-nugget speed/orbit variation from phase (block ID)
-        float speed_var = 0.8 + fract(phase * 0.618) * 0.8; // golden ratio hash, range [0.8, 1.6]
-        float orbit_var = fract(phase * 0.3183) * 6.28;      // 1/pi hash, full rotation offset
+        float speed_var = 0.8 + fract(phase * 0.618) * 0.8;
+        float orbit_var = fract(phase * 0.3183) * 6.28;
 
         for (int i = 0; i < 4; i++) {
             float fi = float(i);
-            // Stagger timing strongly per nugget: large phase offset + varied speed
             float sp = TIME * (1.2 + fi * 0.3) * speed_var + fi * 2.1 + orbit_var;
-            float sparkle_alpha = max(0.0, sin(sp)) * 0.9;
+            float brightness = max(0.0, sin(sp));
+            brightness = brightness * brightness;
 
-            if (sparkle_alpha > 0.05) {
-                // Varied orbit radii and directions per nugget
+            if (brightness > 0.02) {
                 float orbit_r = cs * (0.2 + 0.15 * sin(orbit_var + fi * 1.7));
                 float sx = center.x + sin(sp * (0.5 + fi * 0.15) + orbit_var) * orbit_r;
                 float sy = center.y + cos(sp * (0.4 + fi * 0.12) + orbit_var * 1.3) * orbit_r;
-                float arm_len = 2.5 + sparkle_alpha * 1.5;
-                float arm_w = 0.6;
-                float s = star4(p, vec2(sx, sy), arm_len, arm_w);
-                if (s > 0.0) {
-                    col = mix(col, star_colors[i], s * sparkle_alpha / max(alpha + s * sparkle_alpha, 0.001));
-                    alpha = max(alpha, s * sparkle_alpha);
+
+                float size = 1.8 + brightness * 3.0;
+                float star = sparkle_star(p, vec2(sx, sy), size);
+
+                if (star < 1.0) {
+                    float sa = (1.0 - star) * brightness;
+                    vec3 sc = mix(star_colors[i], vec3(1.0), star < 0.3 ? 1.0 - star / 0.3 : 0.0);
+                    col = mix(col, sc, sa / max(alpha + sa, 0.001));
+                    alpha = max(alpha, sa);
                 }
             }
         }
@@ -197,16 +198,19 @@ void fragment() {
                 alpha = max(alpha, stroke_a);
             }
 
-            // Per-diamond sparkle star
+            // Per-diamond sparkle
             float sp = TIME * 1.8 + float(i) * 2.3 + phase * 0.043;
-            float sparkle_a = max(0.0, sin(sp)) * 0.7;
-            if (sparkle_a > 0.05) {
+            float sparkle_b = max(0.0, sin(sp));
+            sparkle_b *= sparkle_b;
+            if (sparkle_b > 0.02) {
                 float sx = positions[i].x + sin(sp * 0.6 + float(i) * 3.7) * d_size * 0.8;
                 float sy = positions[i].y + cos(sp * 0.4 + float(i) * 2.9) * d_size * 0.8;
-                float s = star4(p, vec2(sx, sy), 2.0, 0.5);
-                if (s > 0.0) {
-                    col = mix(col, vec3(0.8, 0.9, 1.0), s * sparkle_a / max(alpha + s * sparkle_a, 0.001));
-                    alpha = max(alpha, s * sparkle_a);
+                float star = sparkle_star(p, vec2(sx, sy), 1.5 + sparkle_b * 2.0);
+                if (star < 1.0) {
+                    float sa = (1.0 - star) * sparkle_b * 0.8;
+                    vec3 sc = mix(vec3(0.8, 0.9, 1.0), vec3(1.0), star < 0.3 ? 1.0 - star / 0.3 : 0.0);
+                    col = mix(col, sc, sa / max(alpha + sa, 0.001));
+                    alpha = max(alpha, sa);
                 }
             }
         }
