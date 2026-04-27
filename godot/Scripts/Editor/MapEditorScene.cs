@@ -93,6 +93,8 @@ public partial class MapEditorScene : Node2D
 
 	public override void _Ready()
 	{
+		Godot.Input.SetDefaultCursorShape(Godot.Input.CursorShape.Arrow);
+
 		// Initialize simulation constants
 		Constants.Initialize(_config.ToSimulationConfig());
 

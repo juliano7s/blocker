@@ -47,6 +47,7 @@ public partial class GameManager : Node2D
 		// Initialize config and simulation constants
 		Config ??= GameConfig.CreateDefault();
 		Constants.Initialize(Config.ToSimulationConfig());
+		CursorConfig.ApplyDefaults();
 
 		// Load map from GameLaunchData (set by SlotConfigScreen for both SP and MP)
 		if (GameLaunchData.MapData == null || GameLaunchData.Assignments == null)

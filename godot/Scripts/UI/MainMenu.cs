@@ -1,3 +1,4 @@
+using Blocker.Game.Config;
 using Blocker.Game.Maps;
 using Blocker.Game.Rendering;
 using Blocker.Game.Rendering.Effects;
@@ -10,6 +11,8 @@ namespace Blocker.Game.UI;
 
 public partial class MainMenu : Control
 {
+	[Export] public CursorConfig? Cursors { get; set; }
+
 	private static readonly Color EffectColor = new(1f, 0.667f, 0.2f);
 
 	private MenuGrid _menuGrid = null!;
@@ -21,6 +24,13 @@ public partial class MainMenu : Control
 
 	public override void _Ready()
 	{
+		if (Cursors != null)
+			Cursors.Apply();
+		else
+			CursorConfig.ApplyDefaults();
+
+		MouseFilter = MouseFilterEnum.Ignore;
+
 		_menuGrid = new MenuGrid { Name = "MenuGrid" };
 		AddChild(_menuGrid);
 

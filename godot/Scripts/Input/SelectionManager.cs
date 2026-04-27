@@ -123,7 +123,70 @@ public partial class SelectionManager : Node2D
 		// Clean up dead/removed blocks from selection
 		_state.RemoveDeadBlocks(_gameState);
 
+		UpdateCursor();
+
 		QueueRedraw();
+	}
+
+	private void UpdateCursor()
+	{
+		if (_state.SelectedBlocks.Count == 0 || !_hoveredCell.HasValue)
+		{
+			Godot.Input.SetDefaultCursorShape(Godot.Input.CursorShape.Arrow);
+			return;
+		}
+
+		var hovered = _hoveredCell.Value;
+		var target = _gameState!.GetBlockAt(hovered);
+		bool hasBuilder = false;
+		bool hasMinedNugget = false;
+
+		foreach (var b in _state.SelectedBlocks)
+		{
+			if (b.Type == BlockType.Builder) hasBuilder = true;
+			if (b.Type == BlockType.Nugget && b.NuggetState is { IsMined: true }) hasMinedNugget = true;
+		}
+
+		if (hasBuilder && target is { Type: BlockType.Nugget, NuggetState.IsMined: false })
+		{
+			Godot.Input.SetDefaultCursorShape(Godot.Input.CursorShape.PointingHand);
+			return;
+		}
+
+		if (hasMinedNugget && target != null)
+		{
+			if (target.Type is BlockType.Soldier or BlockType.Jumper
+				&& target.PlayerId == ControllingPlayer
+				&& target.Hp < (target.Type == BlockType.Soldier
+					? Constants.SoldierMaxHp : Constants.JumperMaxHp))
+			{
+				Godot.Input.SetDefaultCursorShape(Godot.Input.CursorShape.PointingHand);
+				return;
+			}
+
+			if (target.Type == BlockType.Wall
+				&& target.PlayerId == ControllingPlayer
+				&& target.FortifiedHp == 0)
+			{
+				Godot.Input.SetDefaultCursorShape(Godot.Input.CursorShape.PointingHand);
+				return;
+			}
+		}
+
+		if (hasMinedNugget)
+		{
+			foreach (var nest in _gameState.Nests)
+			{
+				if (nest.PlayerId != ControllingPlayer) continue;
+				if (hovered.ChebyshevDistance(nest.Center) <= Constants.NuggetRefineRadius)
+				{
+					Godot.Input.SetDefaultCursorShape(Godot.Input.CursorShape.PointingHand);
+					return;
+				}
+			}
+		}
+
+		Godot.Input.SetDefaultCursorShape(Godot.Input.CursorShape.Arrow);
 	}
 
 	private bool IsBlockVisible(Block block)

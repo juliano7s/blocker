@@ -1,8 +1,16 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://co6yu754cjglp"]
 
-[ext_resource type="Script" path="res://Scripts/UI/MainMenu.cs" id="1_menu"]
+[ext_resource type="Script" uid="uid://dcaeiuxp2bc2o" path="res://Scripts/UI/MainMenu.cs" id="1_menu"]
+[ext_resource type="Texture2D" uid="uid://lkty0gc6cgr" path="res://Assets/Sprites/pointer_c_shaded.png" id="2_ghw46"]
+[ext_resource type="Texture2D" uid="uid://3qrnpih5m1n7" path="res://Assets/Sprites/hand_point.png" id="3_df05h"]
+[ext_resource type="Script" uid="uid://boters3le020d" path="res://Scripts/Config/CursorConfig.cs" id="4_8um5k"]
 
-[node name="MainMenu" type="Control"]
+[sub_resource type="Resource" id="Resource_xim88"]
+script = ExtResource("4_8um5k")
+Arrow = ExtResource("2_ghw46")
+PointingHand = ExtResource("3_df05h")
+
+[node name="MainMenu" type="Control" unique_id=1520571739]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -10,3 +18,4 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_menu")
+Cursors = SubResource("Resource_xim88")
