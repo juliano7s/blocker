@@ -121,6 +121,7 @@ public static class NuggetSystem
         foreach (var nest in state.Nests)
         {
             if (nest.PlayerId != nugget.PlayerId) continue;
+            if (!nest.RefineEnabled) continue;
 
             int chebyshev = Math.Max(
                 Math.Abs(nugget.Pos.X - nest.Center.X),
@@ -377,6 +378,7 @@ public static class NuggetSystem
         foreach (var nest in state.Nests)
         {
             if (nest.PlayerId != nugget.PlayerId) continue;
+            if (!nest.RefineEnabled) continue;
             int dist = nugget.Pos.ChebyshevDistance(nest.Center);
             if (dist < bestDist || (dist == bestDist && nest.Id < bestNestId))
             {

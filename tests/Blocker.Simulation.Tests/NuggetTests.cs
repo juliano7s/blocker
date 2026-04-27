@@ -670,4 +670,83 @@ public class NuggetTests
         state.ProcessCommands([new Command(0, CommandType.ToggleRefine, [memberId])]);
         Assert.True(nest.RefineEnabled);
     }
+
+    [Fact]
+    public void AutoRally_SkipsDisabledNest_GoesToEnabled()
+    {
+        var state = CreateState();
+
+        var nestClose = new Nest
+        {
+            Id = state.NextNestId(),
+            Type = NestType.Builder,
+            PlayerId = 0,
+            Center = new GridPos(3, 3),
+            RefineEnabled = false,
+        };
+        state.Nests.Add(nestClose);
+
+        var nestFar = new Nest
+        {
+            Id = state.NextNestId(),
+            Type = NestType.Builder,
+            PlayerId = 0,
+            Center = new GridPos(15, 15),
+        };
+        state.Nests.Add(nestFar);
+
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(4, 4));
+        nugget.NuggetState!.IsMined = true;
+
+        NuggetSystem.Tick(state);
+
+        Assert.Equal(new GridPos(15, 15), nugget.MoveTarget);
+    }
+
+    [Fact]
+    public void AutoRally_AllNestsDisabled_NuggetStaysPut()
+    {
+        var state = CreateState();
+
+        var nest = new Nest
+        {
+            Id = state.NextNestId(),
+            Type = NestType.Builder,
+            PlayerId = 0,
+            Center = new GridPos(3, 3),
+            RefineEnabled = false,
+        };
+        state.Nests.Add(nest);
+
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(10, 10));
+        nugget.NuggetState!.IsMined = true;
+
+        NuggetSystem.Tick(state);
+
+        Assert.Null(nugget.MoveTarget);
+    }
+
+    [Fact]
+    public void Consumption_SkipsDisabledNest()
+    {
+        var state = CreateState();
+
+        var nest = new Nest
+        {
+            Id = state.NextNestId(),
+            Type = NestType.Builder,
+            PlayerId = 0,
+            Center = new GridPos(5, 5),
+            RefineEnabled = false,
+        };
+        state.Nests.Add(nest);
+
+        var nugget = state.AddBlock(BlockType.Nugget, 0, new GridPos(5, 6));
+        nugget.NuggetState!.IsMined = true;
+        nugget.NuggetState.ManuallyMoved = true;
+
+        NuggetSystem.Tick(state);
+
+        Assert.NotNull(state.GetBlock(nugget.Id));
+    }
 }
