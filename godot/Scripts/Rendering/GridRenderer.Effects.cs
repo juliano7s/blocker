@@ -14,6 +14,7 @@ public partial class GridRenderer : Node2D
     private readonly Dictionary<int, ColorRect> _wardenZocRects = new();
     private readonly Dictionary<int, ColorRect> _nestRefineRects = new();
     private static readonly Shader _gridRingsShader = GD.Load<Shader>("res://Assets/Shaders/grid_rings.gdshader");
+    private static readonly Shader _nestRefineShader = GD.Load<Shader>("res://Assets/Shaders/nest_refine.gdshader");
 
     private void UpdateWardenZoC()
     {
@@ -100,25 +101,21 @@ public partial class GridRenderer : Node2D
         var activeNests = new HashSet<int>();
         foreach (var nest in _gameState.Nests)
         {
+            if (!nest.RefineEnabled) continue;
             if (_localVisibility != null && !_localVisibility.IsVisible(nest.Center)) continue;
 
             activeNests.Add(nest.Id);
 
             if (!_nestRefineRects.TryGetValue(nest.Id, out var rect))
             {
-                var mat = new ShaderMaterial { Shader = _gridRingsShader };
+                var mat = new ShaderMaterial { Shader = _nestRefineShader };
 
                 mat.SetShaderParameter("grid_size", new Vector2(grid.Width, grid.Height));
                 mat.SetShaderParameter("cell_size", CellSize);
                 mat.SetShaderParameter("max_radius", (float)refineR + 1f);
-                mat.SetShaderParameter("trail", 1.5f);
-                mat.SetShaderParameter("ring_color", new Color(0.85f, 0.9f, 1.0f, 1.0f));
-                mat.SetShaderParameter("fade_mult", 1.0f);
-                mat.SetShaderParameter("mode", 0); // square rings
-                mat.SetShaderParameter("loop_mode", true);
-                mat.SetShaderParameter("base_alpha", 0.15f);
-                mat.SetShaderParameter("progress", 0f);
-                mat.SetShaderParameter("age_ms", 0f);
+                mat.SetShaderParameter("zone_color", new Color(0.55f, 0.67f, 1.0f, 0.8f));
+                mat.SetShaderParameter("march_speed", 40f);
+                mat.SetShaderParameter("time_ms", 0f);
 
                 rect = new ColorRect
                 {
@@ -133,9 +130,7 @@ public partial class GridRenderer : Node2D
 
             var mat2 = (ShaderMaterial)rect.Material;
             mat2.SetShaderParameter("center", new Vector2(nest.Center.X + 0.5f, nest.Center.Y + 0.5f));
-            mat2.SetShaderParameter("age_ms", (float)Time.GetTicksMsec());
-            // No expanding wave — just steady glow with gentle shimmer from age_ms
-            mat2.SetShaderParameter("progress", 0f);
+            mat2.SetShaderParameter("time_ms", (float)Time.GetTicksMsec());
         }
 
         var stale = new List<int>();
