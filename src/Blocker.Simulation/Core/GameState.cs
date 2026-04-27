@@ -175,6 +175,19 @@ public class GameState
                 continue;
             }
 
+            if (cmd.Type == CommandType.ToggleRefine)
+            {
+                foreach (var blockId in cmd.BlockIds)
+                {
+                    var block = GetBlock(blockId);
+                    if (block == null || block.PlayerId != cmd.PlayerId) continue;
+                    var nest = Nests.FirstOrDefault(n => n.MemberIds.Contains(blockId));
+                    if (nest == null) continue;
+                    nest.RefineEnabled = !nest.RefineEnabled;
+                }
+                continue;
+            }
+
             foreach (var blockId in cmd.BlockIds)
             {
                 var block = GetBlock(blockId);

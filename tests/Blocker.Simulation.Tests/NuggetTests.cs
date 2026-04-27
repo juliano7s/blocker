@@ -621,6 +621,26 @@ public class NuggetTests
 
     // --- Toggleable Nest Refine ---
 
+    private Nest CreateNestWithMembers(GameState state, int playerId, GridPos center)
+    {
+        var b1 = state.AddBlock(BlockType.Builder, playerId, center + new GridPos(0, -1));
+        var b2 = state.AddBlock(BlockType.Builder, playerId, center + new GridPos(-1, 0));
+        var b3 = state.AddBlock(BlockType.Builder, playerId, center + new GridPos(1, 0));
+        var nest = new Nest
+        {
+            Id = state.NextNestId(),
+            Type = NestType.Builder,
+            PlayerId = playerId,
+            Center = center,
+        };
+        nest.MemberIds.AddRange([b1.Id, b2.Id, b3.Id]);
+        b1.FormationId = nest.Id;
+        b2.FormationId = nest.Id;
+        b3.FormationId = nest.Id;
+        state.Nests.Add(nest);
+        return nest;
+    }
+
     [Fact]
     public void Nest_RefineEnabled_DefaultTrue()
     {
@@ -632,6 +652,22 @@ public class NuggetTests
             Center = new GridPos(5, 5),
         };
 
+        Assert.True(nest.RefineEnabled);
+    }
+
+    [Fact]
+    public void ToggleRefine_FlipsNestRefineEnabled()
+    {
+        var state = CreateState();
+        var nest = CreateNestWithMembers(state, 0, new GridPos(5, 5));
+        var memberId = nest.MemberIds[0];
+
+        Assert.True(nest.RefineEnabled);
+
+        state.ProcessCommands([new Command(0, CommandType.ToggleRefine, [memberId])]);
+        Assert.False(nest.RefineEnabled);
+
+        state.ProcessCommands([new Command(0, CommandType.ToggleRefine, [memberId])]);
         Assert.True(nest.RefineEnabled);
     }
 }
