@@ -46,8 +46,7 @@ public partial class MainMenu : Control
 		EffectFactory.Initialize();
 
 		int titleRow = 3;
-		_menuTitle.Initialize(0, 0, cellSize, _menuGrid.GridToPixel);
-		int titleGridWidth = _menuTitle.TotalWidth;
+		int titleGridWidth = MenuTitle.MeasureWidth();
 		int titleOffsetX = (cols - titleGridWidth) / 2;
 		_menuTitle.Initialize(titleOffsetX, titleRow, cellSize, _menuGrid.GridToPixel);
 
