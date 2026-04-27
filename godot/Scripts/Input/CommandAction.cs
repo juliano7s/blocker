@@ -10,5 +10,6 @@ public enum CommandAction
     Stun,
     Jump,
     Magnet,
-    Tower
+    Tower,
+    RefineNuggets
 }

@@ -39,6 +39,7 @@ public partial class CommandCard : Control
         new(CommandAction.Jump, "Jump", "⤴", "F", b => b.Type == BlockType.Jumper),
         new(CommandAction.Magnet, "Magnet", "🧲", "D", b => b.Type == BlockType.Warden && b.IsFullyRooted),
         new(CommandAction.Tower, "Tower", "🗼", "Z", b => b.Type == BlockType.Soldier || b.Type == BlockType.Stunner, b => b.IsFullyRooted && !b.IsInFormation),
+        new(CommandAction.RefineNuggets, "Refine Nuggets", "◆", "N", b => b.IsInFormation),
     ];
 
     private static readonly BlueprintDef[] AllBlueprints =

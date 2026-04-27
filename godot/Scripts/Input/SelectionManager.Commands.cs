@@ -58,6 +58,9 @@ public partial class SelectionManager
             case CommandAction.Tower:
                 IssueCommandToSelected(CommandType.CreateTower, queue);
                 break;
+            case CommandAction.RefineNuggets:
+                IssueCommandToSelected(CommandType.ToggleRefine, queue);
+                break;
             }
     }
 
@@ -360,6 +363,8 @@ public partial class SelectionManager
                 .Where(b => b.Type is BlockType.Soldier or BlockType.Stunner).ToList(),
             CommandType.TogglePush => _state.SelectedBlocks
                 .Where(b => b.Type == BlockType.Builder).ToList(),
+            CommandType.ToggleRefine => _state.SelectedBlocks
+                .Where(b => b.IsInFormation).ToList(),
             CommandType.Jump => _state.SelectedBlocks
                 .Where(b => b.Type == BlockType.Jumper).ToList(),
             _ => _state.SelectedBlocks.ToList()
