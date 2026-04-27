@@ -84,6 +84,7 @@ public static class StateHasher
             MixI32(ref h, n.TeardownTimer);
             MixI32(ref h, n.IsPaused ? 1 : 0);
             MixI32(ref h, n.NuggetLoaded ? 1 : 0);
+            MixI32(ref h, n.RefineEnabled ? 1 : 0);
         }
 
         // Towers — sorted by Id

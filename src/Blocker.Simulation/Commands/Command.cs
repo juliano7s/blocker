@@ -20,6 +20,7 @@ public enum CommandType
     MineNugget,         // Builder mines an unmined nugget
     HealWithNugget,     // Nugget heals a damaged soldier/jumper
     FortifyWithNugget,  // Nugget fortifies walls
+    ToggleRefine,       // Nest-level: toggle nugget refining on/off. BlockIds = nest members.
 }
 
 public record Command(

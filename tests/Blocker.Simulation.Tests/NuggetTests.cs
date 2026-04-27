@@ -618,4 +618,20 @@ public class NuggetTests
         Assert.Null(state.GetBlock(nugget.Id));
         Assert.True(nest.SpawnProgress > progressBefore);
     }
+
+    // --- Toggleable Nest Refine ---
+
+    [Fact]
+    public void Nest_RefineEnabled_DefaultTrue()
+    {
+        var nest = new Nest
+        {
+            Id = 1,
+            Type = NestType.Builder,
+            PlayerId = 0,
+            Center = new GridPos(5, 5),
+        };
+
+        Assert.True(nest.RefineEnabled);
+    }
 }

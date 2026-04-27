@@ -30,6 +30,9 @@ public class Nest
     /// <summary>Whether a nugget has been loaded into this nest (required for some spawn types).</summary>
     public bool NuggetLoaded { get; set; }
 
+    /// <summary>Whether this nest accepts incoming nuggets for refining.</summary>
+    public bool RefineEnabled { get; set; } = true;
+
     /// <summary>Tearing down countdown. >0 means dissolution in progress (Section 7).</summary>
     public int TeardownTimer { get; set; }
     public bool IsTearingDown => TeardownTimer > 0;
