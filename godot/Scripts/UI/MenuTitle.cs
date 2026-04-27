@@ -81,10 +81,6 @@ public partial class MenuTitle : Node2D
 	public int TotalWidth => _totalW;
 	public int TotalHeight => _totalH;
 
-	/// <summary>
-	/// Computes the total grid width of the title text without instantiating or initializing.
-	/// Used to measure the title before positioning it on the grid.
-	/// </summary>
 	public static int MeasureWidth()
 	{
 		int totalW = 0;

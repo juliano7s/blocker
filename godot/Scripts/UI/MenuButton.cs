@@ -47,8 +47,19 @@ public partial class MenuButton : Node2D
 			BlockCount * cellSize + labelWidth + 8, cellSize + 8);
 	}
 
+	private void UpdateHitRect()
+	{
+		if (_gridToPixel == null) return;
+		var topLeft = _gridToPixel(_gridX, _gridY);
+		float labelWidth = _label.Length * 10f + 40f;
+		_hitRect = new Rect2(topLeft.X - 4, topLeft.Y - 4,
+			BlockCount * _cellSize + labelWidth + 8, _cellSize + 8);
+	}
+
 	public override void _Process(double delta)
 	{
+		UpdateHitRect();
+
 		float dt = (float)delta * 1000f;
 
 		float target = _hovered ? 1f : 0f;
@@ -73,7 +84,10 @@ public partial class MenuButton : Node2D
 
 		if (@event is InputEventMouseMotion motion)
 		{
+			bool wasHovered = _hovered;
 			_hovered = _hitRect.HasPoint(motion.Position);
+			if (_hovered != wasHovered)
+				Godot.Input.SetDefaultCursorShape(_hovered ? Godot.Input.CursorShape.PointingHand : Godot.Input.CursorShape.Arrow);
 		}
 		else if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
 		{
