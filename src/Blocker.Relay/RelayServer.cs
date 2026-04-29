@@ -213,6 +213,7 @@ public sealed class RelayServer
                 case Protocol.KickPlayer:  await HandleKickPlayer(conn, buf, len, ct); break;
                 case Protocol.Commands:    await FanOutCommands(conn, buf, len, ct); break;
                 case Protocol.Hash:        await FanOutHash(conn, buf, len, ct); break;
+                case Protocol.ChatMessage: await FanOutChat(conn, buf, len, ct); break;
                 default:
                     await SendError(conn, ErrorCode.UnknownMessageType, ct);
                     return;
@@ -559,6 +560,33 @@ public sealed class RelayServer
         }
         catch { return; }
         await FanOutToRoom(room, conn, payload, len, ct);
+    }
+
+    private async Task FanOutChat(Connection conn, byte[] payload, int len, CancellationToken ct)
+    {
+        if (conn.CurrentRoom is not Room room) return;
+        if (conn.AssignedPlayerId is not byte assigned) return;
+        if (len < 3) return;
+        byte textLen = payload[1];
+        if (len < 2 + textLen) return;
+
+        // Rewrite message to include senderId (client sends [0x30][len][text],
+        // relay fans out [0x30][senderId][len][text]).
+        var msg = new byte[3 + textLen];
+        msg[0] = Protocol.ChatMessage;
+        msg[1] = assigned;
+        msg[2] = textLen;
+        Array.Copy(payload, 2, msg, 3, textLen);
+
+        var segment = new ArraySegment<byte>(msg);
+        foreach (var kv in room.Slots)
+        {
+            if (kv.Value.OwnerId is not Guid id) continue;
+            Connection? other;
+            lock (_connectionsLock) _connections.TryGetValue(id, out other);
+            if (other == null) continue;
+            try { await other.Ws.SendAsync(segment, WebSocketMessageType.Binary, true, ct); } catch { }
+        }
     }
 
     private async Task FanOutToRoom(Room room, Connection sender, byte[] payload, int len, CancellationToken ct)

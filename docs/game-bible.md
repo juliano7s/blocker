@@ -772,7 +772,7 @@ The signature visual system. Procedural lightning patterns travel along grid lin
 - **Selection info**: Type and count of selected blocks.
 - **Minimap**: Bottom-right corner. Shows terrain, blocks, and nest zones. Click to jump camera.
 - **Keybind hints**: Contextual key prompts based on current selection.
-- **Chat messages**: Player name + text with timestamps, rendered in margin area.
+- **Message area**: Center-bottom, above HUD panels. Shows system messages (spawn toggles, refine toggles, eliminations), alerts (pop cap, game over), and multiplayer chat. Messages fade after 5s. Press Enter to open chat input (multiplayer only), Enter/Escape to close. Protocol: relay `0x30` ChatMessage.
 
 ---
 

@@ -15,4 +15,7 @@ public interface IRelayClient
     event Action<int /*playerId*/, int /*tick*/, IReadOnlyList<Command>>? CommandsReceived;
     event Action<int /*playerId*/, int /*tick*/, uint>? HashReceived;
     event Action<int /*playerId*/, int /*effectiveTick*/, LeaveReason>? PlayerLeft;
+
+    void SendChat(string text);
+    event Action<int /*slotId*/, string /*text*/>? ChatReceived;
 }

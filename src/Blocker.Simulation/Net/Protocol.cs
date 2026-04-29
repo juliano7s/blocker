@@ -32,6 +32,10 @@ public static class Protocol
     public const byte PlayerLeft   = 0x12;
     // 0x13 reserved (was Surrender; now sent as a Command in the Commands stream).
 
+    // Social — 0x30–0x3F
+    public const byte ChatMessage  = 0x30;
+    // 0x31 reserved for TeamPing
+
     // Diagnostics — 0x20–0x2F
     public const byte DesyncReport = 0x20;
     public const byte Error        = 0x21;

@@ -1,15 +1,16 @@
 
 # Menu
- - Add the grid as the background
- - The menu buttons are in the grid, on hover they highlight the grid cells, when clicked they trigger the grid effects
- - Add the blocker title with grid animations like the prototype
- - Blocks appear periodically and they explode with different grid effects
 
 
 # Chat, Alerts and Info
  - right above the bottom hud, center aligned
  - being attacked alerts
  - team pings
+-  I want to implement a chat and message area. Located center aligned, in the bottom, right above the bottom hud.
+
+  There should appear game info messages, alerts and chat when in multiplayer.
+
+  Let's brainstorm and discuss the feature.
 
 # Controls
  - blueprint commands should also auto-queue when rooting/uprooting or immobile cooldown

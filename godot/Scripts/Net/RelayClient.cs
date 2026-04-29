@@ -29,6 +29,7 @@ public sealed class RelayClient : IRelayClient, IDisposable
     public event Action<int, int, IReadOnlyList<Command>>? CommandsReceived;
     public event Action<int, int, uint>? HashReceived;
     public event Action<int, int, LeaveReason>? PlayerLeft;
+    public event Action<int, string>? ChatReceived;
 
     // Lobby-level events — also fired on main thread.
     public event Action? HelloAcked;
@@ -108,6 +109,18 @@ public sealed class RelayClient : IRelayClient, IDisposable
     {
         // M1: log-only, minimal payload. Relay only records that we reported.
         var msg = new byte[] { Protocol.DesyncReport, (byte)_localPlayerId };
+        _outbox.Writer.TryWrite(msg);
+    }
+
+    public void SendChat(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        var textBytes = System.Text.Encoding.UTF8.GetBytes(text);
+        if (textBytes.Length > 128) textBytes = textBytes[..128];
+        var msg = new byte[2 + textBytes.Length];
+        msg[0] = Protocol.ChatMessage;
+        msg[1] = (byte)textBytes.Length;
+        Array.Copy(textBytes, 0, msg, 2, textBytes.Length);
         _outbox.Writer.TryWrite(msg);
     }
 
@@ -232,6 +245,14 @@ public sealed class RelayClient : IRelayClient, IDisposable
                     var (effTick, _) = Varint.Read(new ReadOnlySpan<byte>(msg, 2, msg.Length - 2), 0);
                     byte reason = msg[msg.Length - 1];
                     PlayerLeft?.Invoke(pid, (int)effTick, (LeaveReason)reason);
+                    break;
+                }
+                case Protocol.ChatMessage:
+                {
+                    byte senderId = msg[1];
+                    byte textLen = msg[2];
+                    string text = System.Text.Encoding.UTF8.GetString(msg, 3, textLen);
+                    ChatReceived?.Invoke(senderId, text);
                     break;
                 }
                 case Protocol.Error: ServerError?.Invoke((ErrorCode)msg[1]); break;

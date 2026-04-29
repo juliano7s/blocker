@@ -66,6 +66,9 @@ public class LockstepCoordinatorTests
         { add => _inner.HashReceived += value; remove => _inner.HashReceived -= value; }
         public event Action<int, int, LeaveReason>? PlayerLeft
         { add => _inner.PlayerLeft += value; remove => _inner.PlayerLeft -= value; }
+        public void SendChat(string text) => _inner.SendChat(text);
+        public event Action<int, string>? ChatReceived
+        { add => _inner.ChatReceived += value; remove => _inner.ChatReceived -= value; }
     }
 
     [Fact]

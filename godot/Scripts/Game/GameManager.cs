@@ -25,6 +25,7 @@ public partial class GameManager : Node2D
 	private TickRunner _tickRunner = null!;
 	private HudOverlay _hud = null!;
 	private HudBar _hudBar = null!;
+	private MessageArea _messageArea = null!;
 	private PostProcessingManager _postProcessing = null!;
 	private EffectManager _effectManager = null!;
 	private AudioManager _audioManager = null!;
@@ -137,9 +138,36 @@ public partial class GameManager : Node2D
 			else
 				_selectionManager.SelectBlockById(blockId);
 		};
-		_hudBar.CommandClicked += action => _selectionManager.IssueCommand(action);
+		_hudBar.CommandClicked += action =>
+		{
+			_selectionManager.IssueCommand(action);
+			if (action == Input.CommandAction.RefineNuggets)
+				_messageArea?.AddSystemMessage("Refine nugget toggled");
+		};
 		_hudBar.BlueprintClicked += type => _selectionManager.ToggleBlueprintMode(type);
 		_hudBar.SetControllingPlayer(_selectionManager.ControllingPlayer);
+
+		// Set up message area
+		_messageArea = new MessageArea();
+		AddChild(_messageArea);
+		_messageArea.SetGameState(gameState);
+		_messageArea.SetConfig(Config);
+		_messageArea.SetControllingPlayer(_selectionManager.ControllingPlayer);
+		if (_launchSession != null)
+		{
+			var slotNames = new Dictionary<int, string>();
+			foreach (var id in _launchSession.ActivePlayerIds)
+				slotNames[id] = $"Player {id}";
+			_messageArea.SetRelay(_launchSession.Relay, slotNames);
+		}
+		_hud.SpawnToggleChanged += unitType =>
+		{
+			var bt = (Blocker.Simulation.Blocks.BlockType)unitType;
+			var player = gameState.Players.Find(p => p.Id == _selectionManager.ControllingPlayer);
+			bool willDisable = player != null && !player.SpawnDisabled.Contains(bt);
+			string action = willDisable ? "disabled" : "enabled";
+			_messageArea.AddSystemMessage($"Spawn {bt} {action}");
+		};
 
 		// Tell camera about HUD coverage so it offsets the visible area
 		_camera.SetHudInsets(HudStyles.TopBarHeight, HudStyles.MinimapSize + HudStyles.BottomPanelMargin);
@@ -179,6 +207,8 @@ public partial class GameManager : Node2D
 		// Keep HUD, effects, and audio in sync with controlling player
 		_hud.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_hudBar.SetControllingPlayer(_selectionManager.ControllingPlayer);
+		_messageArea.SetControllingPlayer(_selectionManager.ControllingPlayer);
+		_messageArea.ProcessVisualEvents();
 		_effectManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_audioManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_gridRenderer.SetControllingPlayer(_selectionManager.ControllingPlayer);
