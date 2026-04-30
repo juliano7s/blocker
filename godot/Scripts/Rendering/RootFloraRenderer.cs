@@ -13,13 +13,11 @@ namespace Blocker.Game.Rendering;
 /// For each connected cluster of rooted blocks, procedurally generates
 /// Line2D vines that hug the cluster perimeter and thread between cells.
 /// Vines grow in over the rooting duration (36 ticks), then stay alive
-/// with gentle sway until the block uproots.
+/// with gentle GPU-based sway until the block uproots.
 ///
-/// When a new block roots adjacent to an existing rooted block, the cluster
-/// is regenerated so vines connect the two seamlessly.
-///
-/// All vines use the digital_vine.gdshader for GPU shimmer, taper, and color.
-/// CPU updates sway per frame.
+/// All vine rendering is GPU-driven: growth reveal, shimmer, taper, color shift,
+/// and sway are handled entirely by digital_vine.gdshader. No per-frame CPU
+/// point updates or Line2D mesh rebuilds.
 /// </summary>
 public partial class RootFloraRenderer : Node2D
 {
@@ -28,6 +26,7 @@ public partial class RootFloraRenderer : Node2D
 	private readonly Random _rng = new();
 
 	private readonly Dictionary<int, RootCluster> _blockToCluster = new();
+	private readonly Dictionary<(int X, int Y), RootCluster> _posToCluster = new();
 	private readonly List<RootCluster> _clusters = new();
 
 	public override void _Ready()
@@ -38,13 +37,14 @@ public partial class RootFloraRenderer : Node2D
 
 	public override void _Process(double delta)
 	{
+		if (_clusters.Count == 0) return;
+
 		float ageMs = (float)Time.GetTicksMsec();
 
 		foreach (var cluster in _clusters)
 		{
 			foreach (var vine in cluster.Vines)
 			{
-				vine.UpdateSway(ageMs);
 				vine.CoreMat.SetShaderParameter("age_ms", ageMs);
 				vine.GlowMat.SetShaderParameter("age_ms", ageMs);
 			}
@@ -53,10 +53,6 @@ public partial class RootFloraRenderer : Node2D
 		}
 	}
 
-	/// <summary>
-	/// Called every frame from GridRenderer for each block in rooting/rooted/uprooting state.
-	/// Updates growth progress and manages cluster lifecycle.
-	/// </summary>
 	public void UpdateBlock(Block block, Color teamColor)
 	{
 		if (block.Type == BlockType.Wall) return;
@@ -87,12 +83,12 @@ public partial class RootFloraRenderer : Node2D
 			AddBlock(block, teamColor);
 	}
 
-	/// <summary>
-	/// Immediately remove all flora for a block by ID (e.g. block destroyed).
-	/// </summary>
 	public void RemoveBlock(int blockId)
 	{
 		if (!_blockToCluster.TryGetValue(blockId, out var cluster)) return;
+
+		if (cluster.Blocks.TryGetValue(blockId, out var block))
+			_posToCluster.Remove((block.Pos.X, block.Pos.Y));
 
 		cluster.Blocks.Remove(blockId);
 		_blockToCluster.Remove(blockId);
@@ -108,15 +104,13 @@ public partial class RootFloraRenderer : Node2D
 		}
 	}
 
-	/// <summary>
-	/// Clean up everything (scene exit, game end).
-	/// </summary>
 	public void ClearAll()
 	{
 		foreach (var cluster in _clusters)
 			cluster.Destroy();
 		_clusters.Clear();
 		_blockToCluster.Clear();
+		_posToCluster.Clear();
 	}
 
 	public void SetGameState(GameState gameState)
@@ -126,11 +120,13 @@ public partial class RootFloraRenderer : Node2D
 	private void AddBlock(Block block, Color teamColor)
 	{
 		RootCluster? adjacentCluster = FindAdjacentCluster(block);
+		var pos = (block.Pos.X, block.Pos.Y);
 
 		if (adjacentCluster != null)
 		{
 			adjacentCluster.Blocks[block.Id] = block;
 			_blockToCluster[block.Id] = adjacentCluster;
+			_posToCluster[pos] = adjacentCluster;
 			RebuildCluster(adjacentCluster);
 		}
 		else
@@ -138,6 +134,7 @@ public partial class RootFloraRenderer : Node2D
 			var cluster = new RootCluster { TeamColor = teamColor };
 			cluster.Blocks[block.Id] = block;
 			_blockToCluster[block.Id] = cluster;
+			_posToCluster[pos] = cluster;
 			_clusters.Add(cluster);
 			BuildClusterVines(cluster);
 		}
@@ -180,15 +177,8 @@ public partial class RootFloraRenderer : Node2D
 	{
 		foreach (var offset in GridPos.OrthogonalOffsets)
 		{
-			var neighbor = block.Pos + offset;
-			foreach (var cluster in _clusters)
-			{
-				foreach (var b in cluster.Blocks.Values)
-				{
-					if (b.Pos == neighbor)
-						return cluster;
-				}
-			}
+			if (_posToCluster.TryGetValue((block.Pos.X + offset.X, block.Pos.Y + offset.Y), out var cluster))
+				return cluster;
 		}
 		return null;
 	}
@@ -209,7 +199,9 @@ public partial class RootFloraRenderer : Node2D
 
 		if (cells.Count == 0) return;
 
-		var perimeter = FindPerimeterPoints(cells);
+		var perimeterSet = FindPerimeterPoints(cells);
+		var perimeterList = perimeterSet.ToList();
+
 		var color = cluster.TeamColor;
 		var vineColor = new Color(
 			color.R * 0.6f + 0.05f,
@@ -218,32 +210,28 @@ public partial class RootFloraRenderer : Node2D
 		);
 		var glowColor = vineColor * 0.8f;
 
-		// Perimeter-hugging vines — density scales with cluster size
 		int vineCount = Math.Min(cells.Count * 3 + 2, 20);
 		for (int i = 0; i < vineCount; i++)
 		{
-			var path = GenerateVinePath(perimeter, 3, 6 + cells.Count);
+			var path = GenerateVinePath(perimeterSet, perimeterList, 3, 6 + cells.Count);
 			if (path.Length < 2) continue;
 
 			SpawnVine(cluster, path, vineColor, 1.0f, 0.18f + _rng.NextSingle() * 0.08f, 1.3f);
 		}
 
-		// Outward tendrils
 		int tendrilCount = Math.Max(2, cells.Count);
 		for (int i = 0; i < tendrilCount; i++)
 		{
-			var path = GenerateOutwardTendril(cells, 2);
+			var path = GenerateOutwardTendril(cells, perimeterList, 2);
 			if (path.Length < 2) continue;
 
 			SpawnVine(cluster, path, glowColor, 1.2f, 0.15f, 1.0f);
 		}
 
-		// Interior bridge vines between adjacent cells
 		SpawnInteriorVines(cluster, cells, vineColor * 0.7f);
 
-		// Leaves at perimeter
 		var leafPositions = new List<Vector2>();
-		foreach (var (px, py) in perimeter)
+		foreach (var (px, py) in perimeterList)
 		{
 			if (_rng.NextSingle() < 0.3f)
 				leafPositions.Add(new Vector2(
@@ -253,7 +241,6 @@ public partial class RootFloraRenderer : Node2D
 		if (leafPositions.Count > 0)
 			SpawnLeaves(cluster, leafPositions, vineColor);
 
-		// Apply current growth
 		float progress = cluster.GrowthProgress;
 		foreach (var vine in cluster.Vines)
 		{
@@ -273,28 +260,38 @@ public partial class RootFloraRenderer : Node2D
 		for (int i = 0; i < gridPoints.Length; i++)
 			pixelPoints[i] = GridToPixel(gridPoints[i]);
 
-		var coreMat = MakeVineMat(color, 0.75f, 0.25f, swaySpeed);
-		var glowMat = MakeVineMat(color, 0.08f, 0.18f, swaySpeed);
+		Vector2 dir = gridPoints[^1] - gridPoints[0];
+		Vector2 perpDir = new Vector2(-dir.Y, dir.X).Normalized();
+		float phase = _rng.NextSingle() * MathF.Tau;
+
+		var coreMat = MakeVineMat(color, 0.75f, 0.25f, shimmerSpeed: swaySpeed);
+		var glowMat = MakeVineMat(color, 0.08f, 0.18f, shimmerSpeed: swaySpeed);
+
+		SetSwayParams(coreMat, perpDir, swaySpeed, swayAmt, phase);
+		SetSwayParams(glowMat, perpDir, swaySpeed, swayAmt, phase);
 
 		var coreLine = MakeLine(pixelPoints, coreMat, width);
 		var glowLine = MakeLine(pixelPoints, glowMat, width * 3f);
 
 		cluster.Vines.Add(new FloraVine
 		{
-			GridPoints = (Vector2[])gridPoints.Clone(),
 			CoreLine = coreLine,
 			GlowLine = glowLine,
 			CoreMat = coreMat,
 			GlowMat = glowMat,
-			SwayAmount = swayAmt,
-			SwaySpeed = swaySpeed,
-			Phase = _rng.NextSingle() * MathF.Tau,
 		});
+	}
+
+	private static void SetSwayParams(ShaderMaterial mat, Vector2 dir, float speed, float amount, float phase)
+	{
+		mat.SetShaderParameter("sway_dir", dir);
+		mat.SetShaderParameter("sway_speed", speed);
+		mat.SetShaderParameter("sway_amount", amount);
+		mat.SetShaderParameter("sway_phase", phase);
 	}
 
 	private void SpawnInteriorVines(RootCluster cluster, HashSet<(int X, int Y)> cells, Color color)
 	{
-		// Find pairs of adjacent cells and draw short vines between their centers
 		foreach (var (cx, cy) in cells)
 		{
 			if (cells.Contains((cx + 1, cy)))
@@ -376,11 +373,12 @@ public partial class RootFloraRenderer : Node2D
 		return result;
 	}
 
-	private Vector2[] GenerateVinePath(HashSet<(int X, int Y)> perimeter, int minLen, int maxLen)
+	private Vector2[] GenerateVinePath(HashSet<(int X, int Y)> perimeterSet,
+		List<(int X, int Y)> perimeterList, int minLen, int maxLen)
 	{
-		if (perimeter.Count == 0) return Array.Empty<Vector2>();
+		if (perimeterList.Count == 0) return Array.Empty<Vector2>();
 
-		var start = perimeter.ElementAt(_rng.Next(perimeter.Count));
+		var start = perimeterList[_rng.Next(perimeterList.Count)];
 		var path = new List<Vector2> { new(start.X, start.Y) };
 
 		int cx = start.X, cy = start.Y;
@@ -394,7 +392,7 @@ public partial class RootFloraRenderer : Node2D
 			foreach (var d in dirs)
 			{
 				int nx = cx + d[0], ny = cy + d[1];
-				if (perimeter.Contains((nx, ny)) && (nx != prevX || ny != prevY))
+				if (perimeterSet.Contains((nx, ny)) && (nx != prevX || ny != prevY))
 					neighbors.Add((nx, ny));
 			}
 
@@ -409,12 +407,12 @@ public partial class RootFloraRenderer : Node2D
 		return path.Count >= 2 ? path.ToArray() : Array.Empty<Vector2>();
 	}
 
-	private Vector2[] GenerateOutwardTendril(HashSet<(int X, int Y)> cells, int maxReach)
+	private Vector2[] GenerateOutwardTendril(HashSet<(int X, int Y)> cells,
+		List<(int X, int Y)> perimeterList, int maxReach)
 	{
-		var perimeter = FindPerimeterPoints(cells);
-		if (perimeter.Count == 0) return Array.Empty<Vector2>();
+		if (perimeterList.Count == 0) return Array.Empty<Vector2>();
 
-		var start = perimeter.ElementAt(_rng.Next(perimeter.Count));
+		var start = perimeterList[_rng.Next(perimeterList.Count)];
 		var path = new List<Vector2> { new(start.X, start.Y) };
 
 		int cx = start.X, cy = start.Y;
@@ -528,46 +526,9 @@ public partial class RootFloraRenderer : Node2D
 
 	private class FloraVine
 	{
-		public Vector2[] GridPoints = Array.Empty<Vector2>();
 		public Line2D CoreLine = null!;
 		public Line2D GlowLine = null!;
 		public ShaderMaterial CoreMat = null!;
 		public ShaderMaterial GlowMat = null!;
-		public float SwayAmount;
-		public float SwaySpeed;
-		public float Phase;
-
-		public void UpdateSway(float ageMs)
-		{
-			if (GridPoints.Length < 2) return;
-
-			var pts = new Vector2[GridPoints.Length];
-			float maxDist = GridPoints.Length - 1;
-			float cellSize = GridRenderer.CellSize;
-
-			for (int i = 0; i < GridPoints.Length; i++)
-			{
-				float t = maxDist > 0 ? i / maxDist : 0f;
-
-				Vector2 segDir;
-				if (i == 0)
-					segDir = (GridPoints[1] - GridPoints[0]).Normalized();
-				else if (i == GridPoints.Length - 1)
-					segDir = (GridPoints[i] - GridPoints[i - 1]).Normalized();
-				else
-					segDir = (GridPoints[i + 1] - GridPoints[i - 1]).Normalized();
-
-				var perp = new Vector2(-segDir.Y, segDir.X);
-				float swayOffset = MathF.Sin(ageMs * SwaySpeed * 0.001f + t * 4.0f + Phase)
-					* SwayAmount * t * (1f - t * 0.4f);
-
-				pts[i] = new Vector2(
-					GridPoints[i].X * cellSize + GridRenderer.GridPadding + perp.X * swayOffset,
-					GridPoints[i].Y * cellSize + GridRenderer.GridPadding + perp.Y * swayOffset);
-			}
-
-			CoreLine.Points = pts;
-			GlowLine.Points = pts;
-		}
 	}
 }

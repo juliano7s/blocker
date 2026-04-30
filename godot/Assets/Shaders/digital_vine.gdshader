@@ -14,6 +14,17 @@ uniform float shimmer_speed : hint_range(0.1, 10.0) = 1.2;
 uniform float color_shift : hint_range(0.0, 0.3) = 0.05;
 uniform bool grow_mode    = false;
 uniform float trail       : hint_range(0.01, 0.5) = 0.2;
+uniform vec2 sway_dir     = vec2(0.0, 1.0);
+uniform float sway_speed  : hint_range(0.01, 2.0) = 0.2;
+uniform float sway_amount : hint_range(0.0, 5.0) = 1.0;
+uniform float sway_phase  : hint_range(0.0, 6.283) = 0.0;
+
+void vertex() {
+	float t = COLOR.r;
+	float wave = sin(age_ms * sway_speed * 0.001 + t * 4.0 + sway_phase);
+	float amp = sway_amount * t * (1.0 - t * 0.4);
+	VERTEX += sway_dir * wave * amp;
+}
 
 float easeOutCubic(float t) {
 	return 1.0 - pow(1.0 - clamp(t, 0.0, 1.0), 3.0);
