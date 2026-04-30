@@ -22,6 +22,7 @@ public partial class GridRenderer : Node2D
 	private int _controllingTeamId = -1;
 	private float _tickInterval = 1f / 12f; // Updated by GameManager
 	private GlowLayer? _glowLayer;
+	private RootFloraRenderer? _floraRenderer;
 
 	public void SetVisibility(VisibilityMap? visibility) => _localVisibility = visibility;
 
@@ -46,6 +47,9 @@ public partial class GridRenderer : Node2D
 	{
 		_glowLayer = new GlowLayer { Name = "GlowLayer" };
 		AddChild(_glowLayer);
+
+		_floraRenderer = new RootFloraRenderer { Name = "RootFlora" };
+		AddChild(_floraRenderer);
 
 		// Initialize background shader
 		var shader = GD.Load<Shader>("res://Assets/Shaders/grid_background.gdshader");
@@ -427,6 +431,7 @@ public partial class GridRenderer : Node2D
 				_idleAngles.Remove(id);
 				_idleCooldowns.Remove(id);
 				_lastMiningHitTime.Remove(id);
+				_floraRenderer?.RemoveBlock(id);
 			}
 		}
 
@@ -536,6 +541,7 @@ public partial class GridRenderer : Node2D
 				continue;
 
 			var color = _config.GetPalette(block.PlayerId).Base;
+			_floraRenderer?.UpdateBlock(block, color);
 			var rect = new Rect2(
 				worldPos.X - CellSize / 2f + BlockInset,
 				worldPos.Y - CellSize / 2f + BlockInset,

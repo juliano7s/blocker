@@ -33,11 +33,11 @@ public partial class GridRenderer : Node2D
             float time = (float)Time.GetTicksMsec() / 1000f;
             float spinSpeed = rooting ? 1.5f : -1.5f;
             float tracerLen = 0.25f; // fraction of perimeter covered by the tracer
-            DrawOutlineTracer(rect, time * spinSpeed, tracerLen, new Color(0.78f, 0.78f, 0.78f, 0.4f + 0.3f * progress), 1.5f);
+            DrawOutlineTracer(rect, time * spinSpeed, tracerLen, new Color(0.6f, 0.6f, 0.6f, 0.2f + 0.15f * progress), 1.0f);
         }
 
-        // 2) Digital root tendrils — grow from corners along grid lines
-        DrawRootTendrils(rect, progress, palette.Base);
+        // 2) Digital flora vines — managed by RootFloraRenderer (persistent Line2D + shader)
+        // (UpdateBlock is called from the main block loop for ALL blocks)
 
         // 3) Diagonal stripes — scroll TL→BR when rooting, BR→TL when uprooting, static when rooted
         {
@@ -105,98 +105,6 @@ public partial class GridRenderer : Node2D
         float t0 = (overlapStart - segStart) / segLen;
         float t1 = (overlapEnd - segStart) / segLen;
         DrawLine(from.Lerp(to, t0), from.Lerp(to, t1), color, width, true);
-    }
-
-    /// <summary>
-    /// Digital root tendrils: segmented lines that grow from each block corner,
-    /// first diagonally to the nearest grid intersection, then along the grid line.
-    /// Thicker near the corner, tapering to thin. Team-colored, blending into the grid.
-    /// </summary>
-    private void DrawRootTendrils(Rect2 rect, float progress, Color teamColor)
-    {
-        if (progress < 0.02f) return;
-
-        float inset = BlockInset;
-        float maxGridLen = CellSize * 0.4f; // max reach along grid line after the diagonal
-        float totalReach = inset * Mathf.Sqrt2 + maxGridLen; // diagonal + grid portion
-        float tendrilLen = totalReach * progress;
-
-        if (tendrilLen < 1f) return;
-
-        // Grid intersections (cell corners) for each block corner
-        var tl = rect.Position; // block corner (inset from grid)
-        var tr = new Vector2(rect.End.X, rect.Position.Y);
-        var bl = new Vector2(rect.Position.X, rect.End.Y);
-        var br = rect.End;
-
-        // Grid intersections: block corner offset by inset diagonally outward
-        var tlGrid = tl + new Vector2(-inset, -inset);
-        var trGrid = tr + new Vector2(inset, -inset);
-        var blGrid = bl + new Vector2(-inset, inset);
-        var brGrid = br + new Vector2(inset, inset);
-
-        // Each corner sends two tendrils: diagonal to grid corner, then along each grid line
-        DrawTendril(tl, tlGrid, Vector2.Left, tendrilLen, totalReach, teamColor);
-        DrawTendril(tl, tlGrid, Vector2.Up, tendrilLen, totalReach, teamColor);
-        DrawTendril(tr, trGrid, Vector2.Right, tendrilLen, totalReach, teamColor);
-        DrawTendril(tr, trGrid, Vector2.Up, tendrilLen, totalReach, teamColor);
-        DrawTendril(bl, blGrid, Vector2.Left, tendrilLen, totalReach, teamColor);
-        DrawTendril(bl, blGrid, Vector2.Down, tendrilLen, totalReach, teamColor);
-        DrawTendril(br, brGrid, Vector2.Right, tendrilLen, totalReach, teamColor);
-        DrawTendril(br, brGrid, Vector2.Down, tendrilLen, totalReach, teamColor);
-    }
-
-    /// <summary>
-    /// Draws one tendril: diagonal from blockCorner to gridCorner, then along gridDir.
-    /// The tendril is drawn as tapered segments with gaps for a digital feel.
-    /// </summary>
-    private void DrawTendril(Vector2 blockCorner, Vector2 gridCorner, Vector2 gridDir,
-        float currentLen, float maxLen, Color color)
-    {
-        float diagLen = (gridCorner - blockCorner).Length();
-        int segments = 6;
-        float maxWidth = 1.0f;
-        float minWidth = 0.2f;
-
-        for (int i = 0; i < segments; i++)
-        {
-            float t0 = (float)i / segments;
-            float t1 = (float)(i + 1) / segments;
-
-            // Distance along the full tendril path
-            float d0 = t0 * currentLen;
-            float d1 = t1 * currentLen;
-
-            // Small gap between segments
-            float gap = (d1 - d0) * 0.2f;
-            d1 -= gap;
-
-            if (d1 <= d0) continue;
-
-            // Map distance to world position: first diagonal, then along grid
-            var p0 = TendrilPointAt(blockCorner, gridCorner, gridDir, diagLen, d0);
-            var p1 = TendrilPointAt(blockCorner, gridCorner, gridDir, diagLen, d1);
-
-            // Taper width and alpha from root to tip
-            float width = Mathf.Lerp(maxWidth, minWidth, t0);
-            float alpha = Mathf.Lerp(0.6f, 0.08f, t0);
-
-            DrawLine(p0, p1, color.Darkened(0.2f) with { A = alpha * 0.3f }, width + 2f, true);
-            DrawLine(p0, p1, color with { A = alpha }, width, true);
-        }
-    }
-
-    private static Vector2 TendrilPointAt(Vector2 blockCorner, Vector2 gridCorner,
-        Vector2 gridDir, float diagLen, float dist)
-    {
-        if (dist <= diagLen)
-        {
-            // Still on the diagonal portion
-            float t = diagLen > 0.001f ? dist / diagLen : 1f;
-            return blockCorner.Lerp(gridCorner, t);
-        }
-        // Past the diagonal — continue along the grid line
-        return gridCorner + gridDir * (dist - diagLen);
     }
 
     /// <summary>
