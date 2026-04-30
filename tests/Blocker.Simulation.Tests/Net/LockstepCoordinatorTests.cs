@@ -67,6 +67,8 @@ public class LockstepCoordinatorTests
         public event Action<int, int, LeaveReason>? PlayerLeft
         { add => _inner.PlayerLeft += value; remove => _inner.PlayerLeft -= value; }
         public void SendChat(string text) => _inner.SendChat(text);
+        public void SendListRooms() => _inner.SendListRooms();
+        public void SendSetReady(bool ready) => _inner.SendSetReady(ready);
         public event Action<int, string>? ChatReceived
         { add => _inner.ChatReceived += value; remove => _inner.ChatReceived -= value; }
     }

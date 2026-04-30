@@ -3,7 +3,7 @@ using Blocker.Simulation.Maps;
 namespace Blocker.Game.Net;
 
 /// <summary>
-/// Carried from MultiplayerMenu/SlotConfigScreen into GameManager via a static
+/// Carried from LobbyListScreen/GameLobbyScreen into GameManager via a static
 /// slot on GameLaunchData (mirrors the existing single-player launch pattern).
 /// </summary>
 public sealed class MultiplayerSessionState

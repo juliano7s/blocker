@@ -50,7 +50,7 @@ public partial class GameManager : Node2D
 		Constants.Initialize(Config.ToSimulationConfig());
 		CursorConfig.ApplyDefaults();
 
-		// Load map from GameLaunchData (set by SlotConfigScreen for both SP and MP)
+		// Load map from GameLaunchData (set by GameLobbyScreen for both SP and MP)
 		if (GameLaunchData.MapData == null || GameLaunchData.Assignments == null)
 			throw new System.Exception("GameLaunchData.MapData and Assignments must be set before launching the game.");
 
@@ -204,6 +204,8 @@ public partial class GameManager : Node2D
 
 	public override void _Process(double delta)
 	{
+		if (_hud == null) return;
+
 		// Keep HUD, effects, and audio in sync with controlling player
 		_hud.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_hudBar.SetControllingPlayer(_selectionManager.ControllingPlayer);
@@ -336,7 +338,7 @@ public partial class GameManager : Node2D
 		var relay = _launchSession.Relay;
 		_mpRoomStateHandler = (rs) =>
 		{
-			// Stash so the new SlotConfigScreen can seed its lobby panel
+			// Stash so the new GameLobbyScreen can seed its lobby panel
 			// immediately without waiting for a second broadcast.
 			MultiplayerLaunchData.PendingRoomState = rs;
 			CallDeferred(nameof(OnMpRoomStateAfterGameEnded));
@@ -361,7 +363,7 @@ public partial class GameManager : Node2D
 		_coord?.Detach();
 		_coord = null;
 
-		GetTree().ChangeSceneToFile("res://Scenes/SlotConfig.tscn");
+		GetTree().ChangeSceneToFile("res://Scenes/GameLobby.tscn");
 	}
 
 	public override void _ExitTree()

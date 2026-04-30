@@ -8,9 +8,9 @@ namespace Blocker.Simulation.Net;
 /// </summary>
 public static class Protocol
 {
-    // Bumped 1→2 for M2: CreateRoom carries GameMode; RoomState carries
-    // GameMode + per-slot TeamId. Mismatched clients are rejected on Hello.
-    public const byte ProtocolVersion = 2;
+    // Bumped 2→3 for M3: room names in CreateRoom/RoomState, per-slot isReady,
+    // and ListRooms/RoomList for the lobby browser.
+    public const byte ProtocolVersion = 3;
     public const ushort SimulationVersion = 1;
 
     // Session / lobby — 0x00–0x0F
@@ -25,6 +25,9 @@ public static class Protocol
     public const byte Rematch      = 0x09;
     public const byte UpdateRoom   = 0x0A;
     public const byte KickPlayer   = 0x0B;
+    public const byte ListRooms    = 0x0C;
+    public const byte RoomList     = 0x0D;
+    public const byte SetReady     = 0x0E;
 
     // Tick traffic — 0x10–0x1F
     public const byte Commands     = 0x10;
@@ -91,3 +94,12 @@ public enum ErrorCode : byte
     HostLeft            = 11,
     Kicked              = 12,
 }
+
+public sealed record SlotStateEntry(
+    string DisplayName, byte ColorIndex, byte TeamId,
+    bool IsOpen, bool IsClosed, bool IsReady);
+
+public sealed record RoomStatePayload(
+    string Code, Guid HostId, ushort SimulationVersion,
+    GameMode GameMode, string RoomName, string MapName,
+    SlotStateEntry[] Slots);

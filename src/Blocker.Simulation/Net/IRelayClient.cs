@@ -17,5 +17,7 @@ public interface IRelayClient
     event Action<int /*playerId*/, int /*effectiveTick*/, LeaveReason>? PlayerLeft;
 
     void SendChat(string text);
+    void SendListRooms();
+    void SendSetReady(bool ready);
     event Action<int /*slotId*/, string /*text*/>? ChatReceived;
 }

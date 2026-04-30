@@ -33,6 +33,7 @@ public sealed class RelayClient : IRelayClient, IDisposable
 
     // Lobby-level events — also fired on main thread.
     public event Action? HelloAcked;
+    public event Action<RoomSummary[]>? RoomListReceived;
     public event Action<RoomStatePayload>? RoomStateReceived;
     public event Action<int /*localPlayerId*/, int[] /*activePlayerIds*/>? GameStarted;
     public event Action<ErrorCode>? ServerError;
@@ -124,24 +125,8 @@ public sealed class RelayClient : IRelayClient, IDisposable
         _outbox.Writer.TryWrite(msg);
     }
 
-    public void SendCreateRoom(byte slotCount, GameMode gameMode, string mapName, byte[] mapBlob)
-    {
-        var nameBytes = System.Text.Encoding.UTF8.GetBytes(mapName);
-        var varBuf = new byte[5];
-        int vn = Varint.Write(varBuf, 0, (uint)nameBytes.Length);
-        var varBuf2 = new byte[5];
-        int vb = Varint.Write(varBuf2, 0, (uint)mapBlob.Length);
-        var msg = new byte[3 + vn + nameBytes.Length + vb + mapBlob.Length];
-        int o = 0;
-        msg[o++] = Protocol.CreateRoom;
-        msg[o++] = slotCount;
-        msg[o++] = (byte)gameMode;
-        Array.Copy(varBuf, 0, msg, o, vn); o += vn;
-        Array.Copy(nameBytes, 0, msg, o, nameBytes.Length); o += nameBytes.Length;
-        Array.Copy(varBuf2, 0, msg, o, vb); o += vb;
-        Array.Copy(mapBlob, 0, msg, o, mapBlob.Length);
-        _outbox.Writer.TryWrite(msg);
-    }
+    public void SendCreateRoom(byte slotCount, GameMode gameMode, string roomName, string mapName, byte[] mapBlob) =>
+        SendRoomConfig(Protocol.CreateRoom, slotCount, gameMode, roomName, mapName, mapBlob);
 
     public void SendRematch() =>
         _outbox.Writer.TryWrite(new byte[] { Protocol.Rematch });
@@ -163,24 +148,38 @@ public sealed class RelayClient : IRelayClient, IDisposable
     public void SendLeaveRoom() =>
         _outbox.Writer.TryWrite(new byte[] { Protocol.LeaveRoom });
 
-    public void SendUpdateRoom(byte slotCount, GameMode gameMode, string mapName, byte[] mapBlob)
+    public void SendUpdateRoom(byte slotCount, GameMode gameMode, string roomName, string mapName, byte[] mapBlob) =>
+        SendRoomConfig(Protocol.UpdateRoom, slotCount, gameMode, roomName, mapName, mapBlob);
+
+    private void SendRoomConfig(byte type, byte slotCount, GameMode gameMode, string roomName, string mapName, byte[] mapBlob)
     {
+        var roomNameBytes = System.Text.Encoding.UTF8.GetBytes(roomName);
         var nameBytes = System.Text.Encoding.UTF8.GetBytes(mapName);
         var varBuf = new byte[5];
-        int vn = Varint.Write(varBuf, 0, (uint)nameBytes.Length);
+        int vr = Varint.Write(varBuf, 0, (uint)roomNameBytes.Length);
         var varBuf2 = new byte[5];
-        int vb = Varint.Write(varBuf2, 0, (uint)mapBlob.Length);
-        var msg = new byte[3 + vn + nameBytes.Length + vb + mapBlob.Length];
+        int vn = Varint.Write(varBuf2, 0, (uint)nameBytes.Length);
+        var varBuf3 = new byte[5];
+        int vb = Varint.Write(varBuf3, 0, (uint)mapBlob.Length);
+        var msg = new byte[3 + vr + roomNameBytes.Length + vn + nameBytes.Length + vb + mapBlob.Length];
         int o = 0;
-        msg[o++] = Protocol.UpdateRoom;
+        msg[o++] = type;
         msg[o++] = slotCount;
         msg[o++] = (byte)gameMode;
-        Array.Copy(varBuf, 0, msg, o, vn); o += vn;
+        Array.Copy(varBuf, 0, msg, o, vr); o += vr;
+        Array.Copy(roomNameBytes, 0, msg, o, roomNameBytes.Length); o += roomNameBytes.Length;
+        Array.Copy(varBuf2, 0, msg, o, vn); o += vn;
         Array.Copy(nameBytes, 0, msg, o, nameBytes.Length); o += nameBytes.Length;
-        Array.Copy(varBuf2, 0, msg, o, vb); o += vb;
+        Array.Copy(varBuf3, 0, msg, o, vb); o += vb;
         Array.Copy(mapBlob, 0, msg, o, mapBlob.Length);
         _outbox.Writer.TryWrite(msg);
     }
+
+    public void SendListRooms() =>
+        _outbox.Writer.TryWrite(new byte[] { Protocol.ListRooms });
+
+    public void SendSetReady(bool ready) =>
+        _outbox.Writer.TryWrite(new byte[] { Protocol.SetReady, (byte)(ready ? 1 : 0) });
 
     public void SendKickPlayer(byte slotId) =>
         _outbox.Writer.TryWrite(new byte[] { Protocol.KickPlayer, slotId });
@@ -210,6 +209,26 @@ public sealed class RelayClient : IRelayClient, IDisposable
             switch (type)
             {
                 case Protocol.HelloAck: HelloAcked?.Invoke(); break;
+                case Protocol.RoomList:
+                {
+                    var (count, vc) = Varint.Read(msg, 1);
+                    int o = 1 + vc;
+                    var summaries = new RoomSummary[(int)count];
+                    for (int i = 0; i < (int)count; i++)
+                    {
+                        string code = System.Text.Encoding.ASCII.GetString(msg, o, 4); o += 4;
+                        var (rnLen, rc) = Varint.Read(msg, o); o += rc;
+                        string roomName = System.Text.Encoding.UTF8.GetString(msg, o, (int)rnLen); o += (int)rnLen;
+                        byte playerCount = msg[o++];
+                        byte slotCount = msg[o++];
+                        var (mnLen, mc) = Varint.Read(msg, o); o += mc;
+                        string mapName = System.Text.Encoding.UTF8.GetString(msg, o, (int)mnLen); o += (int)mnLen;
+                        byte gameMode = msg[o++];
+                        summaries[i] = new RoomSummary(code, roomName, playerCount, slotCount, mapName, gameMode);
+                    }
+                    RoomListReceived?.Invoke(summaries);
+                    break;
+                }
                 case Protocol.RoomState: RoomStateReceived?.Invoke(ParseRoomState(msg)); break;
                 case Protocol.GameStarted:
                 {
@@ -271,6 +290,10 @@ public sealed class RelayClient : IRelayClient, IDisposable
         byte slotCount = msg[o++];
         ushort simVer = (ushort)(msg[o] | (msg[o + 1] << 8)); o += 2;
         GameMode gameMode = (GameMode)msg[o++];
+        // Room name (NEW)
+        var (roomNameLen, cr) = Varint.Read(msg, o); o += cr;
+        string roomName = System.Text.Encoding.UTF8.GetString(msg, o, (int)roomNameLen); o += (int)roomNameLen;
+        // Map name
         var (mapNameLen, c1) = Varint.Read(msg, o); o += c1;
         string mapName = System.Text.Encoding.UTF8.GetString(msg, o, (int)mapNameLen); o += (int)mapNameLen;
         var slots = new SlotStateEntry[slotCount];
@@ -282,9 +305,10 @@ public sealed class RelayClient : IRelayClient, IDisposable
             byte teamId = msg[o++];
             byte flags = msg[o++];
             slots[i] = new SlotStateEntry(name, colorIdx, teamId,
-                IsOpen: (flags & 1) != 0, IsClosed: (flags & 2) != 0);
+                IsOpen: (flags & 1) != 0, IsClosed: (flags & 2) != 0,
+                IsReady: (flags & 4) != 0);
         }
-        return new RoomStatePayload(code, new Guid(hostBytes), simVer, gameMode, mapName, slots);
+        return new RoomStatePayload(code, new Guid(hostBytes), simVer, gameMode, roomName, mapName, slots);
     }
 
     private async Task ReceiveLoop()
@@ -335,7 +359,6 @@ public sealed class RelayClient : IRelayClient, IDisposable
     }
 }
 
-public sealed record RoomStatePayload(
-    string Code, Guid HostId, ushort SimulationVersion, GameMode GameMode, string MapName, SlotStateEntry[] Slots);
-
-public sealed record SlotStateEntry(string DisplayName, byte ColorIndex, byte TeamId, bool IsOpen, bool IsClosed);
+public sealed record RoomSummary(
+    string Code, string RoomName, byte PlayerCount,
+    byte SlotCount, string MapName, byte GameMode);

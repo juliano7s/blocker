@@ -48,6 +48,9 @@ public class FakeRelayClient : IRelayClient
             peer.ChatReceived?.Invoke(LocalPlayerId, text);
     }
 
+    public void SendListRooms() { /* noop in tests */ }
+    public void SendSetReady(bool ready) { /* noop in tests */ }
+
     /// <summary>Simulate a disconnect for tests. Raises PlayerLeft on all peers.</summary>
     public void SimulateDisconnect(int effectiveTick)
     {

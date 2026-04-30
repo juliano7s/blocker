@@ -10,6 +10,7 @@ public sealed class Room
     public ushort SimulationVersion { get; set; }
     public byte[] MapBlob { get; set; } = Array.Empty<byte>();
     public string MapName { get; set; } = "";
+    public string RoomName { get; set; } = "";
     public int SlotCount { get; set; }
     /// <summary>Game mode byte (matches Blocker.Simulation.Net.GameMode).</summary>
     public byte GameMode { get; set; }
@@ -26,4 +27,5 @@ public sealed record SlotInfo(
     byte ColorIndex,
     byte TeamId,
     bool IsOpen,
-    bool IsClosed);
+    bool IsClosed,
+    bool IsReady);

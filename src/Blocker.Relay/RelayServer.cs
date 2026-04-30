@@ -12,6 +12,10 @@ public sealed class RelayServer
     private readonly Dictionary<Guid, Connection> _connections = new();
     private readonly object _connectionsLock = new();
 
+    private byte[]? _cachedRoomList;
+    private DateTime _cachedRoomListExpiry = DateTime.MinValue;
+    private readonly object _cacheLock = new();
+
     public RelayServer(RelayOptions opts) { _opts = opts; }
 
     private bool RateAllows(Connection conn)
@@ -211,6 +215,8 @@ public sealed class RelayServer
                 case Protocol.Rematch:     await HandleRematch(conn, ct); break;
                 case Protocol.UpdateRoom:  await HandleUpdateRoom(conn, buf, len, ct); break;
                 case Protocol.KickPlayer:  await HandleKickPlayer(conn, buf, len, ct); break;
+                case Protocol.ListRooms:   await HandleListRooms(conn, ct); break;
+                case Protocol.SetReady:    await HandleSetReady(conn, buf, len, ct); break;
                 case Protocol.Commands:    await FanOutCommands(conn, buf, len, ct); break;
                 case Protocol.Hash:        await FanOutHash(conn, buf, len, ct); break;
                 case Protocol.ChatMessage: await FanOutChat(conn, buf, len, ct); break;
@@ -222,13 +228,15 @@ public sealed class RelayServer
     }
 
     // Message layouts:
-    //   CreateRoom: [0x03][slotCount:byte][gameMode:byte][mapNameLen:varint][mapName][mapBlobLen:varint][mapBlob]
+    //   CreateRoom: [0x03][slotCount:byte][gameMode:byte][roomNameLen:varint][roomName][mapNameLen:varint][mapName][mapBlobLen:varint][mapBlob]
     //   JoinRoom:   [0x04][codeLen:byte=4][code bytes][desiredSlot:byte]
     //   RoomState:  [0x05][code:4][hostId:16][slotCount:byte][sim:uint16 LE][gameMode:byte]
+    //               [roomNameLen:varint][roomName]
     //               [mapNameLen:varint][mapName]
-    //               per slot: [ownerNameLen:varint][ownerName][colorIdx:byte][teamId:byte][flags:byte(0=normal,1=open,2=closed)]
+    //               per slot: [ownerNameLen:varint][ownerName][colorIdx:byte][teamId:byte][flags:byte(bit0=open,bit1=closed,bit2=ready)]
     //   GameStarted:[0x08][yourPlayerId:byte][activeCount:byte][playerIds...]
     //   Rematch:    [0x09]                  — host requests room reset to Lobby
+    //   UpdateRoom: [0x0A][slotCount:byte][gameMode:byte][roomNameLen:varint][roomName][mapNameLen:varint][mapName][mapBlobLen:varint][mapBlob]
     //   (Surrender is no longer a wire-level message — clients send it as a
     //    Command via the existing Commands stream so the simulation applies it
     //    deterministically at the same tick on every peer.)
@@ -238,8 +246,15 @@ public sealed class RelayServer
         if (payload.Length < 4) { _ = SendError(conn, ErrorCode.ProtocolMismatch, ct); return; }
         byte slotCount = payload[1];
         byte gameMode = payload[2];
-        var (nameLen, c1) = Varint.Read(payload, 3);
-        int pos = 3 + c1;
+        // NEW: parse roomName first
+        var (roomNameLen, cr) = Varint.Read(payload, 3);
+        int pos = 3 + cr;
+        if (pos + (int)roomNameLen > payload.Length || roomNameLen > 64) { _ = SendError(conn, ErrorCode.ProtocolMismatch, ct); return; }
+        string roomName = System.Text.Encoding.UTF8.GetString(payload.Slice(pos, (int)roomNameLen));
+        pos += (int)roomNameLen;
+        // Then mapName
+        var (nameLen, c1) = Varint.Read(payload, pos);
+        pos += c1;
         if (pos + (int)nameLen > payload.Length) { _ = SendError(conn, ErrorCode.ProtocolMismatch, ct); return; }
         string mapName = System.Text.Encoding.UTF8.GetString(payload.Slice(pos, (int)nameLen));
         pos += (int)nameLen;
@@ -251,11 +266,13 @@ public sealed class RelayServer
                                      conn.SimulationVersion, mapBlob, mapName, slotCount, gameMode);
         if (room == null) { _ = SendError(conn, ErrorCode.TooManyRooms, ct); return; }
 
+        room.RoomName = roomName; // NEW
+
         // Host takes slot 0; remaining slots start open. TeamId is derived from
         // (slotId, gameMode) on every peer, so we just record what the host sent.
-        room.Slots[0] = new SlotInfo(conn.Id, conn.ClientName, 0, TeamForSlot(0, gameMode), IsOpen: false, IsClosed: false);
+        room.Slots[0] = new SlotInfo(conn.Id, conn.ClientName, 0, TeamForSlot(0, gameMode), IsOpen: false, IsClosed: false, IsReady: false);
         for (byte i = 1; i < slotCount; i++)
-            room.Slots[i] = new SlotInfo(null, "", i, TeamForSlot(i, gameMode), IsOpen: true, IsClosed: false);
+            room.Slots[i] = new SlotInfo(null, "", i, TeamForSlot(i, gameMode), IsOpen: true, IsClosed: false, IsReady: false);
 
         conn.CurrentRoom = room;
         conn.AssignedPlayerId = 0;
@@ -301,7 +318,7 @@ public sealed class RelayServer
 
         // Preserve TeamId baked in at room creation — slot index → team is fixed.
         var existing = room.Slots[chosen];
-        room.Slots[chosen] = new SlotInfo(conn.Id, conn.ClientName, existing.ColorIndex, existing.TeamId, IsOpen: false, IsClosed: false);
+        room.Slots[chosen] = new SlotInfo(conn.Id, conn.ClientName, existing.ColorIndex, existing.TeamId, IsOpen: false, IsClosed: false, IsReady: false);
         conn.CurrentRoom = room;
         conn.AssignedPlayerId = chosen;
         room.LastActivity = DateTime.UtcNow;
@@ -407,10 +424,11 @@ public sealed class RelayServer
         if (room.HostId != conn.Id) { await SendError(conn, ErrorCode.NotHost, ct); return; }
         if (room.Lifecycle != RoomLifecycle.Lobby) return;
 
-        // Parse — same layout as CreateRoom: [0x0A][slotCount][gameMode][mapNameLen:varint][mapName][blobLen:varint][blob]
+        // Parse — same layout as CreateRoom: [0x0A][slotCount][gameMode][roomNameLen:varint][roomName][mapNameLen:varint][mapName][blobLen:varint][blob]
         ReadOnlySpan<byte> payload;
         byte newSlotCount;
         byte newGameMode;
+        string newRoomName;
         string newMapName;
         byte[] newMapBlob;
         {
@@ -418,8 +436,17 @@ public sealed class RelayServer
             if (payload.Length < 4) { await SendError(conn, ErrorCode.ProtocolMismatch, ct); return; }
             newSlotCount = payload[1];
             newGameMode = payload[2];
-            var (nameLen, c1) = Varint.Read(payload, 3);
-            int pos = 3 + c1;
+
+            // NEW: parse roomName first
+            var (roomNameLen, cr) = Varint.Read(payload, 3);
+            int pos = 3 + cr;
+            if (pos + (int)roomNameLen > payload.Length || roomNameLen > 64) { await SendError(conn, ErrorCode.ProtocolMismatch, ct); return; }
+            newRoomName = System.Text.Encoding.UTF8.GetString(payload.Slice(pos, (int)roomNameLen));
+            pos += (int)roomNameLen;
+
+            // Then mapName
+            var (nameLen, c1) = Varint.Read(payload, pos);
+            pos += c1;
             if (pos + (int)nameLen > payload.Length) { await SendError(conn, ErrorCode.ProtocolMismatch, ct); return; }
             newMapName = System.Text.Encoding.UTF8.GetString(payload.Slice(pos, (int)nameLen));
             pos += (int)nameLen;
@@ -449,7 +476,7 @@ public sealed class RelayServer
         {
             byte newTeam = TeamForSlot(nextSlot, newGameMode);
             room.Slots[nextSlot] = new SlotInfo(kv.Value.OwnerId, kv.Value.DisplayName,
-                nextSlot, newTeam, IsOpen: false, IsClosed: false);
+                nextSlot, newTeam, IsOpen: false, IsClosed: false, IsReady: false);
             // Update the connection's assigned player ID to the new slot index.
             if (kv.Value.OwnerId is Guid oid)
             {
@@ -461,10 +488,11 @@ public sealed class RelayServer
         }
         // Fill remaining with open slots.
         for (byte i = nextSlot; i < newSlotCount; i++)
-            room.Slots[i] = new SlotInfo(null, "", i, TeamForSlot(i, newGameMode), IsOpen: true, IsClosed: false);
+            room.Slots[i] = new SlotInfo(null, "", i, TeamForSlot(i, newGameMode), IsOpen: true, IsClosed: false, IsReady: false);
 
         room.SlotCount = newSlotCount;
         room.GameMode = newGameMode;
+        room.RoomName = newRoomName;
         room.MapName = newMapName;
         room.MapBlob = newMapBlob;
         room.LastActivity = DateTime.UtcNow;
@@ -496,7 +524,7 @@ public sealed class RelayServer
         lock (_connectionsLock) _connections.TryGetValue(targetId, out target);
 
         // Open the slot before notifying — the broadcast will show it as open.
-        room.Slots[targetSlot] = new SlotInfo(null, "", slotInfo.ColorIndex, slotInfo.TeamId, IsOpen: true, IsClosed: false);
+        room.Slots[targetSlot] = new SlotInfo(null, "", slotInfo.ColorIndex, slotInfo.TeamId, IsOpen: true, IsClosed: false, IsReady: false);
 
         if (target != null)
         {
@@ -515,12 +543,85 @@ public sealed class RelayServer
         await BroadcastRoomState(room, ct);
     }
 
+    private async Task HandleListRooms(Connection conn, CancellationToken ct)
+    {
+        byte[]? bytes;
+        var now = DateTime.UtcNow;
+        lock (_cacheLock)
+        {
+            if (_cachedRoomList != null && now < _cachedRoomListExpiry)
+            {
+                bytes = _cachedRoomList;
+            }
+            else
+            {
+                var ms = new MemoryStream();
+                ms.WriteByte(Protocol.RoomList);
+
+                var lobbies = _rooms.All()
+                    .Where(r => r.Lifecycle == RoomLifecycle.Lobby)
+                    .ToList();
+
+                var varintBuf = new byte[5];
+                int vl = Varint.Write(varintBuf, 0, (uint)lobbies.Count);
+                ms.Write(varintBuf, 0, vl);
+
+                foreach (var room in lobbies)
+                {
+                    // code: 4 ASCII bytes
+                    ms.Write(System.Text.Encoding.ASCII.GetBytes(room.Code));
+                    // roomName: varint + UTF-8
+                    var nameBytes = System.Text.Encoding.UTF8.GetBytes(room.RoomName);
+                    vl = Varint.Write(varintBuf, 0, (uint)nameBytes.Length);
+                    ms.Write(varintBuf, 0, vl);
+                    ms.Write(nameBytes, 0, nameBytes.Length);
+                    // playerCount: byte (filled slots)
+                    byte playerCount = (byte)room.Slots.Values.Count(s => s.OwnerId != null);
+                    ms.WriteByte(playerCount);
+                    // slotCount: byte
+                    ms.WriteByte((byte)room.SlotCount);
+                    // mapName: varint + UTF-8
+                    var mapBytes = System.Text.Encoding.UTF8.GetBytes(room.MapName);
+                    vl = Varint.Write(varintBuf, 0, (uint)mapBytes.Length);
+                    ms.Write(varintBuf, 0, vl);
+                    ms.Write(mapBytes, 0, mapBytes.Length);
+                    // gameMode: byte
+                    ms.WriteByte(room.GameMode);
+                }
+
+                bytes = ms.ToArray();
+                _cachedRoomList = bytes;
+                _cachedRoomListExpiry = now.AddSeconds(1);
+            }
+        }
+
+        try { await conn.Ws.SendAsync(bytes, WebSocketMessageType.Binary, true, ct); } catch { }
+    }
+
+    private async Task HandleSetReady(Connection conn, byte[] buf, int len, CancellationToken ct)
+    {
+        if (conn.CurrentRoom is not Room room) { await SendError(conn, ErrorCode.NotInRoom, ct); return; }
+        if (room.Lifecycle != RoomLifecycle.Lobby) return;
+        if (conn.AssignedPlayerId is not byte slotId) return;
+        if (len < 2) return;
+
+        // Host can't set ready (host controls the start button)
+        if (conn.Id == room.HostId) return;
+
+        bool ready = buf[1] != 0;
+        if (!room.Slots.TryGetValue(slotId, out var slot)) return;
+        room.Slots[slotId] = slot with { IsReady = ready };
+        room.LastActivity = DateTime.UtcNow;
+        Logger.Info($"conn={conn.Id} event=set-ready code={room.Code} slot={slotId} ready={ready}");
+        await BroadcastRoomState(room, ct);
+    }
+
     private static void RemoveConnFromRoom(Connection conn, Room room)
     {
         foreach (var kv in room.Slots.ToList())
         {
             if (kv.Value.OwnerId == conn.Id)
-                room.Slots[kv.Key] = new SlotInfo(null, "", kv.Value.ColorIndex, kv.Value.TeamId, IsOpen: true, IsClosed: false);
+                room.Slots[kv.Key] = new SlotInfo(null, "", kv.Value.ColorIndex, kv.Value.TeamId, IsOpen: true, IsClosed: false, IsReady: false);
         }
     }
 
@@ -582,6 +683,7 @@ public sealed class RelayServer
         foreach (var kv in room.Slots)
         {
             if (kv.Value.OwnerId is not Guid id) continue;
+            if (id == conn.Id) continue;
             Connection? other;
             lock (_connectionsLock) _connections.TryGetValue(id, out other);
             if (other == null) continue;
@@ -615,11 +717,20 @@ public sealed class RelayServer
         ms.WriteByte((byte)(room.SimulationVersion & 0xFF));
         ms.WriteByte((byte)((room.SimulationVersion >> 8) & 0xFF));
         ms.WriteByte(room.GameMode);
-        var mapNameBytes = System.Text.Encoding.UTF8.GetBytes(room.MapName);
+
         var varintBuf = new byte[5];
-        int vl = Varint.Write(varintBuf, 0, (uint)mapNameBytes.Length);
+        // Room name (NEW)
+        var roomNameBytes = System.Text.Encoding.UTF8.GetBytes(room.RoomName);
+        int vl = Varint.Write(varintBuf, 0, (uint)roomNameBytes.Length);
+        ms.Write(varintBuf, 0, vl);
+        ms.Write(roomNameBytes, 0, roomNameBytes.Length);
+
+        // Map name
+        var mapNameBytes = System.Text.Encoding.UTF8.GetBytes(room.MapName);
+        vl = Varint.Write(varintBuf, 0, (uint)mapNameBytes.Length);
         ms.Write(varintBuf, 0, vl);
         ms.Write(mapNameBytes, 0, mapNameBytes.Length);
+
         for (byte i = 0; i < room.SlotCount; i++)
         {
             var s = room.Slots[i];
@@ -629,7 +740,7 @@ public sealed class RelayServer
             ms.Write(name, 0, name.Length);
             ms.WriteByte(s.ColorIndex);
             ms.WriteByte(s.TeamId);
-            byte flags = (byte)((s.IsOpen ? 1 : 0) | (s.IsClosed ? 2 : 0));
+            byte flags = (byte)((s.IsOpen ? 1 : 0) | (s.IsClosed ? 2 : 0) | (s.IsReady ? 4 : 0));
             ms.WriteByte(flags);
         }
         var bytes = ms.ToArray();

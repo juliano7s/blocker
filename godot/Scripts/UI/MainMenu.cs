@@ -132,11 +132,14 @@ public partial class MainMenu : Control
 		GetTree().ChangeSceneToFile("res://Scenes/Main.tscn");
 	}
 
-	private void OnPlayVsAiPressed() =>
-		GetTree().ChangeSceneToFile("res://Scenes/MapSelect.tscn");
+	private void OnPlayVsAiPressed()
+	{
+		MultiplayerLaunchData.Intent = MultiplayerIntent.None;
+		GetTree().ChangeSceneToFile("res://Scenes/GameLobby.tscn");
+	}
 
 	private void OnPlayMultiplayerPressed() =>
-		GetTree().ChangeSceneToFile("res://Scenes/MultiplayerMenu.tscn");
+		GetTree().ChangeSceneToFile("res://Scenes/LobbyList.tscn");
 
 	private void OnMapEditorPressed() =>
 		GetTree().ChangeSceneToFile("res://Scenes/MapEditor.tscn");

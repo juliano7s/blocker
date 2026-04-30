@@ -22,6 +22,9 @@
 
 # Visuals
 
+ - Change rays to more flashy lasers
+ - Add lights - not sure how yet. Nuggets? Neutral?
+
  - Shaders: Only one is being applied. Directional bloom is a bit weird, generates some permanent artifacts. Screen distortion is too intense.
 
 # Gameplay
