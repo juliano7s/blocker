@@ -96,7 +96,7 @@ public class TeamModeTests
 
         // Ally is killed, jumper gets combo
         Assert.DoesNotContain(ally, state.Blocks);
-        Assert.True(jumper.HasCombo); // Kill grants combo
+        Assert.True(jumper.HasJumpReset); // Kill grants combo
     }
 
     [Fact]

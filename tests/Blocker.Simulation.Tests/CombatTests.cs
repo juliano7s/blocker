@@ -140,14 +140,15 @@ public class CombatTests
     public void SoldierLosesHp_WhenKillingEnemy()
     {
         var state = CreateState();
-        state.AddBlock(BlockType.Builder, 0, new GridPos(5, 5)); // Target
+        state.AddBlock(BlockType.Builder, 0, new GridPos(5, 5));
         var soldier = state.AddBlock(BlockType.Soldier, 1, new GridPos(5, 4));
 
         Assert.Equal(Constants.SoldierMaxHp, soldier.Hp);
 
         CombatSystem.Tick(state);
 
-        Assert.Equal(Constants.SoldierMaxHp - 1, soldier.Hp);
+        Assert.Equal(Constants.SoldierMaxHp, soldier.Hp);
+        Assert.True(soldier.SwordComboTimer > 0);
     }
 
     [Fact]
@@ -174,9 +175,10 @@ public class CombatTests
 
         CombatSystem.Tick(state);
 
-        Assert.DoesNotContain(target, state.Blocks); // Rooted soldier kills like uprooted
+        Assert.DoesNotContain(target, state.Blocks);
         Assert.Contains(soldier, state.Blocks);
-        Assert.Equal(Constants.SoldierMaxHp - 1, soldier.Hp); // Loses 1 HP
+        Assert.Equal(Constants.SoldierMaxHp, soldier.Hp);
+        Assert.True(soldier.SwordComboTimer > 0);
     }
 
     [Fact]
@@ -190,9 +192,70 @@ public class CombatTests
 
         CombatSystem.Tick(state);
 
-        Assert.DoesNotContain(mobileEnemy, state.Blocks); // Rooted soldier kills enemy soldier
-        Assert.Contains(rootedSoldier, state.Blocks); // Rooted soldier survives (not mutual kill)
-        Assert.Equal(Constants.SoldierMaxHp - 1, rootedSoldier.Hp); // Loses 1 HP
+        Assert.DoesNotContain(mobileEnemy, state.Blocks);
+        Assert.Contains(rootedSoldier, state.Blocks);
+        Assert.Equal(Constants.SoldierMaxHp, rootedSoldier.Hp);
+        Assert.True(rootedSoldier.SwordComboTimer > 0);
+    }
+
+    [Fact]
+    public void SoldierCombo_HpLossAfterTimerExpires()
+    {
+        var state = CreateState();
+        var soldier = state.AddBlock(BlockType.Soldier, 1, new GridPos(5, 4));
+        soldier.SwordComboTimer = 1;
+
+        state.Tick();
+
+        Assert.Equal(Constants.SoldierMaxHp - 1, soldier.Hp);
+        Assert.Equal(0, soldier.SwordComboTimer);
+    }
+
+    [Fact]
+    public void SoldierCombo_ResetOnChainedKill()
+    {
+        var state = CreateState();
+        var soldier = state.AddBlock(BlockType.Soldier, 1, new GridPos(5, 4));
+        soldier.SwordComboTimer = 10;
+
+        state.AddBlock(BlockType.Builder, 0, new GridPos(5, 5));
+
+        state.Tick();
+
+        Assert.Equal(Constants.SoldierMaxHp, soldier.Hp);
+        Assert.Equal(Constants.SoldierComboTicks, soldier.SwordComboTimer);
+    }
+
+    [Fact]
+    public void SoldierCombo_OnlyLoses1Hp_RegardlessOfKillCount()
+    {
+        var state = CreateState();
+        var soldier = state.AddBlock(BlockType.Soldier, 1, new GridPos(5, 5));
+        state.AddBlock(BlockType.Builder, 0, new GridPos(5, 4));
+        state.AddBlock(BlockType.Builder, 0, new GridPos(5, 6));
+
+        state.Tick();
+
+        Assert.Equal(Constants.SoldierMaxHp, soldier.Hp);
+        Assert.Equal(Constants.SoldierComboTicks, soldier.SwordComboTimer);
+
+        for (int i = 0; i < Constants.SoldierComboTicks; i++)
+            state.Tick();
+
+        Assert.Equal(Constants.SoldierMaxHp - 1, soldier.Hp);
+    }
+
+    [Fact]
+    public void SoldierCombo_MutualKillUnchanged()
+    {
+        var state = CreateState();
+        var s0 = state.AddBlock(BlockType.Soldier, 0, new GridPos(5, 5));
+        var s1 = state.AddBlock(BlockType.Soldier, 1, new GridPos(5, 4));
+
+        state.Tick();
+
+        Assert.DoesNotContain(s0, state.Blocks);
+        Assert.DoesNotContain(s1, state.Blocks);
     }
 
     [Fact]

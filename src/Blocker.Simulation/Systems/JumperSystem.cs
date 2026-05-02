@@ -21,7 +21,7 @@ public static class JumperSystem
         if (jumper.Type == BlockType.Wall) return false;
 
         // Can't jump while on cooldown UNLESS we have combo
-        if (jumper.IsOnCooldown && !jumper.HasCombo) return false;
+        if (jumper.IsOnCooldown && !jumper.HasJumpReset) return false;
 
         // Warden ZoC blocks jump initiation
         if (WardenSystem.IsInEnemyWardenZoC(state, jumper)) return false;
@@ -112,12 +112,12 @@ public static class JumperSystem
         if (kills > 0 && !hitObstacle)
         {
             // Grant combo — can jump again immediately, NO cooldown yet
-            jumper.HasCombo = true;
+            jumper.HasJumpReset = true;
         }
         else
         {
             // Miss: lose 1 HP, apply immobile cooldown, no combo
-            jumper.HasCombo = false;
+            jumper.HasJumpReset = false;
             jumper.Hp--;
             jumper.Cooldown = Constants.JumperJumpCooldown;
 
@@ -139,7 +139,7 @@ public static class JumperSystem
     public static void ConsumeCombo(Block jumper)
     {
         if (jumper.Type != BlockType.Jumper) return;
-        jumper.HasCombo = false;
+        jumper.HasJumpReset = false;
         jumper.Cooldown = Constants.JumperJumpCooldown;
         jumper.MobileCooldown = true; // Can still move, just can't jump
     }

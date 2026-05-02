@@ -40,7 +40,8 @@ public class Block
     public bool WasJumpedThisTick { get; set; }
 
     // Jumper state
-    public bool HasCombo { get; set; }        // Can jump again immediately after killing
+    public bool HasJumpReset { get; set; }
+    public int SwordComboTimer { get; set; }
     public bool IsJumping { get; set; }       // Currently mid-jump (for animation)
     public bool MobileCooldown { get; set; }  // True when cooldown allows movement (Jumper combo, Stunner post-fire)
 

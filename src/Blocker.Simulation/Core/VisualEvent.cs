@@ -54,6 +54,10 @@ public enum VisualEventType
     NuggetHealConsumed,
     NuggetFortifyConsumed,
 
+    // Soldier combo
+    SoldierComboStarted,
+    SoldierArmLost,
+
     // Command-issued (nugget)
     CommandMineIssued,
     CommandHealIssued,

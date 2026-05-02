@@ -69,6 +69,7 @@ public static class Constants
     // Soldier
     public static int SoldierExplodeRange => _config.Soldier.ExplodeRange;
     public static int SoldierMaxHp => _config.Soldier.Hp;
+    public static int SoldierComboTicks => _config.Soldier.ComboTicks;
 
     // Population
     public static int SupplyPopCap => _config.Economy.SupplyPopCap;

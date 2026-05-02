@@ -122,14 +122,16 @@ public static class CombatSystem
             }
         }
 
-        // Pass 4: Apply soldier HP loss
-        foreach (var (soldierId, loss) in soldierHpLoss)
+        // Pass 4: Soldier combo — start or reset combo timer instead of immediate HP loss
+        foreach (var soldierId in soldierHpLoss.Keys)
         {
             var soldier = state.GetBlock(soldierId);
             if (soldier == null) continue;
-            soldier.Hp -= loss;
-            if (soldier.Hp <= 0)
-                toKill.Add(soldier.Id);
+            bool isNewCombo = soldier.SwordComboTimer <= 0;
+            soldier.SwordComboTimer = Constants.SoldierComboTicks + 1;
+            if (isNewCombo)
+                state.VisualEvents.Add(new VisualEvent(
+                    VisualEventType.SoldierComboStarted, soldier.Pos, soldier.PlayerId, BlockId: soldier.Id));
         }
 
         // Pass 5: Neutral obstacle combat (Section 5.3)

@@ -123,7 +123,7 @@ public class JumperTests
 
         // Should kill the friendly block and continue through
         Assert.DoesNotContain(friendly, state.Blocks);
-        Assert.True(jumper.HasCombo); // Kill grants combo
+        Assert.True(jumper.HasJumpReset); // Kill grants combo
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public class JumperTests
 
         JumperSystem.Jump(state, jumper, Direction.Right);
 
-        Assert.True(jumper.HasCombo);
+        Assert.True(jumper.HasJumpReset);
         Assert.Equal(0, jumper.Cooldown); // No cooldown on kill — combo allows immediate re-jump
     }
 
@@ -195,7 +195,7 @@ public class JumperTests
         state.AddBlock(BlockType.Builder, 1, new GridPos(3, 7)); // Kill to get combo
 
         JumperSystem.Jump(state, jumper, Direction.Right);
-        Assert.True(jumper.HasCombo);
+        Assert.True(jumper.HasJumpReset);
         Assert.False(jumper.IsOnCooldown); // No cooldown with combo
 
         // Second jump should work immediately (combo)
@@ -217,18 +217,18 @@ public class JumperTests
         JumperSystem.Jump(state, jumper, Direction.Right);
 
         // Jumper killed the enemy but hit terrain obstacle → no combo
-        Assert.False(jumper.HasCombo);
+        Assert.False(jumper.HasJumpReset);
     }
 
     [Fact]
     public void ConsumeCombo_ClearsFlagAndStartsCooldown()
     {
         var jumper = new Block { Type = BlockType.Jumper };
-        jumper.HasCombo = true;
+        jumper.HasJumpReset = true;
 
         JumperSystem.ConsumeCombo(jumper);
 
-        Assert.False(jumper.HasCombo);
+        Assert.False(jumper.HasJumpReset);
         Assert.Equal(Constants.JumperJumpCooldown, jumper.Cooldown);
     }
 
@@ -244,7 +244,7 @@ public class JumperTests
         JumperSystem.Jump(state, jumper, Direction.Right);
 
         Assert.Equal(Constants.JumperMaxHp - 1, jumper.Hp);
-        Assert.False(jumper.HasCombo);
+        Assert.False(jumper.HasJumpReset);
     }
 
     [Fact]
@@ -256,7 +256,7 @@ public class JumperTests
         JumperSystem.Jump(state, jumper, Direction.Right);
 
         Assert.Equal(Constants.JumperJumpCooldown, jumper.Cooldown);
-        Assert.False(jumper.HasCombo);
+        Assert.False(jumper.HasJumpReset);
     }
 
     [Fact]
@@ -413,7 +413,7 @@ public class JumperTests
 
         // First jump kills enemy → combo
         JumperSystem.Jump(state, jumper, Direction.Right);
-        Assert.True(jumper.HasCombo);
+        Assert.True(jumper.HasJumpReset);
         Assert.Equal(0, jumper.Cooldown);
 
         // Second jump should succeed immediately with combo
@@ -432,11 +432,11 @@ public class JumperTests
 
         // Jump kills enemy → combo
         JumperSystem.Jump(state, jumper, Direction.Right);
-        Assert.True(jumper.HasCombo);
+        Assert.True(jumper.HasJumpReset);
 
         // Consume combo via move
         JumperSystem.ConsumeCombo(jumper);
-        Assert.False(jumper.HasCombo);
+        Assert.False(jumper.HasJumpReset);
         Assert.Equal(Constants.JumperJumpCooldown, jumper.Cooldown);
         Assert.True(jumper.MobileCooldown); // Mobile cooldown — can still move
     }
@@ -451,11 +451,11 @@ public class JumperTests
 
         // Jump kills enemy → combo
         JumperSystem.Jump(state, jumper, Direction.Right);
-        Assert.True(jumper.HasCombo);
+        Assert.True(jumper.HasJumpReset);
 
         // Move consumes combo
         JumperSystem.ConsumeCombo(jumper);
-        Assert.False(jumper.HasCombo);
+        Assert.False(jumper.HasJumpReset);
         Assert.Equal(Constants.JumperJumpCooldown, jumper.Cooldown);
 
         // Can't jump during cooldown
@@ -473,11 +473,11 @@ public class JumperTests
         state.AddBlock(BlockType.Builder, 1, new GridPos(5, 7));
 
         JumperSystem.Jump(state, jumper, Direction.Right);
-        Assert.True(jumper.HasCombo);
+        Assert.True(jumper.HasJumpReset);
         Assert.Equal(0, jumper.Cooldown);
 
         // No move issued — combo stays, can still jump
-        Assert.True(jumper.HasCombo);
+        Assert.True(jumper.HasJumpReset);
         var result = JumperSystem.Jump(state, jumper, Direction.Right);
         Assert.True(result);
     }
@@ -490,7 +490,7 @@ public class JumperTests
         var jumper = state.AddBlock(BlockType.Jumper, 0, new GridPos(3, 7));
 
         JumperSystem.Jump(state, jumper, Direction.Right); // Miss — no enemies
-        Assert.False(jumper.HasCombo);
+        Assert.False(jumper.HasJumpReset);
         Assert.Equal(Constants.JumperJumpCooldown, jumper.Cooldown);
         Assert.False(jumper.MobileCooldown); // NOT mobile — immobile cooldown
 

@@ -481,19 +481,26 @@ public partial class GridRenderer : Node2D
     private void DrawSoldierAnimated(Block block, Rect2 rect, Vector2 center, PlayerPalette palette, float idleAngle)
     {
         var gold = palette.SoldierArmsColor;
-        float arm = rect.Size.X * 0.25f; // quarter of block = TS bs*0.25
+        float arm = rect.Size.X * 0.25f;
 
-        // Periodic spin: 500ms ease-in-out every 4s, staggered per block
         float now = (float)Time.GetTicksMsec();
-        float cycle = 4000f;
-        float spinDur = 500f;
-        float phase = ((now + block.Id * 1337f) % cycle) / spinDur;
-        float angle = 0f;
-        if (phase <= 1f)
+        float angle;
+
+        if (block.SwordComboTimer > 0 && _comboAngles.TryGetValue(block.Id, out float comboAngle))
         {
-            float t = phase;
-            float ease = t < 0.5f ? 4 * t * t * t : 1 - Mathf.Pow(-2 * t + 2, 3) / 2;
-            angle = ease * Mathf.Tau;
+            angle = comboAngle;
+        }
+        else
+        {
+            float cycle = 4000f;
+            float spinDur = 500f;
+            float phase = ((now + block.Id * 1337f) % cycle) / spinDur;
+            angle = 0f;
+            if (phase <= 1f)
+            {
+                float ease = phase < 0.5f ? 4 * phase * phase * phase : 1 - Mathf.Pow(-2 * phase + 2, 3) / 2;
+                angle = ease * Mathf.Tau;
+            }
         }
 
         // Arms visible per HP (removal order: BR first, TR last)
@@ -536,6 +543,34 @@ public partial class GridRenderer : Node2D
 
         // Center dot
         DrawCircle(center, 1f, gold);
+    }
+
+    private void DrawFlyingArms(float now)
+    {
+        foreach (var arm in _flyingArms)
+        {
+            float elapsed = now - arm.StartTime;
+            float duration = 0.6f;
+            float t = Mathf.Clamp(elapsed / duration, 0f, 1f);
+
+            float alpha = 1f - t;
+            float dist = CellSize * 2f * t;
+            float spin = elapsed * 8f;
+
+            var pos = arm.Start + arm.Direction * dist;
+            var col = arm.Color with { A = alpha };
+
+            float cos = Mathf.Cos(spin);
+            float sin = Mathf.Sin(spin);
+            var tip = pos + new Vector2(cos * arm.ArmLength, sin * arm.ArmLength);
+            DrawLine(pos, tip, col, 1.4f);
+
+            if (t < 0.3f)
+            {
+                float flash = (0.3f - t) / 0.3f;
+                QueueGlowCircle(arm.Start, CellSize * 0.5f * flash, Colors.White with { A = flash * 0.6f });
+            }
+        }
     }
 
     /// <summary>

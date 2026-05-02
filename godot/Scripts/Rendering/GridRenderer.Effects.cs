@@ -109,12 +109,13 @@ public partial class GridRenderer : Node2D
             if (!_nestRefineRects.TryGetValue(nest.Id, out var rect))
             {
                 var mat = new ShaderMaterial { Shader = _nestRefineShader };
+                var playerColor = _config.GetPalette(nest.PlayerId).Base;
 
                 mat.SetShaderParameter("grid_size", new Vector2(grid.Width, grid.Height));
                 mat.SetShaderParameter("cell_size", CellSize);
                 mat.SetShaderParameter("max_radius", (float)refineR + 0.5f);
-                mat.SetShaderParameter("zone_color", new Color(0.55f, 0.67f, 1.0f, 0.8f));
-                mat.SetShaderParameter("march_speed", 40f);
+                mat.SetShaderParameter("zone_color", playerColor);
+                mat.SetShaderParameter("march_speed", 20f);
                 mat.SetShaderParameter("time_ms", 0f);
 
                 rect = new ColorRect

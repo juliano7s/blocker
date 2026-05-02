@@ -24,6 +24,16 @@ public partial class GridRenderer : Node2D
 	private GlowLayer? _glowLayer;
 	private RootFloraRenderer? _floraRenderer;
 
+	private struct FlyingArm
+	{
+		public Vector2 Start;
+		public Vector2 Direction;
+		public float StartTime;
+		public Color Color;
+		public float ArmLength;
+	}
+	private readonly List<FlyingArm> _flyingArms = new();
+
 	public void SetVisibility(VisibilityMap? visibility) => _localVisibility = visibility;
 
 	public void SetControllingPlayer(int playerId)
@@ -89,6 +99,7 @@ public partial class GridRenderer : Node2D
 
 	// Per-block idle spin state — angle + cooldown until next spin
 	private readonly Dictionary<int, float> _idleAngles = new();
+	private readonly Dictionary<int, float> _comboAngles = new();
 	private readonly Dictionary<int, float> _idleCooldowns = new(); // seconds until next spin burst
 
 	// Reusable set for dead-block cleanup — avoids per-frame allocation
@@ -309,6 +320,33 @@ public partial class GridRenderer : Node2D
 							}
 						}
 					}
+
+					if (evt.Type == VisualEventType.SoldierArmLost && evt.BlockId.HasValue)
+					{
+						var worldPos = _visualPositions.TryGetValue(evt.BlockId.Value, out var wp)
+							? wp : GridToWorld(evt.Position);
+						var armColor = _config.GetPalette(evt.PlayerId ?? 0).SoldierArmsColor;
+						float armLen = (CellSize - BlockInset * 2) * 0.25f;
+						var soldier = _gameState.GetBlock(evt.BlockId.Value);
+						int hp = soldier?.Hp ?? 0;
+						// Pick the arm that was just lost based on remaining HP
+						// Loss order: BR(4→3), BL(3→2), TL(2→1), TR(1→0)
+						Vector2 flyDir = hp switch
+						{
+							3 => new Vector2(1, 1).Normalized(),
+							2 => new Vector2(-1, 1).Normalized(),
+							1 => new Vector2(-1, -1).Normalized(),
+							_ => new Vector2(1, -1).Normalized(),
+						};
+						_flyingArms.Add(new FlyingArm
+						{
+							Start = worldPos,
+							Direction = flyDir,
+							StartTime = now,
+							Color = armColor,
+							ArmLength = armLen,
+						});
+					}
 				}
 			}
 
@@ -393,8 +431,29 @@ public partial class GridRenderer : Node2D
 				}
 			}
 
+			// Update combo spin angles — accumulate per frame for smooth rotation
+			foreach (var block in _gameState.Blocks)
+			{
+				if (block.Type != BlockType.Soldier) continue;
+				if (block.SwordComboTimer > 0)
+				{
+					float comboMax = (float)Constants.SoldierComboTicks;
+					float comboT = block.SwordComboTimer / comboMax;
+					float speed = comboT * 18f + 2f;
+					_comboAngles.TryGetValue(block.Id, out float ca);
+					_comboAngles[block.Id] = ca + speed * dt;
+				}
+				else
+				{
+					_comboAngles.Remove(block.Id);
+				}
+			}
+
 			// Clean up ghost trails
 			_ghostTrails.RemoveAll(g => now - g.StartTime > (g.IsJump ? 0.3f : 0.5f));
+
+			// Clean up finished flying arms
+			_flyingArms.RemoveAll(a => now - a.StartTime > 0.6f);
 
 			// Complete dying block animations — spawn tendrils on explosion
 			_deadIds.Clear();
@@ -430,6 +489,7 @@ public partial class GridRenderer : Node2D
 			{
 				_idleAngles.Remove(id);
 				_idleCooldowns.Remove(id);
+				_comboAngles.Remove(id);
 				_lastMiningHitTime.Remove(id);
 				_floraRenderer?.RemoveBlock(id);
 			}
@@ -620,6 +680,8 @@ public partial class GridRenderer : Node2D
 		// Draw jumper ghost trails
 		DrawGhostTrails();
 
+		// Draw flying arms from soldier combo expiry
+		DrawFlyingArms(drawNow);
 
 		// Draw formation visuals (last so outlines/corners are on top of block sprites)
 		DrawFormations();

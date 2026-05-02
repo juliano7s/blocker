@@ -488,7 +488,7 @@ public class GameState
                 return WardenSystem.MagnetPull(this, block);
 
             case CommandType.Jump:
-                if (block.IsOnCooldown && !block.HasCombo) return false;
+                if (block.IsOnCooldown && !block.HasJumpReset) return false;
                 {
                     var (dir, dist) = ResolveJumpDirAndRange(block.Pos, cmd.Direction, cmd.TargetPos);
                     if (dir.HasValue)
@@ -704,7 +704,7 @@ public class GameState
             if (block.IsImmobile) continue;
             if (block.IsStunned) continue;
             if (block.IsOnCooldown && block.Type != BlockType.Jumper && block.Type != BlockType.Stunner) continue;
-            if (block.IsOnCooldown && block.Type == BlockType.Jumper && !block.HasCombo && !block.MobileCooldown) continue;
+            if (block.IsOnCooldown && block.Type == BlockType.Jumper && !block.HasJumpReset && !block.MobileCooldown) continue;
             if (!block.MoveTarget.HasValue) continue;
             if (block.Pos == block.MoveTarget.Value)
             {
@@ -731,7 +731,7 @@ public class GameState
             }
 
             // Jumper: consuming move target clears combo
-            if (block.Type == BlockType.Jumper && block.HasCombo)
+            if (block.Type == BlockType.Jumper && block.HasJumpReset)
                 JumperSystem.ConsumeCombo(block);
 
             // Check if this tick is a move tick — uses EffectiveMoveInterval (ZoC + stunner cooldown aware)
@@ -816,6 +816,26 @@ public class GameState
 
         // Step 13: Combat — surrounding kills + soldier adjacency kills
         CombatSystem.Tick(this);
+
+        // Step 13.5: Soldier combo timer decay — lose 1 HP when timer expires
+        for (int i = Blocks.Count - 1; i >= 0; i--)
+        {
+            var block = Blocks[i];
+            if (block.Type != BlockType.Soldier || block.SwordComboTimer <= 0) continue;
+            block.SwordComboTimer--;
+            if (block.SwordComboTimer <= 0)
+            {
+                block.Hp--;
+                VisualEvents.Add(new VisualEvent(
+                    VisualEventType.SoldierArmLost, block.Pos, block.PlayerId, BlockId: block.Id));
+                if (block.Hp <= 0)
+                {
+                    VisualEvents.Add(new VisualEvent(
+                        VisualEventType.BlockDied, block.Pos, block.PlayerId, BlockId: block.Id));
+                    RemoveBlock(block);
+                }
+            }
+        }
 
         // Step 14: Spawning — nest timers and unit production
         NestSystem.TickSpawning(this);

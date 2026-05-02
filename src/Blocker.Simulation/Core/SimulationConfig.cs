@@ -19,6 +19,7 @@ public record SoldierConfig
     public int RootTicks { get; init; } = 36;
     public int UprootTicks { get; init; } = 24;
     public int ExplodeRange { get; init; } = 3;
+    public int ComboTicks { get; init; } = 60;
 }
 
 public record StunnerConfig
