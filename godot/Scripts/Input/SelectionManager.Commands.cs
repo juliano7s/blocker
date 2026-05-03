@@ -184,7 +184,9 @@ public partial class SelectionManager
         }
 
         // Match selected blocks to blueprint roles, closest-first
-        var available = _state.SelectedBlocks.Where(b => b.IsMobile).ToList();
+        var available = _state.SelectedBlocks
+            .Where(b => b.IsMobile || b.State == BlockState.Uprooting)
+            .ToList();
         var assigned = new List<(Block block, GridPos target, string role)>();
         var usedBlocks = new HashSet<int>();
         var usedTargets = new HashSet<GridPos>();
