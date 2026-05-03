@@ -173,7 +173,11 @@ public partial class MessageArea : CanvasLayer
     {
         text = text.Trim();
         if (!string.IsNullOrEmpty(text) && _relay != null)
+        {
             _relay.SendChat(text);
+            AddMessage(MessageCategory.Chat, text,
+                _config.GetPalette(_controllingPlayer).Base, "You");
+        }
         Deactivate();
     }
 

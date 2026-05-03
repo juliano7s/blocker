@@ -22,9 +22,14 @@ public partial class HudOverlay : CanvasLayer
     private PopupMenu? _menuPopup;
     private Action? _surrenderHandler;
     private bool _surrendered;
-    private bool _showDebugFps = false;
+    private bool _showStats;
+    private float _pingMs = -1;
+    private bool _isMultiplayer;
 
-    public void SetShowDebugFps(bool show) => _showDebugFps = show;
+    public void SetShowStats(bool show) => _showStats = show;
+    public void SetShowDebugFps(bool show) => _showStats = show; // back-compat
+    public void SetPingMs(float ms) => _pingMs = ms;
+    public void SetMultiplayer(bool mp) => _isMultiplayer = mp;
 
     [Signal] public delegate void SpawnToggleChangedEventHandler(int unitType);
 
@@ -132,6 +137,15 @@ public partial class HudOverlay : CanvasLayer
 
     public GameState? GetGameState() => _gameState;
     public int GetControllingPlayer() => _controllingPlayer;
+
+    public override void _UnhandledKeyInput(InputEvent @event)
+    {
+        if (@event is InputEventKey key && key.Pressed && !key.Echo && key.Keycode == Key.F3)
+        {
+            _showStats = !_showStats;
+            GetViewport().SetInputAsHandled();
+        }
+    }
 
     /// <summary>Inner Control that handles the actual drawing.</summary>
     private partial class HudDrawControl : Control
@@ -258,17 +272,31 @@ public partial class HudOverlay : CanvasLayer
                     HorizontalAlignment.Left, -1, HudStyles.FontSizeNormal, HudStyles.TextPrimary);
             }
 
-            // Debug FPS (right side, only if enabled)
-            if (_hud._showDebugFps)
+            // Stats overlay (top-right, below menu button) — toggled with F3
+            if (_hud._showStats)
             {
+                float statsX = viewport.X - 14;
+                float statsY = HudStyles.TopBarHeight + 16;
+
                 string fpsText = $"{_fps:F0} FPS";
                 var fpsColor = _fps >= 55 ? new Color(0.4f, 0.9f, 0.4f) :
                                _fps >= 30 ? new Color(0.9f, 0.9f, 0.3f) :
                                new Color(0.9f, 0.3f, 0.3f);
                 float fpsWidth = font.GetStringSize(fpsText, HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall).X;
-                // Position below top bar
-                DrawString(font, new Vector2(viewport.X - fpsWidth - 14, HudStyles.TopBarHeight + 16),
+                DrawString(font, new Vector2(statsX - fpsWidth, statsY),
                     fpsText, HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall, fpsColor);
+                statsY += 16;
+
+                if (_hud._isMultiplayer && _hud._pingMs >= 0)
+                {
+                    string pingText = $"{_hud._pingMs:F0} ms";
+                    var pingColor = _hud._pingMs <= 80 ? new Color(0.4f, 0.9f, 0.4f) :
+                                    _hud._pingMs <= 150 ? new Color(0.9f, 0.9f, 0.3f) :
+                                    new Color(0.9f, 0.3f, 0.3f);
+                    float pingWidth = font.GetStringSize(pingText, HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall).X;
+                    DrawString(font, new Vector2(statsX - pingWidth, statsY),
+                        pingText, HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall, pingColor);
+                }
             }
         }
     }

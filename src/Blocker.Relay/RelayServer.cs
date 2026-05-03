@@ -220,6 +220,10 @@ public sealed class RelayServer
                 case Protocol.Commands:    await FanOutCommands(conn, buf, len, ct); break;
                 case Protocol.Hash:        await FanOutHash(conn, buf, len, ct); break;
                 case Protocol.ChatMessage: await FanOutChat(conn, buf, len, ct); break;
+                case Protocol.Ping:
+                    try { await conn.Ws.SendAsync(new byte[] { Protocol.Pong }, WebSocketMessageType.Binary, true, ct); } catch { }
+                    break;
+                case Protocol.Pong: break;
                 default:
                     await SendError(conn, ErrorCode.UnknownMessageType, ct);
                     return;

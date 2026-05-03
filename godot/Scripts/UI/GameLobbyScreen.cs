@@ -45,6 +45,10 @@ public partial class GameLobbyScreen : Control
     private Label? _mapInfoLabel;
     private bool _navigatingAway;
 
+    // Ping display
+    private Label? _pingLabel;
+    private Godot.Timer? _pingTimer;
+
     // Relay handlers
     private Action<RoomStatePayload>? _relayRoomStateHandler;
     private Action<int, int[]>? _relayGameStartedHandler;
@@ -193,6 +197,34 @@ public partial class GameLobbyScreen : Control
         };
         container.AddChild(_mapMiniature);
         _mapMiniature.SetMap(_mapData);
+    }
+
+    private void SetupPingDisplay(VBoxContainer container)
+    {
+        if (_relay == null) return;
+
+        _pingLabel = new Label { Text = "Ping: …" };
+        LobbyStyles.StyleLabel(_pingLabel, dim: true, fontSize: LobbyStyles.FontSmall);
+        container.AddChild(_pingLabel);
+
+        _relay.SendPing();
+
+        _pingTimer = new Godot.Timer { WaitTime = 2.0, Autostart = true };
+        _pingTimer.Timeout += () =>
+        {
+            if (_relay == null) return;
+            float ms = _relay.PingMs;
+            if (ms >= 0)
+            {
+                _pingLabel!.Text = $"Ping: {ms:F0} ms";
+                _pingLabel.AddThemeColorOverride("font_color",
+                    ms <= 80 ? LobbyStyles.ReadyGreen :
+                    ms <= 150 ? new Color(0.9f, 0.9f, 0.3f) :
+                    new Color(0.9f, 0.3f, 0.3f));
+            }
+            _relay.SendPing();
+        };
+        AddChild(_pingTimer);
     }
 
     private Label MakeSectionHeader(string text)
@@ -381,6 +413,8 @@ public partial class GameLobbyScreen : Control
             GetTree().ChangeSceneToFile("res://Scenes/LobbyList.tscn");
         };
         leftCol.AddChild(backBtn);
+
+        SetupPingDisplay(leftCol);
 
         // Right: map dropdown + mode dropdown + miniature
         BuildMapDropdown(rightCol, enabled: true);
@@ -651,6 +685,8 @@ public partial class GameLobbyScreen : Control
             GetTree().ChangeSceneToFile("res://Scenes/LobbyList.tscn");
         };
         leftCol.AddChild(backBtn);
+
+        SetupPingDisplay(leftCol);
 
         // Right: map info + miniature
         _mapInfoLabel = new Label { Text = "Waiting for room info…" };

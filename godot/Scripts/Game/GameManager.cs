@@ -121,6 +121,13 @@ public partial class GameManager : Node2D
 		_hud.SetGameState(gameState);
 		_hud.SetConfig(Config);
 		_hud.SetControllingPlayer(_selectionManager.ControllingPlayer);
+		if (_launchSession != null)
+		{
+			_hud.SetMultiplayer(true);
+			var pingTimer = new Godot.Timer { WaitTime = 2.0, Autostart = true };
+			pingTimer.Timeout += () => _launchSession.Relay.SendPing();
+			AddChild(pingTimer);
+		}
 		_hud.SetSurrenderHandler(() => _selectionManager.SubmitSurrender());
 		_hud.SpawnToggleChanged += unitType =>
 			_selectionManager.SubmitToggleSpawn((Blocker.Simulation.Blocks.BlockType)unitType);
@@ -214,6 +221,9 @@ public partial class GameManager : Node2D
 		_effectManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_audioManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_gridRenderer.SetControllingPlayer(_selectionManager.ControllingPlayer);
+
+		if (_launchSession != null)
+			_hud.SetPingMs(_launchSession.Relay.PingMs);
 
 		VisibilityMap? visMap = null;
 		if (!_gameOverShown && _gameState != null && Blocker.Simulation.Core.Constants.FogOfWarEnabled)
@@ -310,13 +320,12 @@ public partial class GameManager : Node2D
 
 	private void OnLeavePressed()
 	{
-		// MP: tear down the relay so a return to MultiplayerMenu starts fresh.
-		// SP: just bail to the main menu.
 		if (_launchSession != null)
 		{
 			try { _launchSession.Relay.SendLeaveRoom(); } catch { }
 			_launchSession.Relay.Dispose();
 			MultiplayerLaunchData.Relay = null;
+			_launchSession = null;
 		}
 
 		if (Blocker.Game.UI.GameLaunchData.ReturnToEditor)
@@ -368,14 +377,24 @@ public partial class GameManager : Node2D
 
 	public override void _ExitTree()
 	{
-		// Detach from the long-lived RelayClient so its background ReceiveLoop
-		// doesn't fire our handlers on a freed scene.
 		_coord?.Detach();
 		_coord = null;
-		if (_launchSession != null && _mpRoomStateHandler != null)
+		if (_launchSession != null)
 		{
-			_launchSession.Relay.RoomStateReceived -= _mpRoomStateHandler;
-			_mpRoomStateHandler = null;
+			if (_mpRoomStateHandler != null)
+			{
+				_launchSession.Relay.RoomStateReceived -= _mpRoomStateHandler;
+				_mpRoomStateHandler = null;
+			}
+
+			// If the relay isn't being handed to the next scene (rematch flow),
+			// this is an abrupt exit — notify the relay and close the connection
+			// so the remaining players receive PlayerLeft immediately.
+			if (MultiplayerLaunchData.Relay == null)
+			{
+				try { _launchSession.Relay.SendLeaveRoom(); } catch { }
+				_launchSession.Relay.Dispose();
+			}
 		}
 	}
 }

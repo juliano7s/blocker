@@ -44,6 +44,17 @@ public sealed class RelayClient : IRelayClient, IDisposable
 
     private bool _closedNotified;
 
+    // Ping measurement
+    private long _pingSentTicks;
+    private float _pingMs = -1;
+    public float PingMs => _pingMs;
+
+    public void SendPing()
+    {
+        _pingSentTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+        _outbox.Writer.TryWrite(new byte[] { Protocol.Ping });
+    }
+
     public async Task<bool> ConnectAsync(string url, string clientName)
     {
         State = ConnState.Connecting;
@@ -276,7 +287,14 @@ public sealed class RelayClient : IRelayClient, IDisposable
                 }
                 case Protocol.Error: ServerError?.Invoke((ErrorCode)msg[1]); break;
                 case Protocol.Ping: _outbox.Writer.TryWrite(new byte[] { Protocol.Pong }); break;
-                case Protocol.Pong: break;
+                case Protocol.Pong:
+                    if (_pingSentTicks > 0)
+                    {
+                        long now = System.Diagnostics.Stopwatch.GetTimestamp();
+                        _pingMs = (float)((now - _pingSentTicks) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
+                        _pingSentTicks = 0;
+                    }
+                    break;
             }
         }
         catch (Exception ex) { GD.PrintErr($"RelayClient dispatch error: {ex.Message}"); }
