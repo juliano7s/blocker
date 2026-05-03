@@ -205,16 +205,24 @@ public partial class AudioManager : Node
             VisualEventType.JumpLanded => Config.JumpLand,
             VisualEventType.MagnetPulled => Config.MagnetPull,
 
-            // Nugget events (sounds TBD — wired so they don't silently drop)
-            VisualEventType.CommandMineIssued => null,
-            VisualEventType.CommandHealIssued => null,
-            VisualEventType.CommandFortifyIssued => null,
-            VisualEventType.NuggetMiningStarted => null,
-            VisualEventType.NuggetFreed => null,
-            VisualEventType.NuggetCaptured => null,
-            VisualEventType.NuggetRefineConsumed => null,
-            VisualEventType.NuggetHealConsumed => null,
-            VisualEventType.NuggetFortifyConsumed => null,
+            // Soldier mechanics
+            VisualEventType.SoldierComboStarted => Config.SoldierCombo,
+            VisualEventType.SoldierArmLost => Config.SoldierArmLost,
+
+            // Surround
+            VisualEventType.SurroundTrapped => Config.SurroundTrapped,
+            VisualEventType.SurroundKilled => Config.SurroundKilled,
+
+            // Nuggets
+            VisualEventType.CommandMineIssued => Config.NuggetMineCommand,
+            VisualEventType.CommandHealIssued => Config.NuggetHealCommand,
+            VisualEventType.CommandFortifyIssued => Config.NuggetFortifyCommand,
+            VisualEventType.NuggetMiningStarted => Config.NuggetMiningStarted,
+            VisualEventType.NuggetFreed => Config.NuggetFreed,
+            VisualEventType.NuggetCaptured => Config.NuggetCaptured,
+            VisualEventType.NuggetRefineConsumed => Config.NuggetRefineConsumed,
+            VisualEventType.NuggetHealConsumed => Config.NuggetHealConsumed,
+            VisualEventType.NuggetFortifyConsumed => Config.NuggetFortifyConsumed,
 
             // Game events
             VisualEventType.PlayerEliminated => Config.PlayerEliminated,

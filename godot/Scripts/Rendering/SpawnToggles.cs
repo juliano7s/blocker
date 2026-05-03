@@ -70,7 +70,14 @@ public partial class SpawnToggles : Control
     {
         var t = UnitTypes[index];
         if (!_localDisabled.Remove(t))
+        {
             _localDisabled.Add(t);
+            Audio.UISoundManager.Instance?.PlayToggleOff();
+        }
+        else
+        {
+            Audio.UISoundManager.Instance?.PlayToggleOn();
+        }
         QueueRedraw();
     }
 

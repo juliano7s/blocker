@@ -158,6 +158,7 @@ public partial class LobbyListScreen : Control
         LobbyStyles.StyleButton(backBtn);
         backBtn.Pressed += () =>
         {
+            Audio.UISoundManager.Instance?.PlayClick();
             _relay?.Dispose();
             GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
         };
@@ -305,6 +306,7 @@ public partial class LobbyListScreen : Control
 
     private void OnHostPressed()
     {
+        Audio.UISoundManager.Instance?.PlayClick();
         if (!_connected || _relay == null) return;
         MultiplayerLaunchData.Intent = MultiplayerIntent.Host;
         MultiplayerLaunchData.Relay = _relay;
@@ -315,6 +317,7 @@ public partial class LobbyListScreen : Control
 
     private void OnJoinPressed(string code)
     {
+        Audio.UISoundManager.Instance?.PlayClick();
         if (!_connected || _relay == null) return;
         MultiplayerLaunchData.Intent = MultiplayerIntent.Join;
         MultiplayerLaunchData.JoinCode = code;

@@ -170,6 +170,7 @@ public partial class GameLobbyScreen : Control
 
     private void OnMapSelected(long idx)
     {
+        Audio.UISoundManager.Instance?.PlayClick();
         if (_suppressMapSignal) return;
         int catIdx = _mapDropdown!.GetItemId((int)idx);
         if (catIdx < 0 || catIdx >= _mapCatalog.Count) return;
@@ -268,7 +269,7 @@ public partial class GameLobbyScreen : Control
 
         var backBtn = new Button { Text = "< BACK", CustomMinimumSize = new Vector2(80, 26) };
         LobbyStyles.StyleButton(backBtn);
-        backBtn.Pressed += () => GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn");
+        backBtn.Pressed += () => { Audio.UISoundManager.Instance?.PlayClick(); GetTree().ChangeSceneToFile("res://Scenes/MainMenu.tscn"); };
         leftCol.AddChild(backBtn);
 
         // Right: map dropdown + miniature
@@ -314,6 +315,7 @@ public partial class GameLobbyScreen : Control
 
     private void ToggleSlotAssignment(int slot)
     {
+        Audio.UISoundManager.Instance?.PlayClick();
         if (_slotAssignments[slot] == "Player")
         {
             _slotAssignments[slot] = "AI (inactive)";
@@ -331,6 +333,7 @@ public partial class GameLobbyScreen : Control
 
     private void OnSinglePlayerStart()
     {
+        Audio.UISoundManager.Instance?.PlayStartGame();
         if (_mapData == null) return;
 
         var assignments = new List<SlotAssignment>();
@@ -400,13 +403,14 @@ public partial class GameLobbyScreen : Control
             Disabled = true
         };
         LobbyStyles.StyleButton(_startBtn, accent: true);
-        _startBtn.Pressed += () => _relay!.SendStartGame();
+        _startBtn.Pressed += () => { Audio.UISoundManager.Instance?.PlayStartGame(); _relay!.SendStartGame(); };
         leftCol.AddChild(_startBtn);
 
         var backBtn = new Button { Text = "< BACK", CustomMinimumSize = new Vector2(80, 26) };
         LobbyStyles.StyleButton(backBtn);
         backBtn.Pressed += () =>
         {
+            Audio.UISoundManager.Instance?.PlayClick();
             _relay?.SendLeaveRoom();
             _relay?.Dispose();
             MultiplayerLaunchData.Relay = null;
@@ -483,6 +487,7 @@ public partial class GameLobbyScreen : Control
 
     private void OnModeSelected(long idx)
     {
+        Audio.UISoundManager.Instance?.PlayClick();
         _selectedMode = (GameMode)_modeDropdown!.GetItemId((int)idx);
         if (_roomCreated) SendUpdateRoom();
     }
@@ -586,7 +591,7 @@ public partial class GameLobbyScreen : Control
                 byte kickSlot = (byte)i;
                 var kickBtn = new Button { Text = "X", CustomMinimumSize = new Vector2(24, 20) };
                 LobbyStyles.StyleButton(kickBtn, danger: true);
-                kickBtn.Pressed += () => _relay?.SendKickPlayer(kickSlot);
+                kickBtn.Pressed += () => { Audio.UISoundManager.Instance?.PlayClick(); _relay?.SendKickPlayer(kickSlot); };
                 row.AddChild(kickBtn);
             }
 
@@ -679,6 +684,7 @@ public partial class GameLobbyScreen : Control
         LobbyStyles.StyleButton(backBtn);
         backBtn.Pressed += () =>
         {
+            Audio.UISoundManager.Instance?.PlayClick();
             _relay?.SendLeaveRoom();
             _relay?.Dispose();
             MultiplayerLaunchData.Relay = null;
@@ -740,6 +746,10 @@ public partial class GameLobbyScreen : Control
     private void OnReadyToggle()
     {
         _isReady = !_isReady;
+        if (_isReady)
+            Audio.UISoundManager.Instance?.PlayReadyUp();
+        else
+            Audio.UISoundManager.Instance?.PlayUnready();
         _relay?.SendSetReady(_isReady);
         _readyBtn!.Text = _isReady ? "UNREADY" : "READY";
         if (_isReady)

@@ -108,6 +108,7 @@ public partial class MainMenu : Control
 
 	private void OnButtonClicked(MenuButton btn)
 	{
+		Audio.UISoundManager.Instance?.PlayClick();
 		var (gx, gy) = btn.GridPosition;
 		var effect = EffectFactory.LightningBurst(_effectLayer, new GridPos(gx, gy),
 			EffectColor, maxSegs: 25, duration: 500f);

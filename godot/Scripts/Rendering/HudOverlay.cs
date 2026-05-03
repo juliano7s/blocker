@@ -1,3 +1,4 @@
+using Blocker.Game.Audio;
 using Blocker.Game.Config;
 using Blocker.Simulation.Blocks;
 using Blocker.Simulation.Core;
@@ -88,6 +89,7 @@ public partial class HudOverlay : CanvasLayer
 
     private void OnMenuPressed()
     {
+        Audio.UISoundManager.Instance?.PlayClick();
         if (_menuPopup == null || _menuBtn == null) return;
         var btnRect = _menuBtn.GetGlobalRect();
         _menuPopup.Position = new Vector2I((int)btnRect.Position.X, (int)(btnRect.Position.Y + btnRect.Size.Y));
@@ -102,6 +104,7 @@ public partial class HudOverlay : CanvasLayer
                 if (!_surrendered)
                 {
                     _surrendered = true;
+                    Audio.UISoundManager.Instance?.PlaySurrender();
                     _surrenderHandler?.Invoke();
                 }
                 break;

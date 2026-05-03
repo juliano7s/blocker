@@ -96,6 +96,7 @@ public partial class MessageArea : CanvasLayer
         {
             _chatHandler = (slotId, text) =>
             {
+                Audio.UISoundManager.Instance?.PlayChatReceive();
                 string name = _slotNames != null && _slotNames.TryGetValue(slotId, out var n)
                     ? n : $"Player {slotId}";
                 Color color = _config.GetPalette(slotId).Base;
@@ -174,6 +175,7 @@ public partial class MessageArea : CanvasLayer
         text = text.Trim();
         if (!string.IsNullOrEmpty(text) && _relay != null)
         {
+            Audio.UISoundManager.Instance?.PlayChatSend();
             _relay.SendChat(text);
             AddMessage(MessageCategory.Chat, text,
                 _config.GetPalette(_controllingPlayer).Base, "You");

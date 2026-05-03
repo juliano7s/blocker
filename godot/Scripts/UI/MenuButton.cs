@@ -87,7 +87,10 @@ public partial class MenuButton : Node2D
 			bool wasHovered = _hovered;
 			_hovered = _hitRect.HasPoint(motion.Position);
 			if (_hovered != wasHovered)
+			{
 				Godot.Input.SetDefaultCursorShape(_hovered ? Godot.Input.CursorShape.PointingHand : Godot.Input.CursorShape.Arrow);
+				if (_hovered) Audio.UISoundManager.Instance?.PlayHover();
+			}
 		}
 		else if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
 		{

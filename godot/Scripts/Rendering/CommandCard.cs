@@ -349,6 +349,7 @@ public partial class CommandCard : Control
             CommandAction? cmdKey = GetCommandAt(mb.Position);
             if (cmdKey != null)
             {
+                Audio.UISoundManager.Instance?.PlayCommandClick();
                 EmitSignal(SignalName.CommandClicked, Variant.From(cmdKey.Value));
                 AcceptEvent();
                 return;
@@ -358,6 +359,7 @@ public partial class CommandCard : Control
             BlueprintMode.BlueprintType? bpType = GetBlueprintAt(mb.Position);
             if (bpType != null)
             {
+                Audio.UISoundManager.Instance?.PlayBlueprintClick();
                 EmitSignal(SignalName.BlueprintClicked, Variant.From(bpType.Value));
                 AcceptEvent();
             }

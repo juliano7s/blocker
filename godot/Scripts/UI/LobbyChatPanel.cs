@@ -80,6 +80,7 @@ public partial class LobbyChatPanel : VBoxContainer
 
     private void OnChatDeferred(int slotId, string text)
     {
+        Audio.UISoundManager.Instance?.PlayChatReceive();
         string name = _slotNames.TryGetValue(slotId, out var n) ? n : $"Player {slotId}";
         AddChatMessage(name, text);
     }
@@ -129,6 +130,7 @@ public partial class LobbyChatPanel : VBoxContainer
     private void OnTextSubmitted(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
+        Audio.UISoundManager.Instance?.PlayChatSend();
         _relay?.SendChat(text);
         AddChatMessage("You", text);
         _input.Text = "";

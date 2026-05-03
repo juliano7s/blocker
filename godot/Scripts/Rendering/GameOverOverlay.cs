@@ -118,7 +118,7 @@ public partial class GameOverOverlay : CanvasLayer
                 CustomMinimumSize = new Vector2(140, 44),
                 MouseFilter = Control.MouseFilterEnum.Stop,
             };
-            rematchBtn.Pressed += () => _onRematch?.Invoke();
+            rematchBtn.Pressed += () => { Audio.UISoundManager.Instance?.PlayClick(); _onRematch?.Invoke(); };
             btnRow.AddChild(rematchBtn);
         }
 
@@ -128,7 +128,7 @@ public partial class GameOverOverlay : CanvasLayer
             CustomMinimumSize = new Vector2(140, 44),
             MouseFilter = Control.MouseFilterEnum.Stop,
         };
-        leaveBtn.Pressed += () => _onLeave?.Invoke();
+        leaveBtn.Pressed += () => { Audio.UISoundManager.Instance?.PlayClick(); _onLeave?.Invoke(); };
         btnRow.AddChild(leaveBtn);
 
         AddChild(panel);
