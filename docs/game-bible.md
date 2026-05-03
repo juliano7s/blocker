@@ -235,6 +235,26 @@ Two destructible neutral obstacle types:
 - Blocks all movement and ray line-of-sight.
 - Destroyed by: stun ray, Jumper jump, or 2+ adjacent Soldiers (any player, all 8 directions).
 
+### 5.4 Surround Kill (Encirclement)
+
+When blocks from an attacking team completely encircle enemy mobile units (flood-fill from trapped unit cannot reach map edge), trapped units die after a configurable delay.
+
+**Impassable cells (form the kill ring):**
+- Any block from the attacker's team (all types, all states)
+- Victim's own immobile blocks (rooted, walls, formation members)
+- Neutral terrain (walls, breakable walls, fragile walls)
+- Nuggets
+
+**Passable cells (escape routes):**
+- Empty cells
+- Victim's own mobile blocks
+
+**Area cap:** Flood-fill capped at 36 cells. Enclosures larger than this don't trigger kills.
+
+**Delay:** Configurable (`SurroundKillDelay`, default 0 = instant). While trapped, blocks blink with accelerating frequency until death. Breaking the ring resets the timer.
+
+**Counterplay:** Victim can uproot one of their own blocks during the delay to punch a hole in the ring.
+
 ---
 
 ## 6. Economy: Nest Zones and Spawning

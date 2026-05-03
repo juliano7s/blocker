@@ -249,6 +249,23 @@ public partial class GridRenderer : Node2D
         }
     }
 
+    private void DrawSurroundTrapBlink(Block block, Rect2 rect)
+    {
+        int delay = Constants.SurroundKillDelay;
+        if (delay <= 0) return;
+
+        float progress = Mathf.Clamp((float)block.TrapTicks / delay, 0f, 1f);
+        float time = (float)Time.GetTicksMsec() / 1000f;
+
+        // Accelerating blink: frequency grows quadratically from 0.8Hz to 12Hz
+        float freq = Mathf.Lerp(0.8f, 12f, progress * progress);
+        float alpha = (Mathf.Sin(time * freq * Mathf.Tau) + 1f) * 0.5f;
+
+        // White flash overlay, intensity grows with progress
+        var overlayColor = new Color(1f, 1f, 1f, alpha * Mathf.Lerp(0.15f, 0.7f, progress));
+        DrawRect(rect, overlayColor);
+    }
+
     private void DrawThreatIndicators(Block block, Rect2 rect)
     {
         // Count adjacent enemy soldiers

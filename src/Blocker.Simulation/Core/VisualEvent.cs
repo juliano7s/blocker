@@ -62,6 +62,10 @@ public enum VisualEventType
     CommandMineIssued,
     CommandHealIssued,
     CommandFortifyIssued,
+
+    // Surround kill
+    SurroundTrapped,
+    SurroundKilled,
 }
 
 public readonly record struct VisualEvent(

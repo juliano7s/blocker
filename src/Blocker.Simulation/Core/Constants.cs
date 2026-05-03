@@ -78,6 +78,10 @@ public static class Constants
     // Neutral obstacles
     public static int FragileWallSoldierThreshold => _config.Combat.FragileWallSoldierThreshold;
 
+    // Surround kill
+    public static int SurroundKillMaxArea => _config.Combat.SurroundKillMaxArea;
+    public static int SurroundKillDelay => _config.Combat.SurroundKillDelay;
+
     // Warden
     public static int WardenZocRadius => _config.Warden.ZocRadius;
     public static int WardenPullRadius => _config.Warden.PullRadius;

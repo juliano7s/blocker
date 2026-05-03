@@ -62,6 +62,10 @@ public class Block
     // Wall fortification — stun ray hits before destruction (0 = normal wall)
     public int FortifiedHp { get; set; }
 
+    // Surround kill state
+    public int TrapTicks { get; set; }
+    public int? TrappedByPlayerId { get; set; }
+
     public bool IsFullyRooted => State == BlockState.Rooted;
     public bool IsMobile => State == BlockState.Mobile;
     public bool IsImmobile => Type == BlockType.Wall

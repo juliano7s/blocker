@@ -817,6 +817,9 @@ public class GameState
         // Step 13: Combat — surrounding kills + soldier adjacency kills
         CombatSystem.Tick(this);
 
+        // Step 13.1: Surround kill — encirclement detection and trap timer
+        SurroundKillSystem.Tick(this);
+
         // Step 13.5: Soldier combo timer decay — lose 1 HP when timer expires
         for (int i = Blocks.Count - 1; i >= 0; i--)
         {

@@ -619,6 +619,10 @@ public partial class GridRenderer : Node2D
 			if (block.IsStunned)
 				DrawFrozenOverlay(block, rect);
 
+			// Surround trap blink
+			if (block.TrapTicks > 0)
+				DrawSurroundTrapBlink(block, rect);
+
 			// Cooldown bars (stun timer + ability cooldown), floating below cell
 			if (block.IsStunned || block.IsOnCooldown)
 				DrawCooldownBars(block, rect);
