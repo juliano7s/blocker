@@ -9,7 +9,10 @@ public class SurroundKillTests
 {
     public SurroundKillTests()
     {
-        Constants.Reset();
+        Constants.Initialize(new SimulationConfig
+        {
+            Combat = new CombatConfig { SurroundKillDelay = 0 }
+        });
     }
 
     private GameState CreateState(int width = 10, int height = 10)

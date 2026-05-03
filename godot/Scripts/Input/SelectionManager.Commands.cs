@@ -229,7 +229,7 @@ public partial class SelectionManager
         // Issue commands for each assignment
         foreach (var (block, target, role) in assigned)
         {
-            EmitCommand(new Command(ControllingPlayer, CommandType.Move, [block.Id], target));
+            EmitCommand(new Command(ControllingPlayer, CommandType.Move, [block.Id], target, Queue: shiftHeld));
 
             if (role == "wall")
             {
