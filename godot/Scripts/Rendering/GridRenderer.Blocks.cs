@@ -376,8 +376,19 @@ public partial class GridRenderer : Node2D
             }
 
             case BlockType.Jumper:
+            {
+                var style = JumperStyleToggle.Current;
+                if (style == JumperStyle.GlossyOrb || style == JumperStyle.BronzeBall)
+                {
+                    var sprite = SpriteFactory.GetSprite(BlockType.Jumper, block.PlayerId);
+                    if (sprite != null)
+                        DrawTextureRect(sprite, rect, false);
+                    else
+                        DrawSmoothGradientBody(rect, palette.SoldierFill, palette.SoldierFill.Lightened(0.2f), palette.SoldierFill.Darkened(0.2f));
+                }
                 DrawJumperAnimated(block, rect, center, palette, time);
                 break;
+            }
 
             case BlockType.Nugget:
             {
@@ -720,57 +731,222 @@ public partial class GridRenderer : Node2D
         DrawRoundLine(center + new Vector2(-shieldW * 0.45f, -shieldH * 0.04f), center + new Vector2(shieldW * 0.45f, -shieldH * 0.04f), crossColor, 1.5f);
     }
 
-    /// <summary>
-    /// Jumper: Lava sphere — smooth gradient from bright center to dark rim.
-    /// No background square. Shrinks with HP loss.
-    /// </summary>
     private void DrawJumperAnimated(Block block, Rect2 rect, Vector2 center, PlayerPalette palette, float time)
     {
-        float maxRadius = rect.Size.X * 0.46f;
-
-        float hpScale = block.Hp switch
+        switch (JumperStyleToggle.Current)
         {
-            >= 3 => 1f,
-            2 => 0.75f,
-            1 => 0.45f,
-            _ => 0.2f
-        };
-        float radius = maxRadius * hpScale;
+            case JumperStyle.GlossyOrb:
+                DrawJumperGlossyOrb(block, rect, center, palette, time);
+                break;
+            case JumperStyle.BronzeBall:
+                DrawJumperBronzeBall(block, rect, center, palette, time);
+                break;
+            case JumperStyle.BeveledSphere:
+                DrawJumperBeveledSphere(block, rect, center, palette, time);
+                break;
+            case JumperStyle.FacetedGem:
+                DrawJumperFacetedGem(block, rect, center, palette, time);
+                break;
+        }
+    }
 
-        float pulse1 = Mathf.Sin(time * 3.5f);
-        float pulse2 = Mathf.Sin(time * 5.1f + 1.3f);
+    /// <summary>Style A: Square body + glossy glass orb emblem.</summary>
+    private void DrawJumperGlossyOrb(Block block, Rect2 rect, Vector2 center, PlayerPalette palette, float time)
+    {
+        float maxR = rect.Size.X * 0.34f;
+        float hpScale = block.Hp >= 3 ? 1f : block.Hp == 2 ? 0.8f : block.Hp == 1 ? 0.55f : 0.25f;
+        float r = maxR * hpScale;
 
-        // Sphere-like gradient: many concentric circles from dark rim to bright center
-        // Light source offset (top-left) for 3D feel
-        var lightOff = new Vector2(-radius * 0.15f, -radius * 0.15f);
-        int rings = 8;
+        float pulse = Mathf.Sin(time * 3f) * 0.08f;
+
+        int rings = 10;
+        var lightOff = new Vector2(-r * 0.18f, -r * 0.18f);
         for (int i = 0; i < rings; i++)
         {
-            float t = (float)i / rings; // 0 = outermost, 1 = innermost
-            float r = radius * (1f - t);
-            // Interpolate from dark rim → core → bright highlight
-            Color ringColor;
-            if (t < 0.4f)
-                ringColor = palette.JumperDark.Lerp(palette.JumperCore, t / 0.4f);
+            float t = (float)i / rings;
+            float ringR = r * (1f - t);
+            Color c;
+            if (t < 0.3f)
+                c = palette.JumperDark.Lerp(palette.JumperCore, t / 0.3f);
+            else if (t < 0.6f)
+                c = palette.JumperCore.Lerp(palette.JumperBright, (t - 0.3f) / 0.3f);
             else
-                ringColor = palette.JumperCore.Lerp(palette.JumperBright, (t - 0.4f) / 0.6f);
-
-            // Shift inner rings toward light source for sphere illusion
-            var ringCenter = center + lightOff * t * 0.5f;
-            DrawCircle(ringCenter, r, ringColor);
+                c = palette.JumperBright.Lerp(new Color(1f, 1f, 0.95f), (t - 0.6f) / 0.4f);
+            DrawCircle(center + lightOff * t * 0.6f, ringR, c);
         }
 
-        // Specular highlight — small bright spot offset toward light
-        var specCenter = center + lightOff * 0.6f + new Vector2(pulse1 * 0.3f, pulse2 * 0.2f);
-        DrawCircle(specCenter, radius * 0.18f, Colors.White with { A = 0.45f + 0.2f * pulse1 });
+        // Sharp specular highlight
+        var specOff = lightOff * 0.55f;
+        DrawCircle(center + specOff, r * 0.22f, Colors.White with { A = 0.55f + pulse });
+        DrawCircle(center + specOff * 0.8f, r * 0.1f, Colors.White with { A = 0.75f + pulse });
 
-        // Lava churn: subtle shifting bright patches
-        float churnOff = radius * 0.1f * pulse2;
-        DrawCircle(center + new Vector2(churnOff, -churnOff * 0.5f), radius * 0.25f,
-            palette.JumperBright with { A = 0.15f + 0.1f * pulse1 });
+        // Bottom reflection
+        DrawCircle(center + new Vector2(r * 0.1f, r * 0.5f), r * 0.12f, Colors.White with { A = 0.1f });
 
-        // Outer heat glow
-        QueueGlowRadial(center, radius * 1.8f, palette.JumperPulseGlow with { A = 0.08f + 0.04f * pulse1 });
+        // Soft glow
+        QueueGlowRadial(center, r * 2f, palette.JumperPulseGlow with { A = 0.06f + 0.03f * Mathf.Sin(time * 2.5f) });
+    }
+
+    /// <summary>Style B: Square body + bronze metallic ball emblem.</summary>
+    private void DrawJumperBronzeBall(Block block, Rect2 rect, Vector2 center, PlayerPalette palette, float time)
+    {
+        float maxR = rect.Size.X * 0.33f;
+        float hpScale = block.Hp >= 3 ? 1f : block.Hp == 2 ? 0.8f : block.Hp == 1 ? 0.55f : 0.25f;
+        float r = maxR * hpScale;
+
+        // Dark rim
+        DrawCircle(center, r + 1f, new Color(0.15f, 0.08f, 0.02f, 0.7f));
+
+        // Metallic body — directional gradient via concentric circles
+        int rings = 10;
+        var lightOff = new Vector2(-r * 0.15f, -r * 0.18f);
+        var rimColor = new Color(0.25f, 0.15f, 0.06f);
+        var midColor = new Color(0.6f, 0.4f, 0.2f);
+        var brightColor = new Color(0.95f, 0.85f, 0.65f);
+
+        for (int i = 0; i < rings; i++)
+        {
+            float t = (float)i / rings;
+            float ringR = r * (1f - t);
+            Color c;
+            if (t < 0.5f)
+                c = rimColor.Lerp(midColor, t / 0.5f);
+            else
+                c = midColor.Lerp(brightColor, (t - 0.5f) / 0.5f);
+            DrawCircle(center + lightOff * t * 0.5f, ringR, c);
+        }
+
+        // Rim highlight arc (top)
+        float arcR = r * 0.85f;
+        for (int i = 0; i < 5; i++)
+        {
+            float angle = -Mathf.Pi * 0.7f + i * 0.15f;
+            var p = center + new Vector2(Mathf.Cos(angle) * arcR, Mathf.Sin(angle) * arcR);
+            DrawCircle(p, 0.8f, new Color(1f, 0.9f, 0.75f, 0.3f - i * 0.04f));
+        }
+
+        // Specular
+        DrawCircle(center + lightOff * 0.5f, r * 0.16f, Colors.White with { A = 0.35f });
+
+        // Bottom reflection
+        DrawCircle(center + new Vector2(r * 0.12f, r * 0.55f), r * 0.1f, new Color(1f, 0.9f, 0.7f, 0.08f));
+
+        // Subtle warm glow
+        float pulse = Mathf.Sin(time * 2f);
+        QueueGlowRadial(center, r * 1.6f, new Color(0.8f, 0.5f, 0.2f, 0.05f + 0.02f * pulse));
+    }
+
+    /// <summary>Style E: Full beveled sphere — pool ball / marble feel.</summary>
+    private void DrawJumperBeveledSphere(Block block, Rect2 rect, Vector2 center, PlayerPalette palette, float time)
+    {
+        float maxR = rect.Size.X * 0.46f;
+        float hpScale = block.Hp >= 3 ? 1f : block.Hp == 2 ? 0.75f : block.Hp == 1 ? 0.45f : 0.2f;
+        float r = maxR * hpScale;
+
+        // Dark bevel rim
+        DrawCircle(center + new Vector2(0.5f, 1f), r, new Color(0.2f, 0.07f, 0f, 0.6f));
+        DrawCircle(center, r, palette.JumperDark.Darkened(0.4f));
+
+        // Main sphere
+        int rings = 12;
+        var lightOff = new Vector2(-r * 0.15f, -r * 0.2f);
+        for (int i = 0; i < rings; i++)
+        {
+            float t = (float)i / rings;
+            float ringR = (r - 2f) * (1f - t);
+            Color c;
+            if (t < 0.35f)
+                c = palette.JumperDark.Lerp(palette.JumperCore, t / 0.35f);
+            else if (t < 0.65f)
+                c = palette.JumperCore.Lerp(palette.JumperBright, (t - 0.35f) / 0.3f);
+            else
+                c = palette.JumperBright.Lerp(new Color(1f, 0.98f, 0.9f), (t - 0.65f) / 0.35f);
+            DrawCircle(center + lightOff * t * 0.6f, ringR, c);
+        }
+
+        // Broad top highlight band
+        var highlightCenter = center + lightOff * 0.4f;
+        DrawCircle(highlightCenter, r * 0.4f, Colors.White with { A = 0.12f });
+
+        // Sharp specular
+        var specPos = center + lightOff * 0.55f;
+        DrawCircle(specPos, r * 0.18f, Colors.White with { A = 0.45f });
+        DrawCircle(specPos + new Vector2(-0.5f, -0.5f), r * 0.08f, Colors.White with { A = 0.65f });
+
+        // Bottom rim reflection
+        DrawCircle(center + new Vector2(r * 0.1f, r * 0.65f), r * 0.12f, Colors.White with { A = 0.06f });
+
+        // Pulse glow
+        float pulse = Mathf.Sin(time * 2.5f);
+        QueueGlowRadial(center, r * 1.8f, palette.JumperPulseGlow with { A = 0.07f + 0.03f * pulse });
+    }
+
+    /// <summary>Style H: Full circle faceted gem — round with visible cut facets.</summary>
+    private void DrawJumperFacetedGem(Block block, Rect2 rect, Vector2 center, PlayerPalette palette, float time)
+    {
+        float maxR = rect.Size.X * 0.46f;
+        float hpScale = block.Hp >= 3 ? 1f : block.Hp == 2 ? 0.75f : block.Hp == 1 ? 0.45f : 0.2f;
+        float r = maxR * hpScale;
+
+        // Dark outer rim for depth
+        DrawCircle(center + new Vector2(0.5f, 0.8f), r, palette.JumperDark.Darkened(0.5f) with { A = 0.5f });
+
+        // Base circle — directional gradient for 3D feel
+        int rings = 12;
+        var lightOff = new Vector2(-r * 0.12f, -r * 0.15f);
+        for (int i = 0; i < rings; i++)
+        {
+            float t = (float)i / rings;
+            float ringR = r * (1f - t);
+            Color c;
+            if (t < 0.4f)
+                c = palette.JumperDark.Lerp(palette.JumperCore, t / 0.4f);
+            else
+                c = palette.JumperCore.Lerp(palette.JumperBright, (t - 0.4f) / 0.6f * 0.7f);
+            DrawCircle(center + lightOff * t * 0.5f, ringR, c);
+        }
+
+        // Facet vertices
+        var top = center + new Vector2(0, -r * 0.92f);
+        var left = center + new Vector2(-r * 0.88f, r * 0.15f);
+        var right = center + new Vector2(r * 0.88f, r * 0.15f);
+        var bot = center + new Vector2(0, r * 0.92f);
+        var midL = center + new Vector2(-r * 0.55f, -r * 0.35f);
+        var midR = center + new Vector2(r * 0.55f, -r * 0.35f);
+
+        // Top crown facet fill — catches the most light
+        DrawColoredPolygon(new[] { top, midL, midR }, Colors.White with { A = 0.14f });
+        // Upper-left facet — secondary highlight
+        DrawColoredPolygon(new[] { top, midL, left }, Colors.White with { A = 0.07f });
+        // Lower facets — subtle darkening
+        DrawColoredPolygon(new[] { midR, right, bot }, Colors.Black with { A = 0.06f });
+        DrawColoredPolygon(new[] { left, bot, midL }, Colors.Black with { A = 0.04f });
+
+        // Facet edges — upper bright, lower dark
+        var facetLight = Colors.White with { A = 0.25f };
+        var facetMid = Colors.White with { A = 0.12f };
+        var facetDark = Colors.Black with { A = 0.18f };
+        DrawLine(top, midL, facetLight, 1.2f, true);
+        DrawLine(top, midR, facetLight, 1.2f, true);
+        DrawLine(midL, midR, facetMid, 1f, true);
+        DrawLine(midL, left, facetDark, 1f, true);
+        DrawLine(midR, right, facetDark, 1f, true);
+        DrawLine(left, bot, facetDark, 0.8f, true);
+        DrawLine(right, bot, facetDark, 0.8f, true);
+        DrawLine(midL, bot, Colors.Black with { A = 0.1f }, 0.7f, true);
+        DrawLine(midR, bot, Colors.Black with { A = 0.1f }, 0.7f, true);
+
+        // Specular on top crown facet
+        var specPos = center + new Vector2(-r * 0.12f, -r * 0.42f);
+        DrawCircle(specPos, r * 0.14f, Colors.White with { A = 0.4f });
+        DrawCircle(specPos + new Vector2(-0.3f, -0.3f), r * 0.06f, Colors.White with { A = 0.6f });
+
+        // Rim edge
+        DrawArc(center, r, 0f, Mathf.Tau, 32, palette.JumperDark.Darkened(0.3f) with { A = 0.45f }, 1.2f, true);
+
+        // Subtle glow
+        float pulse = Mathf.Sin(time * 2f);
+        QueueGlowRadial(center, r * 1.6f, palette.JumperPulseGlow with { A = 0.05f + 0.03f * pulse });
     }
 
     private static int NuggetHash(int x)

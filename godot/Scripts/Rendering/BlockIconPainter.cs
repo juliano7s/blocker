@@ -55,8 +55,16 @@ public static class BlockIconPainter
                 break;
             }
             case BlockType.Jumper:
-                DrawJumperSphere(canvas, rect, palette, alpha);
+            {
+                var style = JumperStyleToggle.Current;
+                if (style == JumperStyle.GlossyOrb || style == JumperStyle.BronzeBall)
+                {
+                    var sprite = SpriteFactory.GetSprite(BlockType.Jumper, playerId);
+                    if (sprite != null) canvas.DrawTextureRect(sprite, rect, false, tint);
+                }
+                DrawJumperIcon(canvas, rect, palette, alpha);
                 break;
+            }
             case BlockType.Wall:
             {
                 var sprite = SpriteFactory.GetSprite(BlockType.Wall, playerId);
@@ -155,23 +163,130 @@ public static class BlockIconPainter
         canvas.DrawLine(center + new Vector2(-sw * 0.45f, -sh * 0.04f), center + new Vector2(sw * 0.45f, -sh * 0.04f), cross, 1.5f, true);
     }
 
-    private static void DrawJumperSphere(CanvasItem canvas, Rect2 rect, PlayerPalette palette, float alpha = 1f)
+    private static void DrawJumperIcon(CanvasItem canvas, Rect2 rect, PlayerPalette palette, float alpha = 1f)
+    {
+        switch (JumperStyleToggle.Current)
+        {
+            case JumperStyle.GlossyOrb:
+                DrawJumperGlossyOrbIcon(canvas, rect, palette, alpha);
+                break;
+            case JumperStyle.BronzeBall:
+                DrawJumperBronzeBallIcon(canvas, rect, palette, alpha);
+                break;
+            case JumperStyle.BeveledSphere:
+                DrawJumperBeveledSphereIcon(canvas, rect, palette, alpha);
+                break;
+            case JumperStyle.FacetedGem:
+                DrawJumperFacetedGemIcon(canvas, rect, palette, alpha);
+                break;
+        }
+    }
+
+    private static void DrawJumperGlossyOrbIcon(CanvasItem canvas, Rect2 rect, PlayerPalette palette, float alpha)
     {
         var center = rect.GetCenter();
-        float radius = rect.Size.X * 0.46f;
-        var lightOff = new Vector2(-radius * 0.15f, -radius * 0.15f);
+        float r = rect.Size.X * 0.34f;
+        var lightOff = new Vector2(-r * 0.18f, -r * 0.18f);
 
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < 10; i++)
         {
-            float t = (float)i / 8;
-            float r = radius * (1f - t);
-            var ringColor = t < 0.4f
+            float t = (float)i / 10;
+            float ringR = r * (1f - t);
+            Color c;
+            if (t < 0.3f) c = palette.JumperDark.Lerp(palette.JumperCore, t / 0.3f);
+            else if (t < 0.6f) c = palette.JumperCore.Lerp(palette.JumperBright, (t - 0.3f) / 0.3f);
+            else c = palette.JumperBright.Lerp(new Color(1f, 1f, 0.95f), (t - 0.6f) / 0.4f);
+            canvas.DrawCircle(center + lightOff * t * 0.6f, ringR, Fade(c, alpha));
+        }
+        canvas.DrawCircle(center + lightOff * 0.55f, r * 0.22f, Colors.White with { A = 0.55f * alpha });
+        canvas.DrawCircle(center + lightOff * 0.44f, r * 0.1f, Colors.White with { A = 0.75f * alpha });
+    }
+
+    private static void DrawJumperBronzeBallIcon(CanvasItem canvas, Rect2 rect, PlayerPalette palette, float alpha)
+    {
+        var center = rect.GetCenter();
+        float r = rect.Size.X * 0.33f;
+        var lightOff = new Vector2(-r * 0.15f, -r * 0.18f);
+        var rimColor = new Color(0.25f, 0.15f, 0.06f);
+        var midColor = new Color(0.6f, 0.4f, 0.2f);
+        var brightColor = new Color(0.95f, 0.85f, 0.65f);
+
+        canvas.DrawCircle(center, r + 1f, Fade(new Color(0.15f, 0.08f, 0.02f, 0.7f), alpha));
+        for (int i = 0; i < 10; i++)
+        {
+            float t = (float)i / 10;
+            float ringR = r * (1f - t);
+            var c = t < 0.5f ? rimColor.Lerp(midColor, t / 0.5f) : midColor.Lerp(brightColor, (t - 0.5f) / 0.5f);
+            canvas.DrawCircle(center + lightOff * t * 0.5f, ringR, Fade(c, alpha));
+        }
+        canvas.DrawCircle(center + lightOff * 0.5f, r * 0.16f, Colors.White with { A = 0.35f * alpha });
+    }
+
+    private static void DrawJumperBeveledSphereIcon(CanvasItem canvas, Rect2 rect, PlayerPalette palette, float alpha)
+    {
+        var center = rect.GetCenter();
+        float r = rect.Size.X * 0.46f;
+        var lightOff = new Vector2(-r * 0.15f, -r * 0.2f);
+
+        canvas.DrawCircle(center + new Vector2(0.5f, 1f), r, Fade(new Color(0.2f, 0.07f, 0f, 0.6f), alpha));
+        canvas.DrawCircle(center, r, Fade(palette.JumperDark.Darkened(0.4f), alpha));
+
+        for (int i = 0; i < 12; i++)
+        {
+            float t = (float)i / 12;
+            float ringR = (r - 2f) * (1f - t);
+            Color c;
+            if (t < 0.35f) c = palette.JumperDark.Lerp(palette.JumperCore, t / 0.35f);
+            else if (t < 0.65f) c = palette.JumperCore.Lerp(palette.JumperBright, (t - 0.35f) / 0.3f);
+            else c = palette.JumperBright.Lerp(new Color(1f, 0.98f, 0.9f), (t - 0.65f) / 0.35f);
+            canvas.DrawCircle(center + lightOff * t * 0.6f, ringR, Fade(c, alpha));
+        }
+        canvas.DrawCircle(center + lightOff * 0.4f, r * 0.4f, Colors.White with { A = 0.12f * alpha });
+        canvas.DrawCircle(center + lightOff * 0.55f, r * 0.18f, Colors.White with { A = 0.45f * alpha });
+        canvas.DrawCircle(center + lightOff * 0.44f, r * 0.08f, Colors.White with { A = 0.65f * alpha });
+    }
+
+    private static void DrawJumperFacetedGemIcon(CanvasItem canvas, Rect2 rect, PlayerPalette palette, float alpha)
+    {
+        var center = rect.GetCenter();
+        float r = rect.Size.X * 0.46f;
+        var lightOff = new Vector2(-r * 0.12f, -r * 0.15f);
+
+        canvas.DrawCircle(center + new Vector2(0.5f, 0.8f), r, Fade(palette.JumperDark.Darkened(0.5f) with { A = 0.5f }, alpha));
+
+        for (int i = 0; i < 12; i++)
+        {
+            float t = (float)i / 12;
+            float ringR = r * (1f - t);
+            Color c = t < 0.4f
                 ? palette.JumperDark.Lerp(palette.JumperCore, t / 0.4f)
-                : palette.JumperCore.Lerp(palette.JumperBright, (t - 0.4f) / 0.6f);
-            canvas.DrawCircle(center + lightOff * t * 0.5f, r, Fade(ringColor, alpha));
+                : palette.JumperCore.Lerp(palette.JumperBright, (t - 0.4f) / 0.6f * 0.7f);
+            canvas.DrawCircle(center + lightOff * t * 0.5f, ringR, Fade(c, alpha));
         }
 
-        canvas.DrawCircle(center + lightOff * 0.6f, radius * 0.18f, Colors.White with { A = 0.45f * alpha });
+        var top = center + new Vector2(0, -r * 0.92f);
+        var left = center + new Vector2(-r * 0.88f, r * 0.15f);
+        var right = center + new Vector2(r * 0.88f, r * 0.15f);
+        var bot = center + new Vector2(0, r * 0.92f);
+        var midL = center + new Vector2(-r * 0.55f, -r * 0.35f);
+        var midR = center + new Vector2(r * 0.55f, -r * 0.35f);
+
+        canvas.DrawColoredPolygon(new[] { top, midL, midR }, Colors.White with { A = 0.14f * alpha });
+        canvas.DrawColoredPolygon(new[] { top, midL, left }, Colors.White with { A = 0.07f * alpha });
+
+        var facetLight = Colors.White with { A = 0.25f * alpha };
+        var facetDark = Colors.Black with { A = 0.18f * alpha };
+        canvas.DrawLine(top, midL, facetLight, 1.2f, true);
+        canvas.DrawLine(top, midR, facetLight, 1.2f, true);
+        canvas.DrawLine(midL, midR, Colors.White with { A = 0.12f * alpha }, 1f, true);
+        canvas.DrawLine(midL, left, facetDark, 1f, true);
+        canvas.DrawLine(midR, right, facetDark, 1f, true);
+        canvas.DrawLine(left, bot, facetDark, 0.8f, true);
+        canvas.DrawLine(right, bot, facetDark, 0.8f, true);
+
+        var specPos = center + new Vector2(-r * 0.12f, -r * 0.42f);
+        canvas.DrawCircle(specPos, r * 0.14f, Colors.White with { A = 0.4f * alpha });
+        canvas.DrawArc(center, r, 0f, Mathf.Tau, 32, Fade(palette.JumperDark.Darkened(0.3f) with { A = 0.45f }, alpha), 1.2f, true);
     }
 
     private static void DrawNuggetDiamond(CanvasItem canvas, Rect2 rect, float alpha)

@@ -32,6 +32,10 @@ public static class SpriteFactory
             var palette = config.GetPalette(playerId);
             foreach (var type in types)
             {
+                // Circle-based jumper styles don't use a square pre-rendered sprite
+                if (type == BlockType.Jumper && JumperStyleToggle.Current is JumperStyle.BeveledSphere or JumperStyle.FacetedGem)
+                    continue;
+
                 var baseColor = GetBaseColor(type, palette);
                 var image = CreateBlockImage(baseColor, type, palette);
                 var tex = ImageTexture.CreateFromImage(image);
@@ -46,6 +50,7 @@ public static class SpriteFactory
             _cache[(BlockType.Nugget, -1)] = ImageTexture.CreateFromImage(nuggetImage);
         }
     }
+
 
     /// <summary>
     /// Get sprite for a block type + player. Returns custom sprite if available,
