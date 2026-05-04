@@ -62,8 +62,9 @@ public static class WardenSystem
     }
 
     /// <summary>
-    /// Magnet Pull: a fully rooted Warden pulls all uprooted enemy blocks
-    /// within Chebyshev radius toward itself. Cooldown applies.
+    /// Magnet Pull: a fully rooted Warden pulls all enemy mobile blocks
+    /// within Chebyshev radius as close as possible in a single action.
+    /// Diagonal movement is allowed. Cooldown applies.
     /// </summary>
     public static bool MagnetPull(GameState state, Block warden)
     {
@@ -83,23 +84,38 @@ public static class WardenSystem
 
         foreach (var target in targets)
         {
-            // Pull one cell toward the Warden
-            var dx = warden.Pos.X - target.Pos.X;
-            var dy = warden.Pos.Y - target.Pos.Y;
+            var originPos = target.Pos;
+            var current = target.Pos;
 
-            // Move one step in the dominant axis (or orthogonal if tied)
-            GridPos step;
-            if (Math.Abs(dx) >= Math.Abs(dy))
-                step = new GridPos(Math.Sign(dx), 0);
-            else
-                step = new GridPos(0, Math.Sign(dy));
-
-            var newPos = target.Pos + step;
-            if (state.Grid.InBounds(newPos) && state.Grid[newPos].IsPassable)
+            // Step toward warden as far as possible (diagonal allowed)
+            while (true)
             {
-                state.TryMoveBlock(target, newPos);
-                pulledAny = true;
+                var dx = warden.Pos.X - current.X;
+                var dy = warden.Pos.Y - current.Y;
+                if (dx == 0 && dy == 0) break;
+
+                var step = new GridPos(Math.Sign(dx), Math.Sign(dy));
+                var next = current + step;
+
+                if (!state.Grid.InBounds(next) || !state.Grid[next].IsPassable || state.Grid[next].BlockId.HasValue)
+                    break;
+
+                current = next;
             }
+
+            if (current == originPos) continue;
+
+            // Move directly from origin to final position (single move, no intermediate events)
+            if (state.Grid.InBounds(originPos) && state.Grid[originPos].BlockId == target.Id)
+                state.Grid[originPos].BlockId = null;
+
+            target.PrevPos = originPos;
+            target.Pos = current;
+            target.WasPulledThisTick = true;
+            state.Grid[current].BlockId = target.Id;
+
+            state.VisualEvents.Add(new VisualEvent(VisualEventType.BlockMoved, current, target.PlayerId, BlockId: target.Id));
+            pulledAny = true;
         }
 
         if (pulledAny)

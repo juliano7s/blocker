@@ -38,6 +38,7 @@ public class Block
     public Direction? PushDirection { get; set; }
     public bool WasPushedThisTick { get; set; }
     public bool WasJumpedThisTick { get; set; }
+    public bool WasPulledThisTick { get; set; }
 
     // Jumper state
     public bool HasJumpReset { get; set; }

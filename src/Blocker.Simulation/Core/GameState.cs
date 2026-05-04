@@ -654,6 +654,7 @@ public class GameState
         {
             block.WasPushedThisTick = false;
             block.WasJumpedThisTick = false;
+            block.WasPulledThisTick = false;
         }
 
         // Step 2: Formations — root/uproot progress, nest detection, supply formations
@@ -694,7 +695,7 @@ public class GameState
         // Step 11: Snap prevPos for interpolation (except pushed or jumped blocks)
         foreach (var block in Blocks)
         {
-            if (!block.WasPushedThisTick && !block.WasJumpedThisTick)
+            if (!block.WasPushedThisTick && !block.WasJumpedThisTick && !block.WasPulledThisTick)
                 block.PrevPos = block.Pos;
         }
 

@@ -106,6 +106,7 @@ public partial class GridRenderer : Node2D
 	private readonly HashSet<int> _liveIdSet = new();
 	private readonly List<int> _deadIds = new();
 	private readonly HashSet<int> _nuggetBlockIds = new();
+	private readonly HashSet<int> _pulledBlockIds = new();
 
 	// Dying blocks: heat-up animation before explosion into tendrils
 	private enum DeathCause { Killed, Consumed }
@@ -371,7 +372,16 @@ public partial class GridRenderer : Node2D
 				}
 				else
 				{
-					float speed = CellSize / (block.EffectiveMoveInterval * _tickInterval);
+					if (block.WasPulledThisTick)
+						_pulledBlockIds.Add(block.Id);
+					else if (vp.DistanceSquaredTo(target) < 1f)
+						_pulledBlockIds.Remove(block.Id);
+
+					float speed;
+					if (_pulledBlockIds.Contains(block.Id))
+						speed = CellSize / (1f * _tickInterval);
+					else
+						speed = CellSize / (block.EffectiveMoveInterval * _tickInterval);
 					_visualPositions[block.Id] = vp.MoveToward(target, speed * dt);
 				}
 

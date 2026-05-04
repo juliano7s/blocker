@@ -148,7 +148,7 @@ public class WardenTests
         var result = WardenSystem.MagnetPull(state, warden);
 
         Assert.True(result);
-        Assert.Equal(new GridPos(9, 7), enemy.Pos); // Pulled 1 cell toward warden
+        Assert.Equal(new GridPos(8, 7), enemy.Pos); // Pulled all the way to adjacent cell
         Assert.Equal(Constants.WardenPullCooldown, warden.Cooldown);
     }
 
@@ -224,6 +224,56 @@ public class WardenTests
 
         Assert.False(result);
         Assert.Equal(new GridPos(9, 7), wall.Pos);
+    }
+
+    [Fact]
+    public void MagnetPull_PullsDiagonally()
+    {
+        var state = CreateState();
+        var warden = state.AddBlock(BlockType.Warden, 0, new GridPos(7, 7));
+        warden.State = BlockState.Rooted;
+        warden.RootProgress = Constants.RootTicks;
+
+        var enemy = state.AddBlock(BlockType.Builder, 1, new GridPos(10, 10)); // 3 cells diagonal
+
+        var result = WardenSystem.MagnetPull(state, warden);
+
+        Assert.True(result);
+        Assert.Equal(new GridPos(8, 8), enemy.Pos); // Pulled diagonally to adjacent
+    }
+
+    [Fact]
+    public void MagnetPull_StopsAtObstacle()
+    {
+        var state = CreateState();
+        var warden = state.AddBlock(BlockType.Warden, 0, new GridPos(7, 7));
+        warden.State = BlockState.Rooted;
+        warden.RootProgress = Constants.RootTicks;
+
+        // Place a wall blocking the path at (9, 7)
+        state.AddBlock(BlockType.Wall, 1, new GridPos(9, 7));
+
+        var enemy = state.AddBlock(BlockType.Builder, 1, new GridPos(11, 7)); // 4 cells right
+
+        var result = WardenSystem.MagnetPull(state, warden);
+
+        Assert.True(result);
+        Assert.Equal(new GridPos(10, 7), enemy.Pos); // Stopped one cell before wall
+    }
+
+    [Fact]
+    public void MagnetPull_SetsPulledFlag()
+    {
+        var state = CreateState();
+        var warden = state.AddBlock(BlockType.Warden, 0, new GridPos(7, 7));
+        warden.State = BlockState.Rooted;
+        warden.RootProgress = Constants.RootTicks;
+
+        var enemy = state.AddBlock(BlockType.Builder, 1, new GridPos(10, 7));
+
+        WardenSystem.MagnetPull(state, warden);
+
+        Assert.True(enemy.WasPulledThisTick);
     }
 
     [Fact]
