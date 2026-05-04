@@ -38,6 +38,7 @@ public partial class GameManager : Node2D
 	private MultiplayerSessionState? _launchSession;
 	private LockstepCoordinator? _coord;
 	private bool _gameOverShown;
+	private int _lastAlertTick;
 
 	// MP rematch / scene-handoff handler — held as a field so _ExitTree can
 	// detach it from the long-lived RelayClient when the scene is freed.
@@ -138,6 +139,7 @@ public partial class GameManager : Node2D
 		_hudBar.SetGameState(gameState);
 		_hudBar.SetConfig(Config);
 		_hudBar.MinimapCameraJump += pos => _camera.JumpTo(pos);
+		_hudBar.MinimapMoveCommand += (pos, queue) => _selectionManager.HandleRightClick(pos, queue);
 		_hudBar.UnitClicked += (blockId, shiftHeld) =>
 		{
 			if (shiftHeld)
@@ -218,6 +220,7 @@ public partial class GameManager : Node2D
 		_hudBar.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_messageArea.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_messageArea.ProcessVisualEvents();
+		ProcessMinimapAlerts();
 		_effectManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_audioManager.SetControllingPlayer(_selectionManager.ControllingPlayer);
 		_gridRenderer.SetControllingPlayer(_selectionManager.ControllingPlayer);
@@ -261,6 +264,68 @@ public partial class GameManager : Node2D
 			if (winner is int t)
 				ShowGameOverOverlayDeferred(t);
 		}
+	}
+
+	private void ProcessMinimapAlerts()
+	{
+		if (_gameState == null) return;
+		if (_gameState.TickNumber == _lastAlertTick) return;
+		_lastAlertTick = _gameState.TickNumber;
+
+		int localTeam = _gameState.GetTeamFor(_selectionManager.ControllingPlayer);
+		bool playedSound = false;
+		HashSet<int>? alertedBlockIds = null;
+
+		foreach (var evt in _gameState.VisualEvents)
+		{
+			string? message = null;
+
+			switch (evt.Type)
+			{
+				// BlockDied and SurroundTrapped carry the victim's PlayerId
+				case VisualEventType.BlockDied:
+					if (evt.PlayerId.HasValue && _gameState.GetTeamFor(evt.PlayerId.Value) == localTeam)
+						message = $"Unit lost at ({evt.Position.X}, {evt.Position.Y})";
+					break;
+				case VisualEventType.SurroundTrapped:
+					if (evt.PlayerId.HasValue && _gameState.GetTeamFor(evt.PlayerId.Value) == localTeam)
+						message = $"Unit trapped at ({evt.Position.X}, {evt.Position.Y})";
+					break;
+
+				// StunRayHit and SurroundKilled carry the attacker's PlayerId — check BlockId for victim
+				case VisualEventType.StunRayHit:
+					if (evt.BlockId.HasValue)
+					{
+						var victim = _gameState.GetBlock(evt.BlockId.Value);
+						if (victim != null && _gameState.GetTeamFor(victim.PlayerId) == localTeam)
+							message = $"Unit stunned at ({evt.Position.X}, {evt.Position.Y})";
+					}
+					break;
+				// SurroundKilled carries the killer's PlayerId — alert if WE are not the killer
+				// (the victim gets a BlockDied event too, so this is supplementary)
+				case VisualEventType.SurroundKilled:
+					if (evt.PlayerId.HasValue && _gameState.GetTeamFor(evt.PlayerId.Value) != localTeam)
+						message = $"Unit surrounded at ({evt.Position.X}, {evt.Position.Y})";
+					break;
+			}
+
+			if (message != null)
+			{
+				// Deduplicate: one alert per block per tick
+				if (evt.BlockId.HasValue)
+				{
+					alertedBlockIds ??= new HashSet<int>();
+					if (!alertedBlockIds.Add(evt.BlockId.Value))
+						continue;
+				}
+				_hudBar.AddMinimapAlert(evt.Position);
+				_messageArea.AddAlert(message);
+				playedSound = true;
+			}
+		}
+
+		if (playedSound)
+			_audioManager.PlayUnderAttack();
 	}
 
 	private void ShowGameOverOverlayDeferred(int winningTeam)

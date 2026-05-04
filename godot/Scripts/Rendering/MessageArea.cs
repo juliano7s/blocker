@@ -57,7 +57,7 @@ public partial class MessageArea : CanvasLayer
         _chatInput.AddThemeStyleboxOverride("normal", inputStyle);
         _chatInput.AddThemeStyleboxOverride("focus", inputStyle);
         _chatInput.AddThemeColorOverride("font_color", HudStyles.TextPrimary);
-        _chatInput.AddThemeFontSizeOverride("font_size", HudStyles.FontSizeSmall);
+        _chatInput.AddThemeFontSizeOverride("font_size", HudStyles.FontSizeNormal);
 
         _chatInput.AnchorLeft = 0.5f;
         _chatInput.AnchorRight = 0.5f;
@@ -287,8 +287,8 @@ public partial class MessageArea : CanvasLayer
                 int sec = totalSec % 60;
                 string ts = $"[{min:D2}:{sec:D2}]";
                 DrawString(font, new Vector2(x, y), ts, HorizontalAlignment.Left,
-                    -1, HudStyles.FontSizeSmall, TimestampColor with { A = alpha });
-                x += font.GetStringSize(ts, HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall).X + 4f;
+                    -1, HudStyles.FontSizeNormal, TimestampColor with { A = alpha });
+                x += font.GetStringSize(ts, HorizontalAlignment.Left, -1, HudStyles.FontSizeNormal).X + 4f;
 
                 // Player name (for chat)
                 if (msg.PlayerName != null && msg.PlayerColor.HasValue)
@@ -297,8 +297,8 @@ public partial class MessageArea : CanvasLayer
                         ? $"[{msg.PlayerName}]: "
                         : $"[{msg.PlayerName}] ";
                     DrawString(font, new Vector2(x, y), prefix, HorizontalAlignment.Left,
-                        -1, HudStyles.FontSizeSmall, msg.PlayerColor.Value with { A = alpha });
-                    x += font.GetStringSize(prefix, HorizontalAlignment.Left, -1, HudStyles.FontSizeSmall).X;
+                        -1, HudStyles.FontSizeNormal, msg.PlayerColor.Value with { A = alpha });
+                    x += font.GetStringSize(prefix, HorizontalAlignment.Left, -1, HudStyles.FontSizeNormal).X;
                 }
 
                 // Message text
@@ -310,7 +310,7 @@ public partial class MessageArea : CanvasLayer
                     _ => SystemColor,
                 };
                 DrawString(font, new Vector2(x, y), msg.Text, HorizontalAlignment.Left,
-                    -1, HudStyles.FontSizeSmall, textColor with { A = alpha });
+                    -1, HudStyles.FontSizeNormal, textColor with { A = alpha });
             }
         }
 

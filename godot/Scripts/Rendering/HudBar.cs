@@ -18,6 +18,7 @@ public partial class HudBar : CanvasLayer
     private CommandCard _commandCard = null!;
 
     [Signal] public delegate void MinimapCameraJumpEventHandler(Vector2 worldPos);
+    [Signal] public delegate void MinimapMoveCommandEventHandler(Vector2 worldPos, bool queue);
     [Signal] public delegate void ControlGroupClickedEventHandler(int groupIndex, bool ctrlHeld);
     [Signal] public delegate void UnitClickedEventHandler(int blockId, bool shiftHeld);
     [Signal] public delegate void CommandClickedEventHandler(CommandAction commandKey);
@@ -45,6 +46,7 @@ public partial class HudBar : CanvasLayer
         };
         _minimap.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         _minimap.CameraJumpRequested += pos => EmitSignal(SignalName.MinimapCameraJump, pos);
+        _minimap.MoveCommandRequested += (pos, queue) => EmitSignal(SignalName.MinimapMoveCommand, pos, queue);
         leftAnchor.AddChild(_minimap);
 
         // === Command card (bottom-right, independent height) ===
@@ -99,6 +101,8 @@ public partial class HudBar : CanvasLayer
     {
         _minimap.SetCameraView(worldPos, viewSize);
     }
+
+    public void AddMinimapAlert(GridPos pos) => _minimap.AddAlert(pos);
 
     public void SetSelection(IReadOnlyList<Block>? blocks)
     {

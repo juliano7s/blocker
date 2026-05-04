@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Blocker.Simulation.Core;
 
 public enum RayType
@@ -35,6 +37,9 @@ public class Ray
 
     /// <summary>Whether this ray is part of a radial explosion (self-destruct).</summary>
     public bool IsExplosion { get; init; }
+
+    /// <summary>Block IDs this ray has already hit (for penetrating rays).</summary>
+    public HashSet<int>? HitBlockIds { get; set; }
 
     /// <summary>Whether the ray has hit something and is done.</summary>
     public bool IsExpired { get; set; }

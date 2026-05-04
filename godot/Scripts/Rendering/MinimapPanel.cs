@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Blocker.Game.Config;
 using Blocker.Simulation.Blocks;
 using Blocker.Simulation.Core;
@@ -14,6 +15,7 @@ namespace Blocker.Game.Rendering;
 public partial class MinimapPanel : Control
 {
     [Signal] public delegate void CameraJumpRequestedEventHandler(Vector2 worldPos);
+    [Signal] public delegate void MoveCommandRequestedEventHandler(Vector2 worldPos, bool queue);
 
     private GameState? _gameState;
     private GameConfig _config = GameConfig.CreateDefault();
@@ -27,11 +29,27 @@ public partial class MinimapPanel : Control
 
     private static readonly Color ViewportRectColor = new(1f, 1f, 1f, 0.7f);
     private static readonly Color TerrainColor = new(0.3f, 0.3f, 0.35f);
+    private static readonly Color AlertColor = new(1f, 0.2f, 0.2f);
 
     private int _frameCounter;
     private const int RedrawEveryNFrames = 3;
 
     private VisibilityMap? _localVisibility;
+
+    private struct MinimapAlert
+    {
+        public GridPos Pos;
+        public float TimeLeft;
+    }
+
+    private const float AlertDuration = 4.5f;
+    private const int AlertRingCount = 3;
+    private const float AlertRingDelay = 0.25f;
+    private const float AlertRingLifetime = 1.2f;
+    private const float AlertMinSize = 18f;
+    private const float AlertMaxSize = 64f;
+    private const float AlertBlinkRate = 5f;
+    private readonly List<MinimapAlert> _alerts = new();
 
     public void SetGameState(GameState state) => _gameState = state;
     public void SetConfig(GameConfig config) => _config = config;
@@ -48,10 +66,26 @@ public partial class MinimapPanel : Control
         ClipContents = true;
     }
 
+    public void AddAlert(GridPos pos)
+    {
+        _alerts.Add(new MinimapAlert { Pos = pos, TimeLeft = AlertDuration });
+    }
+
     public override void _Process(double delta)
     {
+        float dt = (float)delta;
+        for (int i = _alerts.Count - 1; i >= 0; i--)
+        {
+            var a = _alerts[i];
+            a.TimeLeft -= dt;
+            if (a.TimeLeft <= 0)
+                _alerts.RemoveAt(i);
+            else
+                _alerts[i] = a;
+        }
+
         _frameCounter++;
-        if (_frameCounter % RedrawEveryNFrames == 0)
+        if (_alerts.Count > 0 || _frameCounter % RedrawEveryNFrames == 0)
             QueueRedraw();
     }
 
@@ -180,14 +214,48 @@ public partial class MinimapPanel : Control
             camH * scale);
 
         DrawRect(vpRect, ViewportRectColor, false, 1.0f);
+
+        // Draw alerts: sequence of expanding unfilled squares with blink
+        float time = (float)Time.GetTicksMsec() / 1000f;
+        float blink = (Mathf.Sin(time * AlertBlinkRate * Mathf.Tau) + 1f) * 0.5f;
+        float blinkBoost = 0.5f + blink * 0.5f; // oscillates 0.5..1.0
+
+        foreach (var alert in _alerts)
+        {
+            float elapsed = AlertDuration - alert.TimeLeft;
+            float ax = gridOffX + (alert.Pos.X + 0.5f) * scale;
+            float ay = gridOffY + (alert.Pos.Y + 0.5f) * scale;
+
+            for (int ring = 0; ring < AlertRingCount; ring++)
+            {
+                float ringStart = ring * AlertRingDelay;
+                float ringElapsed = elapsed - ringStart;
+                if (ringElapsed < 0) continue;
+
+                float t = (ringElapsed % AlertRingLifetime) / AlertRingLifetime;
+                float size = Mathf.Lerp(AlertMinSize, AlertMaxSize, t);
+                float alpha = Mathf.Lerp(1f, 0f, t) * blinkBoost;
+
+                var color = new Color(AlertColor, alpha);
+                DrawRect(new Rect2(ax - size * 0.5f, ay - size * 0.5f, size, size), color, false, 2.5f);
+            }
+        }
     }
 
     public override void _GuiInput(InputEvent @event)
     {
-        if (@event is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Left)
+        if (@event is InputEventMouseButton mb && mb.Pressed)
         {
-            HandleClick(mb.Position);
-            AcceptEvent();
+            if (mb.ButtonIndex == MouseButton.Left)
+            {
+                HandleClick(mb.Position);
+                AcceptEvent();
+            }
+            else if (mb.ButtonIndex == MouseButton.Right)
+            {
+                HandleRightClick(mb.Position, mb.ShiftPressed);
+                AcceptEvent();
+            }
         }
         else if (@event is InputEventMouseMotion motion
                  && Godot.Input.IsMouseButtonPressed(MouseButton.Left))
@@ -197,19 +265,25 @@ public partial class MinimapPanel : Control
         }
     }
 
+    private Vector2 LocalToWorld(Vector2 localPos)
+    {
+        var (scale, gridOffX, gridOffY) = ComputeLayout();
+        float gridX = (localPos.X - gridOffX) / scale;
+        float gridY = (localPos.Y - gridOffY) / scale;
+        float worldX = gridX * GridRenderer.CellSize + GridRenderer.GridPadding;
+        float worldY = gridY * GridRenderer.CellSize + GridRenderer.GridPadding;
+        return new Vector2(worldX, worldY);
+    }
+
     private void HandleClick(Vector2 localPos)
     {
         if (_gameState == null) return;
+        EmitSignal(SignalName.CameraJumpRequested, LocalToWorld(localPos));
+    }
 
-        var (scale, gridOffX, gridOffY) = ComputeLayout();
-
-        // Convert click to grid coords (can be negative or > grid size in margin area)
-        float gridX = (localPos.X - gridOffX) / scale;
-        float gridY = (localPos.Y - gridOffY) / scale;
-
-        float worldX = gridX * GridRenderer.CellSize + GridRenderer.GridPadding;
-        float worldY = gridY * GridRenderer.CellSize + GridRenderer.GridPadding;
-
-        EmitSignal(SignalName.CameraJumpRequested, new Vector2(worldX, worldY));
+    private void HandleRightClick(Vector2 localPos, bool queue)
+    {
+        if (_gameState == null) return;
+        EmitSignal(SignalName.MoveCommandRequested, LocalToWorld(localPos), queue);
     }
 }

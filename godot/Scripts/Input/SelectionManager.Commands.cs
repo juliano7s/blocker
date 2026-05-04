@@ -64,7 +64,7 @@ public partial class SelectionManager
             }
     }
 
-    private void HandleRightClick(Vector2 worldPos, bool queue = false)
+    internal void HandleRightClick(Vector2 worldPos, bool queue = false)
     {
         if (_state.SelectedBlocks.Count == 0) return;
 

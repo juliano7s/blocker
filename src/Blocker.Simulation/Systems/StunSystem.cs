@@ -210,7 +210,11 @@ public static class StunSystem
                     return true; // Ray stops at walls
                 }
 
-                // Stun the target but keep going
+                // Stun the target but keep going — skip if already hit by this ray
+                ray.HitBlockIds ??= new HashSet<int>();
+                if (!ray.HitBlockIds.Add(block.Id))
+                    return false; // Already hit this block, don't re-stun
+
                 block.StunTimer = Constants.StunDuration;
                 state.VisualEvents.Add(new VisualEvent(
                     VisualEventType.StunRayHit, ray.HeadPos, ray.PlayerId, BlockId: block.Id));

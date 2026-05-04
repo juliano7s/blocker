@@ -263,6 +263,17 @@ public partial class AudioManager : Node
         Play(localPlayerWon ? Config?.Win : Config?.Loss);
     }
 
+    private double _lastUnderAttackTime;
+    private const double UnderAttackCooldown = 2.0;
+
+    public void PlayUnderAttack()
+    {
+        double now = Time.GetTicksMsec() / 1000.0;
+        if (now - _lastUnderAttackTime < UnderAttackCooldown) return;
+        _lastUnderAttackTime = now;
+        Play(Config?.UnderAttack);
+    }
+
     private void Play(AudioStream? stream)
     {
         if (stream == null) return;

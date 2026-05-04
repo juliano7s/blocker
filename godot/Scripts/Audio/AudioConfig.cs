@@ -108,6 +108,9 @@ public partial class AudioConfig : Resource
     [Export] public AudioStream? UIUnready { get; set; }
     [Export] public AudioStream? UISurrender { get; set; }
 
+    [ExportGroup("Alerts")]
+    [Export] public AudioStream? UnderAttack { get; set; }
+
     [ExportGroup("Game State")]
     [Export] public AudioStream? PlayerEliminated { get; set; }
     [Export] public AudioStream? PopCapWarning { get; set; }
